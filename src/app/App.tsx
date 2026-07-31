@@ -1,184 +1,307 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
-  LayoutDashboard, FileText, Users, Settings, LogOut,
-  Plus, Search, Eye, Trash2, Download, Send,
-  CheckCircle, Clock, XCircle, Mail, MessageSquare,
+  FileText, LogOut, Plus, Search, Eye, Trash2, Download,
+  Send, CheckCircle, Clock, XCircle, Mail, MessageSquare,
   Pen, ChevronRight, ChevronLeft, Bell, Menu, X,
-  Calendar, Shield, TrendingUp, FileSignature, UserCheck,
-  Activity, Lock, User, Phone, Hash, AlertCircle,
-  Printer, RefreshCw, Filter, ChevronDown, Building2,
-  Stethoscope, ClipboardList, BarChart3, ArrowUpRight,
-  Check, Loader2, Edit3
+  Shield, Users, LayoutDashboard,
+  Check, Phone, Stethoscope,
+  Package, Syringe, Zap, Droplets, BarChart3,
+  Printer, ThumbsUp, ThumbsDown, ClipboardList,
+  BookOpen, Activity, MapPin, AtSign, UserCheck,
+  AlertTriangle, Info
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from "recharts";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── CONSTANTES IPS ──────────────────────────────────────────────────────────
+const IPS = {
+  nombre: "Med&Fis",
+  nit: "901102930",
+  medico: "Dr. Rafael Eduardo Marrero Padilla",
+  rm: "RM 3880525",
+  ciudad: "Colombia",
+};
 
-type Rol = "ADMINISTRADOR" | "MÉDICO" | "RECEPCIÓN";
-type EstadoConsentimiento = "PENDIENTE" | "FIRMADO" | "ANULADO";
-type AppPage =
-  | "login"
-  | "dashboard"
-  | "consentimientos"
-  | "nuevo-consentimiento"
-  | "firma"
-  | "pacientes"
-  | "configuracion";
+// ─── TIPOS ───────────────────────────────────────────────────────────────────
+type AppPage = "login" | "dashboard" | "form" | "historial";
+type TipoConsent = "escleroterapia" | "sueroterapia" | "laser" | "paquete";
+type EstadoConsent = "FIRMADO" | "PENDIENTE" | "ANULADO";
 
-interface UsuarioSistema {
-  id: string;
+interface Usuario { id: string; nombre: string; email: string; rol: string; password: string; }
+
+interface DatosPaciente {
   nombre: string;
-  email: string;
-  rol: Rol;
-  password: string;
-  especialidad?: string;
-}
-
-interface Paciente {
-  id: string;
-  tipo_doc: string;
   documento: string;
-  nombres: string;
-  apellidos: string;
-  fecha_nacimiento: string;
+  tipoDoc: string;
   telefono: string;
   email: string;
   direccion: string;
+  fechaNacimiento: string;
+  fecha: string;
 }
 
-interface Consentimiento {
+interface DatosVitales {
+  oximetria: string;
+  tension: string;
+  peso: string;
+  talla: string;
+  frecuenciaCardiaca: string;
+  temperatura: string;
+}
+
+interface DatosEscleroterapia {
+  paciente: DatosPaciente;
+  cuestionario: Record<string, "Si" | "No" | "">;
+  vitales: DatosVitales;
+  firmaConsentimiento: string;
+  firmaMedico: string;
+  consentido: boolean | null;
+  observacionesEnfermera: string;
+}
+
+interface DatosSueroterapia {
+  paciente: DatosPaciente;
+  vitales: DatosVitales;
+  dosis_vitC: string;
+  dosis_compB: string;
+  trazabilidad: {
+    nacl: string; vitC: string; compB: string;
+    jeringa: string; pericraneal: string; macrogotero: string;
+  };
+  firmaConsentimiento: string;
+  firmaResponsable: string;
+  consentido: boolean | null;
+  observacionesEnfermera: string;
+}
+
+interface LaserRow {
+  fototipo: string; pieza: string; modo: string;
+  frecuencia: string; fluencia: string; energia: string;
+  area: string; pases: string;
+}
+
+interface DatosLaser {
+  paciente: DatosPaciente;
+  vitales: DatosVitales;
+  parametros: LaserRow[];
+  firmaConsentimiento: string;
+  firmaMedico: string;
+  consentido: boolean | null;
+  observacionesEnfermera: string;
+}
+
+interface ConsentRecord {
   id: string;
+  tipo: TipoConsent;
   radicado: string;
-  paciente: Paciente;
-  tipo: string;
-  medico: string;
   fecha: string;
-  estado: EstadoConsentimiento;
-  procedimiento: string;
-  diagnostico: string;
-  observaciones: string;
+  pacienteNombre: string;
+  pacienteDoc: string;
+  pacienteTel: string;
+  estado: EstadoConsent;
   enviado_email: boolean;
   enviado_whatsapp: boolean;
-  firma_url?: string;
+  pendienteMedico: boolean;
+  datos: DatosEscleroterapia | DatosSueroterapia | DatosLaser | ConsentRecord[];
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const USUARIOS: UsuarioSistema[] = [
-  { id: "1", nombre: "Dr. Carlos Mendoza Ruiz", email: "carlos.mendoza@ips.com", rol: "MÉDICO", password: "medico123", especialidad: "Cirugía General" },
-  { id: "2", nombre: "Ana Restrepo Valencia", email: "ana.restrepo@ips.com", rol: "RECEPCIÓN", password: "recepcion123" },
-  { id: "3", nombre: "Administrador IPS", email: "admin@ips.com", rol: "ADMINISTRADOR", password: "admin123" },
-  { id: "4", nombre: "Dra. Paola Suárez Muñoz", email: "paola.suarez@ips.com", rol: "MÉDICO", password: "medico456", especialidad: "Anestesiología" },
+// ─── USUARIOS MOCK ────────────────────────────────────────────────────────────
+const USUARIOS: Usuario[] = [
+  { id: "1", nombre: "Dr. Rafael Eduardo Marrero Padilla", email: "rafael.marrero@medfis.com", rol: "MÉDICO", password: "medico123" },
+  { id: "2", nombre: "Administrador Med&Fis", email: "admin@medfis.com", rol: "ADMINISTRADOR", password: "admin123" },
+  { id: "3", nombre: "Auxiliar Recepción", email: "auxiliar@medfis.com", rol: "AUXILIAR", password: "auxiliar123" },
 ];
 
-const PACIENTES_INIT: Paciente[] = [
-  { id: "1", tipo_doc: "CC", documento: "1023456789", nombres: "María Isabel", apellidos: "García Torres", fecha_nacimiento: "1985-03-15", telefono: "3001234567", email: "maria.garcia@gmail.com", direccion: "Cra 45 #23-10, Medellín" },
-  { id: "2", tipo_doc: "CC", documento: "1034567890", nombres: "Juan Pablo", apellidos: "Rodríguez Silva", fecha_nacimiento: "1978-07-22", telefono: "3112345678", email: "juan.rodriguez@gmail.com", direccion: "Cll 80 #12-45, Bogotá" },
-  { id: "3", tipo_doc: "CC", documento: "1045678901", nombres: "Lucía Fernanda", apellidos: "Martínez Ospina", fecha_nacimiento: "1992-11-08", telefono: "3223456789", email: "lucia.martinez@hotmail.com", direccion: "Av. 6N #34-20, Cali" },
-  { id: "4", tipo_doc: "CC", documento: "1056789012", nombres: "Roberto Andrés", apellidos: "López Castro", fecha_nacimiento: "1965-04-30", telefono: "3134567890", email: "roberto.lopez@yahoo.com", direccion: "Cra 15 #64-30, Barranquilla" },
-  { id: "5", tipo_doc: "CC", documento: "1067890123", nombres: "Claudia Patricia", apellidos: "Herrera Vargas", fecha_nacimiento: "1990-09-17", telefono: "3245678901", email: "claudia.herrera@gmail.com", direccion: "Cll 50 #40-12, Bucaramanga" },
+// ─── CUESTIONARIO ESCLEROTERAPIA ──────────────────────────────────────────────
+const CUESTIONARIO_PREGUNTAS = [
+  "¿Enfermedad como diabetes, Presión arterial, Lupus, artritis Reumatoide, Cáncer actualmente?",
+  "¿Cansancio en piernas?",
+  "¿Visibilidad de venas varices?",
+  "Alergias a Medicamentos Y/o Alimentos.",
+  "¿Alguna Vez se ha tratado venas varices con infiltración?",
+  "¿Antecedentes de cirugía Vascular?",
+  "¿Antecedentes patológicos cardiovasculares o cerebrales?",
+  "Si está en edad reproductiva: ¿Embarazo o sospecha del mismo o lactancia Materna?",
+  "¿Realiza ejercicio?",
+  "¿Consumo de grasa o ultra procesados con frecuencia?",
+  "¿Condiciones como Ansiedad o Depresión?",
+  "¿Permanece mucho tiempo de pie o sentada?",
+  "¿Uso de medias de compresión alguna Vez?",
 ];
 
-const CONSENTIMIENTOS_INIT: Consentimiento[] = [
-  { id: "1", radicado: "CONS-2024-0001", paciente: PACIENTES_INIT[0], tipo: "Procedimiento Quirúrgico", medico: "Dr. Carlos Mendoza Ruiz", fecha: "2024-01-15", estado: "FIRMADO", procedimiento: "Apendicectomía laparoscópica", diagnostico: "Apendicitis aguda no complicada", observaciones: "Paciente en buen estado general, sin contraindicaciones.", enviado_email: true, enviado_whatsapp: true },
-  { id: "2", radicado: "CONS-2024-0002", paciente: PACIENTES_INIT[1], tipo: "Anestesia General", medico: "Dra. Paola Suárez Muñoz", fecha: "2024-01-16", estado: "PENDIENTE", procedimiento: "Colonoscopia diagnóstica con biopsia", diagnostico: "Síndrome de intestino irritable", observaciones: "Paciente con antecedente de HTA controlada.", enviado_email: false, enviado_whatsapp: false },
-  { id: "3", radicado: "CONS-2024-0003", paciente: PACIENTES_INIT[2], tipo: "Tratamiento Oncológico", medico: "Dr. Carlos Mendoza Ruiz", fecha: "2024-01-17", estado: "FIRMADO", procedimiento: "Quimioterapia — Ciclo 1 de 6", diagnostico: "Carcinoma de mama estadio IIA", observaciones: "Paciente con soporte familiar. Entiende riesgos y beneficios.", enviado_email: true, enviado_whatsapp: false },
-  { id: "4", radicado: "CONS-2024-0004", paciente: PACIENTES_INIT[3], tipo: "Procedimiento Quirúrgico", medico: "Dr. Carlos Mendoza Ruiz", fecha: "2024-01-18", estado: "ANULADO", procedimiento: "Hernioplastia inguinal derecha", diagnostico: "Hernia inguinal reductible", observaciones: "Anulado por solicitud del paciente.", enviado_email: true, enviado_whatsapp: true },
-  { id: "5", radicado: "CONS-2024-0005", paciente: PACIENTES_INIT[4], tipo: "Diagnóstico por Imágenes", medico: "Dr. Carlos Mendoza Ruiz", fecha: "2024-01-19", estado: "PENDIENTE", procedimiento: "Resonancia magnética cerebral contrastada", diagnostico: "Cefalea crónica a estudio", observaciones: "Pendiente firma del paciente.", enviado_email: false, enviado_whatsapp: false },
-];
+// ─── TEXTOS LEGALES DE CONSENTIMIENTO ────────────────────────────────────────
+const TEXTO_ESCLEROTERAPIA = `Yo, el (la) paciente abajo firmante, por medio del presente documento doy mi consentimiento para que se lleve a cabo el procedimiento de ESCLEROTERAPIA (INYECCIÓN) DE VÁRICES DE LOS MIEMBROS INFERIORES, en las instalaciones de la IPS ${IPS.nombre} (NIT ${IPS.nit}), bajo la responsabilidad del ${IPS.medico} (${IPS.rm}).
 
-const TIPOS_CONSENTIMIENTO = [
-  "Procedimiento Quirúrgico",
-  "Anestesia General",
-  "Anestesia Regional",
-  "Tratamiento Oncológico",
-  "Diagnóstico por Imágenes",
-  "Procedimiento Endoscópico",
-  "Transfusión Sanguínea",
-  "Procedimiento Odontológico",
-  "Hospitalización",
-  "Traslado",
-];
+INFORMACIÓN DEL PROCEDIMIENTO:
+La escleroterapia es un procedimiento médico utilizado para el tratamiento de várices y arañas vasculares (telangiectasias) de los miembros inferiores. Consiste en la inyección de una solución esclerosante (Polidocanol) directamente en el interior del vaso afectado, lo que produce la inflamación y cierre de este.
 
+BENEFICIOS ESPERADOS:
+• Eliminación o reducción notable de las várices y telangiectasias tratadas.
+• Mejoría estética y funcional de los miembros inferiores.
+• Alivio de síntomas como pesadez, cansancio y dolor en piernas.
+
+RIESGOS Y POSIBLES COMPLICACIONES:
+• Hiperpigmentación cutánea (manchas oscuras) temporal o permanente.
+• Neovascularización (aparición de nuevos vasos pequeños).
+• Reacción alérgica al esclerosante (rara pero posible).
+• Tromboflebitis superficial (inflamación de la vena tratada).
+• Ulceración cutánea en casos muy raros.
+• Dolor o ardor en el sitio de inyección durante y después del procedimiento.
+
+ALTERNATIVAS TERAPÉUTICAS:
+• Cirugía de várices (fleboextracción).
+• Tratamiento con láser endovenoso.
+• Uso de medias de compresión (tratamiento conservador).
+• Abstención de tratamiento.
+
+OBLIGACIONES DEL PACIENTE POST-PROCEDIMIENTO:
+• Usar medias de compresión durante el tiempo indicado por el médico.
+• Evitar exposición solar directa en zonas tratadas por mínimo 30 días.
+• Caminar diariamente al menos 30 minutos.
+• Evitar baños calientes, saunas y ejercicio intenso por 48-72 horas.
+• Consultar inmediatamente si presenta inflamación excesiva, úlceras o reacción alérgica.
+
+El paciente declara que ha recibido suficiente información sobre el procedimiento y que ha tenido la oportunidad de realizar preguntas, las cuales han sido respondidas de manera satisfactoria por el médico tratante.`;
+
+const TEXTO_SUEROTERAPIA = `Yo, el (la) paciente abajo firmante, por medio del presente documento doy mi consentimiento para que se lleve a cabo el procedimiento de SUEROTERAPIA DE VITAMINA C Y/O COMPLEJO B (Administración intravenosa o intramuscular de vitaminas y micronutrientes), en las instalaciones de la IPS ${IPS.nombre} (NIT ${IPS.nit}), bajo la responsabilidad del ${IPS.medico} (${IPS.rm}).
+
+INFORMACIÓN DEL PROCEDIMIENTO:
+La sueroterapia vitamínica consiste en la administración endovenosa o intramuscular de vitaminas (Vitamina C y/o Complejo B) diluidas en solución salina (NaCl 0.9%), con el objetivo de suplementar deficiencias nutricionales, mejorar el estado general del paciente y apoyar funciones metabólicas específicas.
+
+VITAMINA C (Ácido Ascórbico):
+Antioxidante potente, favorece la síntesis de colágeno, mejora la inmunidad, apoya la cicatrización de tejidos y tiene propiedades antiinflamatorias.
+
+COMPLEJO B (B1, B6, B12):
+Esencial para el metabolismo energético, función neurológica, producción de glóbulos rojos y síntesis de neurotransmisores.
+
+POSIBLES RIESGOS:
+• Dolor o inflamación en el sitio de punción.
+• Reacción alérgica (poco frecuente).
+• Sensación de calor o rubefacción durante la infusión.
+• Mareo o náuseas leves (muy raros).
+• Extravasación del suero (en caso de punción defectuosa).
+
+CONTRAINDICACIONES RELATIVAS:
+• Cálculos renales (urolitiasis por oxalato) — dosis altas de Vitamina C.
+• Déficit de G6PD — hemólisis con dosis altas de Vitamina C.
+• Hipercoagulabilidad — evaluar individualmente.
+
+El paciente declara que ha sido informado de manera clara y comprensible sobre el procedimiento, sus beneficios, riesgos y alternativas. Ha tenido la oportunidad de formular preguntas que han sido respondidas satisfactoriamente. Autoriza la realización del procedimiento de manera libre, voluntaria y sin coacción alguna.`;
+
+const TEXTO_LASER = `Yo, el (la) paciente abajo firmante, por medio del presente documento doy mi consentimiento para que se lleve a cabo el procedimiento de TERAPIA LÁSER ND:YAG PARA EL CONTROL DE VENAS VÁRICES, en las instalaciones de la IPS ${IPS.nombre} (NIT ${IPS.nit}), bajo la responsabilidad del ${IPS.medico} (${IPS.rm}).
+
+INFORMACIÓN DEL PROCEDIMIENTO:
+La terapia láser con equipo Nd:YAG (Neodimio:Itrio-Aluminio-Granate, longitud de onda 1064 nm) es un tratamiento no invasivo o mínimamente invasivo utilizado para el tratamiento de venas varicosas y telangiectasias de los miembros inferiores. El láser emite energía que es absorbida selectivamente por la hemoglobina del interior del vaso, generando calor que colapsa y cierra la vena sin dañar el tejido circundante.
+
+PARÁMETROS DEL EQUIPO:
+El médico tratante definirá los parámetros específicos de energía (Fluencia en J/cm²), frecuencia de pulso (Hz), y área de tratamiento según el fototipo de piel del paciente y el tipo de vena a tratar.
+
+FOTOTIPOS DE PIEL (Clasificación de Fitzpatrick):
+• Fototipo I-II: Piel muy clara, alta sensibilidad — parámetros menores.
+• Fototipo III-IV: Piel morena, parámetros intermedios.
+• Fototipo V-VI: Piel oscura, requiere mayor precaución y ajuste de parámetros.
+
+BENEFICIOS ESPERADOS:
+• Reducción o eliminación de las venas tratadas.
+• Procedimiento sin incisiones, con mínimo tiempo de recuperación.
+• Mejora estética y funcional de los miembros inferiores.
+
+RIESGOS Y POSIBLES EFECTOS SECUNDARIOS:
+• Eritema (enrojecimiento) temporal en el área tratada.
+• Edema (inflamación) leve postratamiento.
+• Cambios pigmentarios temporales (hiperpigmentación o hipopigmentación).
+• Costras o ampollas superficiales (raras, asociadas a energías altas).
+• Dolor durante el procedimiento (sensación de calor intenso puntual).
+• Resultado incompleto que requiera sesiones adicionales.
+
+INSTRUCCIONES POST-TRATAMIENTO:
+• Aplicar compresas frías si hay sensación de calor excesivo.
+• Evitar exposición solar directa por 30 días. Usar protector solar FPS 50+.
+• No aplicar calor local (saunas, baños calientes) por 72 horas.
+• Usar medias de compresión según indicación médica.
+• Reportar inmediatamente cualquier ampolla, úlcera o reacción inusual.
+
+El paciente declara haber leído y comprendido este documento en su totalidad y autoriza voluntariamente la realización del procedimiento descrito.`;
+
+// ─── CHART DATA ───────────────────────────────────────────────────────────────
 const CHART_MENSUAL = [
-  { mes: "Ago", firmados: 28, pendientes: 5 },
-  { mes: "Sep", firmados: 34, pendientes: 8 },
-  { mes: "Oct", firmados: 31, pendientes: 6 },
-  { mes: "Nov", firmados: 42, pendientes: 11 },
-  { mes: "Dic", firmados: 38, pendientes: 7 },
-  { mes: "Ene", firmados: 45, pendientes: 9 },
+  { mes: "Feb", escler: 8, suero: 5, laser: 3 },
+  { mes: "Mar", escler: 12, suero: 7, laser: 5 },
+  { mes: "Abr", escler: 10, suero: 9, laser: 4 },
+  { mes: "May", escler: 15, suero: 11, laser: 7 },
+  { mes: "Jun", escler: 18, suero: 8, laser: 9 },
+  { mes: "Jul", escler: 22, suero: 13, laser: 11 },
 ];
-
 const CHART_TIPOS = [
-  { name: "Quirúrgico", value: 38, color: "#1A56DB" },
-  { name: "Anestesia", value: 22, color: "#00B896" },
-  { name: "Oncológico", value: 15, color: "#F59E0B" },
-  { name: "Imágenes", value: 14, color: "#8B5CF6" },
-  { name: "Otros", value: 11, color: "#64748B" },
+  { name: "Escleroterapia", value: 46, color: "#1A56DB" },
+  { name: "Sueroterapia", value: 29, color: "#00B896" },
+  { name: "Láser Várices", value: 25, color: "#F59E0B" },
 ];
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
-
-function calcAge(dob: string): number {
-  const birth = new Date(dob);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const m = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-  return age;
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function genRadicado(tipo: TipoConsent, n: number) {
+  const prefix = { escleroterapia: "ESC", sueroterapia: "SUE", laser: "LAS", paquete: "PAQ" }[tipo];
+  return `${prefix}-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
 }
-
+function hoy() { return new Date().toISOString().split("T")[0]; }
 function fmtFecha(iso: string) {
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+  if (!iso) return "—";
+  return new Date(iso + "T00:00:00").toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function genRadicado(idx: number) {
-  const year = new Date().getFullYear();
-  return `CONS-${year}-${String(idx).padStart(4, "0")}`;
-}
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ estado }: { estado: EstadoConsentimiento }) {
-  const cfg = {
-    FIRMADO: { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={11} />, label: "Firmado" },
-    PENDIENTE: { bg: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={11} />, label: "Pendiente" },
-    ANULADO: { bg: "bg-red-50 text-red-600 border-red-200", icon: <XCircle size={11} />, label: "Anulado" },
-  }[estado];
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${cfg.bg}`}>
-      {cfg.icon}{cfg.label}
-    </span>
-  );
-}
-
-// ─── Toast ────────────────────────────────────────────────────────────────────
-
+// ─── TOAST ────────────────────────────────────────────────────────────────────
 interface ToastMsg { id: number; type: "success" | "error" | "info"; msg: string; }
-
 function Toast({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number) => void }) {
   return (
-    <div className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2">
+    <div className="fixed bottom-5 right-5 z-[300] flex flex-col gap-2 max-w-sm">
       {toasts.map(t => (
-        <div key={t.id}
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl text-sm font-medium text-white max-w-xs
-            ${t.type === "success" ? "bg-emerald-600" : t.type === "error" ? "bg-red-600" : "bg-[#1A56DB]"}`}>
+        <div key={t.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium text-white
+          ${t.type === "success" ? "bg-emerald-600" : t.type === "error" ? "bg-red-600" : "bg-[#1A56DB]"}`}>
           {t.type === "success" ? <Check size={15} /> : t.type === "error" ? <XCircle size={15} /> : <Bell size={15} />}
           <span className="flex-1">{t.msg}</span>
-          <button onClick={() => remove(t.id)} className="opacity-70 hover:opacity-100"><X size={13} /></button>
+          <button onClick={() => remove(t.id)}><X size={13} className="opacity-70" /></button>
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Signature Canvas ─────────────────────────────────────────────────────────
+// ─── STATUS BADGE ─────────────────────────────────────────────────────────────
+function StatusBadge({ estado }: { estado: EstadoConsent }) {
+  const c = {
+    FIRMADO: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    PENDIENTE: "bg-amber-50 text-amber-700 border-amber-200",
+    ANULADO: "bg-red-50 text-red-600 border-red-200",
+  }[estado];
+  const icon = { FIRMADO: <CheckCircle size={11} />, PENDIENTE: <Clock size={11} />, ANULADO: <XCircle size={11} /> }[estado];
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${c}`}>
+      {icon} {estado}
+    </span>
+  );
+}
 
-function SignatureCanvas({ onSave, onCancel }: { onSave: (dataUrl: string) => void; onCancel: () => void }) {
+// ─── TIPO BADGE ───────────────────────────────────────────────────────────────
+function TipoBadge({ tipo }: { tipo: TipoConsent }) {
+  const cfg = {
+    escleroterapia: { color: "bg-[#1A56DB]/10 text-[#1A56DB]", icon: <Syringe size={10} />, label: "Escleroterapia" },
+    sueroterapia:   { color: "bg-[#00B896]/10 text-[#00B896]", icon: <Droplets size={10} />, label: "Sueroterapia" },
+    laser:          { color: "bg-amber-100 text-amber-700",    icon: <Zap size={10} />,      label: "Láser Várices" },
+    paquete:        { color: "bg-purple-100 text-purple-700",  icon: <Package size={10} />,  label: "Paquete" },
+  }[tipo];
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${cfg.color}`}>
+      {cfg.icon} {cfg.label}
+    </span>
+  );
+}
+
+// ─── SIGNATURE CANVAS ─────────────────────────────────────────────────────────
+function SignatureCanvas({ label, onSave, onCancel }: {
+  label: string; onSave: (dataUrl: string) => void; onCancel: () => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const [hasDrawn, setHasDrawn] = useState(false);
@@ -190,92 +313,52 @@ function SignatureCanvas({ onSave, onCancel }: { onSave: (dataUrl: string) => vo
   };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#0C1A35";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    const start = (e: MouseEvent | TouchEvent) => {
-      e.preventDefault();
-      drawing.current = true;
-      const pos = getPos(e, canvas);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-    };
-    const move = (e: MouseEvent | TouchEvent) => {
-      e.preventDefault();
-      if (!drawing.current) return;
-      const pos = getPos(e, canvas);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-      setHasDrawn(true);
-    };
-    const end = () => { drawing.current = false; };
-
-    canvas.addEventListener("mousedown", start);
-    canvas.addEventListener("mousemove", move);
-    canvas.addEventListener("mouseup", end);
-    canvas.addEventListener("touchstart", start, { passive: false });
-    canvas.addEventListener("touchmove", move, { passive: false });
-    canvas.addEventListener("touchend", end);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#0C1A35"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const start = (e: MouseEvent | TouchEvent) => { e.preventDefault(); drawing.current = true; const p = getPos(e, canvas); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+    const move  = (e: MouseEvent | TouchEvent) => { e.preventDefault(); if (!drawing.current) return; const p = getPos(e, canvas); ctx.lineTo(p.x, p.y); ctx.stroke(); setHasDrawn(true); };
+    const end   = () => { drawing.current = false; };
+    canvas.addEventListener("mousedown", start); canvas.addEventListener("mousemove", move); canvas.addEventListener("mouseup", end);
+    canvas.addEventListener("touchstart", start, { passive: false }); canvas.addEventListener("touchmove", move, { passive: false }); canvas.addEventListener("touchend", end);
     return () => {
-      canvas.removeEventListener("mousedown", start);
-      canvas.removeEventListener("mousemove", move);
-      canvas.removeEventListener("mouseup", end);
-      canvas.removeEventListener("touchstart", start);
-      canvas.removeEventListener("touchmove", move);
-      canvas.removeEventListener("touchend", end);
+      canvas.removeEventListener("mousedown", start); canvas.removeEventListener("mousemove", move); canvas.removeEventListener("mouseup", end);
+      canvas.removeEventListener("touchstart", start); canvas.removeEventListener("touchmove", move); canvas.removeEventListener("touchend", end);
     };
   }, []);
 
   const clear = () => {
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    setHasDrawn(false);
-  };
-
-  const save = () => {
-    const canvas = canvasRef.current!;
-    onSave(canvas.toDataURL("image/png"));
+    const c = canvasRef.current!; const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height); setHasDrawn(false);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-[#1A56DB]/10 flex items-center justify-center">
               <Pen size={15} className="text-[#1A56DB]" />
             </div>
             <div>
-              <p className="font-semibold text-foreground text-sm">Firma del Paciente</p>
-              <p className="text-xs text-muted-foreground">Firme en el recuadro a continuación</p>
+              <p className="font-semibold text-sm">{label}</p>
+              <p className="text-[10px] text-muted-foreground">Firme en el recuadro — funciona con dedo en tablet</p>
             </div>
           </div>
-          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
+          <button onClick={onCancel}><X size={18} className="text-muted-foreground" /></button>
         </div>
         <div className="p-5">
-          <div className="border-2 border-dashed border-border rounded-xl overflow-hidden bg-gray-50 touch-none">
-            <canvas ref={canvasRef} width={560} height={220} className="w-full cursor-crosshair" style={{ touchAction: "none" }} />
+          <div className="border-2 border-dashed border-[#1A56DB]/30 rounded-xl overflow-hidden bg-[#f8faff]">
+            <canvas ref={canvasRef} width={600} height={240} className="w-full cursor-crosshair" style={{ touchAction: "none" }} />
           </div>
-          <p className="text-xs text-muted-foreground text-center mt-2">Firme con el mouse o su dedo en pantallas táctiles</p>
-          <div className="flex gap-3 mt-4">
-            <button onClick={clear} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
-              Limpiar
-            </button>
-            <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
-              Cancelar
-            </button>
-            <button onClick={save} disabled={!hasDrawn}
-              className="flex-1 py-2.5 rounded-lg bg-[#1A56DB] text-white text-sm font-medium hover:bg-[#1648bf] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-              Confirmar Firma
+          <p className="text-[11px] text-center text-muted-foreground mt-2">Optimizado para tablet — use su dedo o lápiz táctil</p>
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            <button onClick={clear} className="py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted">Limpiar</button>
+            <button onClick={onCancel} className="py-2.5 rounded-lg border border-border text-sm font-medium">Cancelar</button>
+            <button onClick={() => onSave(canvasRef.current!.toDataURL("image/png"))} disabled={!hasDrawn}
+              className="py-2.5 rounded-lg bg-[#1A56DB] text-white text-sm font-semibold disabled:opacity-40 hover:bg-[#1648bf] transition-colors">
+              Confirmar ✓
             </button>
           </div>
         </div>
@@ -284,1343 +367,1539 @@ function SignatureCanvas({ onSave, onCancel }: { onSave: (dataUrl: string) => vo
   );
 }
 
-// ─── PDF Viewer Modal ──────────────────────────────────────────────────────────
-
-function PDFViewer({ consent, onClose }: { consent: Consentimiento; onClose: () => void }) {
+// ─── FIRMA FIELD ──────────────────────────────────────────────────────────────
+function FirmaField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="fixed inset-0 bg-black/70 z-[150] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <FileText size={18} className="text-[#1A56DB]" />
-            <div>
-              <p className="font-semibold text-sm">{consent.radicado}</p>
-              <p className="text-xs text-muted-foreground">{consent.paciente.nombres} {consent.paciente.apellidos}</p>
+    <>
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{label}</p>
+        {value ? (
+          <div className="flex items-center gap-3 p-3 border border-emerald-300 bg-emerald-50 rounded-xl">
+            <img src={value} alt="firma" className="h-12 bg-white border border-emerald-200 rounded" />
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-emerald-700">Firma registrada ✓</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1A56DB] border border-[#1A56DB]/30 rounded-lg hover:bg-[#1A56DB]/5 transition-colors">
-              <Printer size={13} /> Imprimir
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#1A56DB] text-white rounded-lg hover:bg-[#1648bf] transition-colors">
-              <Download size={13} /> Descargar PDF
-            </button>
-            <button onClick={onClose} className="ml-1 text-muted-foreground hover:text-foreground"><X size={18} /></button>
-          </div>
-        </div>
-        <div className="overflow-y-auto flex-1 p-8 bg-gray-50">
-          <div className="bg-white rounded-xl shadow-sm p-8 max-w-[600px] mx-auto font-['Inter'] text-sm text-foreground">
-            {/* Header IPS */}
-            <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-[#1A56DB]">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded bg-[#1A56DB] flex items-center justify-center">
-                    <Stethoscope size={16} className="text-white" />
-                  </div>
-                  <span className="font-bold text-[#0C1A35] text-base">IPS SALUD INTEGRAL</span>
-                </div>
-                <p className="text-xs text-muted-foreground">NIT: 900.123.456-7</p>
-                <p className="text-xs text-muted-foreground">Habilitación: 05001000001</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-mono font-medium text-[#1A56DB]">{consent.radicado}</p>
-                <p className="text-xs text-muted-foreground mt-1">Fecha: {fmtFecha(consent.fecha)}</p>
-                <StatusBadge estado={consent.estado} />
-              </div>
-            </div>
-
-            <h2 className="text-center font-bold text-base text-[#0C1A35] mb-6 uppercase tracking-wide">
-              CONSENTIMIENTO INFORMADO
-            </h2>
-            <h3 className="text-center font-semibold text-sm text-[#1A56DB] mb-8">{consent.tipo}</h3>
-
-            <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-[#EEF2F8] rounded-lg">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Paciente</p>
-                <p className="font-semibold">{consent.paciente.nombres} {consent.paciente.apellidos}</p>
-                <p className="text-xs text-muted-foreground">{consent.paciente.tipo_doc}: {consent.paciente.documento}</p>
-                <p className="text-xs text-muted-foreground">Edad: {calcAge(consent.paciente.fecha_nacimiento)} años</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Médico Tratante</p>
-                <p className="font-semibold">{consent.medico}</p>
-                <p className="text-xs text-muted-foreground">Procedimiento: {consent.procedimiento}</p>
-              </div>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Diagnóstico</p>
-                <p className="text-sm">{consent.diagnostico}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Descripción del Procedimiento</p>
-                <p className="text-sm leading-relaxed">El paciente ha sido informado de manera clara y comprensible sobre el procedimiento <strong>{consent.procedimiento}</strong>, incluyendo su naturaleza, propósito, riesgos potenciales, beneficios esperados y alternativas disponibles. El médico tratante ha resuelto todas las preguntas formuladas por el paciente y/o su acudiente.</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Riesgos y Complicaciones</p>
-                <ul className="text-sm space-y-1 pl-4">
-                  <li>• Sangrado o hematoma en zona del procedimiento</li>
-                  <li>• Infección del sitio operatorio</li>
-                  <li>• Reacción a medicamentos anestésicos</li>
-                  <li>• Complicaciones relacionadas con condición de base</li>
-                </ul>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Observaciones</p>
-                <p className="text-sm">{consent.observaciones}</p>
-              </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-dashed border-border">
-              <p className="text-xs text-center text-muted-foreground mb-6">
-                El paciente o su representante legal declara haber leído y comprendido el presente documento, otorgando libre y voluntariamente su consentimiento para la realización del procedimiento descrito.
-              </p>
-              {consent.estado === "FIRMADO" ? (
-                <div className="grid grid-cols-2 gap-8 mt-4">
-                  <div className="text-center">
-                    <div className="h-16 border border-dashed border-[#1A56DB]/40 rounded-lg mb-2 bg-[#EEF2F8]/50 flex items-center justify-center">
-                      <p className="text-[10px] text-[#1A56DB] italic font-medium">[ Firma Digital Registrada ]</p>
-                    </div>
-                    <p className="text-[10px] font-semibold">{consent.paciente.nombres} {consent.paciente.apellidos}</p>
-                    <p className="text-[10px] text-muted-foreground">{consent.paciente.tipo_doc}: {consent.paciente.documento}</p>
-                    <p className="text-[10px] text-muted-foreground">Paciente / Representante Legal</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="h-16 border border-dashed border-[#1A56DB]/40 rounded-lg mb-2 bg-[#EEF2F8]/50 flex items-center justify-center">
-                      <p className="text-[10px] text-[#1A56DB] italic font-medium">[ Firma Digital Registrada ]</p>
-                    </div>
-                    <p className="text-[10px] font-semibold">{consent.medico}</p>
-                    <p className="text-[10px] text-muted-foreground">Médico Tratante</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-                  <p className="text-xs text-amber-700 font-medium">Documento pendiente de firma</p>
-                </div>
-              )}
-            </div>
-            <div className="mt-6 pt-4 border-t border-border text-center">
-              <p className="text-[10px] text-muted-foreground">Documento generado digitalmente · IPS Salud Integral · {new Date().toLocaleDateString("es-CO")}</p>
-              <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Hash: SHA256-{consent.id.padEnd(8, "0")}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
-
-const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "consentimientos", label: "Consentimientos", icon: FileSignature },
-  { id: "pacientes", label: "Pacientes", icon: Users },
-  { id: "configuracion", label: "Configuración", icon: Settings },
-];
-
-function Sidebar({ page, onNav, user, onLogout, collapsed, onToggle }: {
-  page: AppPage; onNav: (p: AppPage) => void;
-  user: UsuarioSistema; onLogout: () => void;
-  collapsed: boolean; onToggle: () => void;
-}) {
-  return (
-    <aside className={`bg-sidebar flex flex-col h-full transition-all duration-300 ${collapsed ? "w-16" : "w-60"} flex-shrink-0`}>
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border">
-        <div className="w-8 h-8 rounded-lg bg-[#1A56DB] flex-shrink-0 flex items-center justify-center">
-          <Stethoscope size={16} className="text-white" />
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
-            <p className="text-white font-bold text-sm leading-tight">IPS Salud</p>
-            <p className="text-sidebar-foreground text-[10px]">Consentimientos</p>
-          </div>
-        )}
-        <button onClick={onToggle} className={`ml-auto text-sidebar-foreground/50 hover:text-white transition-colors ${collapsed ? "mx-auto" : ""}`}>
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 py-4 px-2 space-y-0.5">
-        {NAV_ITEMS.map(item => {
-          const Icon = item.icon;
-          const active = page === item.id;
-          return (
-            <button key={item.id} onClick={() => onNav(item.id as AppPage)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left
-                ${active ? "bg-[#1A56DB] text-white" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"}`}>
-              <Icon size={17} className="flex-shrink-0" />
-              {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* User section */}
-      <div className="border-t border-sidebar-border p-3">
-        {!collapsed ? (
-          <div className="flex items-center gap-2 p-2">
-            <div className="w-7 h-7 rounded-full bg-[#1A56DB]/40 flex-shrink-0 flex items-center justify-center text-white text-xs font-bold">
-              {user.nombre.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-medium truncate">{user.nombre.split(" ")[0]} {user.nombre.split(" ")[1] || ""}</p>
-              <p className="text-sidebar-foreground text-[10px] truncate">{user.rol}</p>
-            </div>
-            <button onClick={onLogout} className="text-sidebar-foreground/50 hover:text-red-400 transition-colors" title="Cerrar sesión">
-              <LogOut size={15} />
-            </button>
+            <button onClick={() => onChange("")} className="text-[11px] text-red-500 hover:underline font-medium">Repetir</button>
           </div>
         ) : (
-          <button onClick={onLogout} className="w-full flex justify-center text-sidebar-foreground/50 hover:text-red-400 transition-colors p-2" title="Cerrar sesión">
-            <LogOut size={15} />
+          <button onClick={() => setOpen(true)}
+            className="w-full border-2 border-dashed border-[#1A56DB]/30 rounded-xl p-5 flex flex-col items-center gap-2 hover:bg-[#1A56DB]/5 transition-colors">
+            <Pen size={20} className="text-[#1A56DB]/50" />
+            <p className="text-sm font-medium text-[#1A56DB]">Toque para firmar</p>
+            <p className="text-[10px] text-muted-foreground">Funciona con dedo en tablet o mouse</p>
           </button>
         )}
       </div>
-    </aside>
+      {open && <SignatureCanvas label={label} onSave={(v) => { onChange(v); setOpen(false); }} onCancel={() => setOpen(false)} />}
+    </>
   );
 }
 
-// ─── Topbar ───────────────────────────────────────────────────────────────────
-
-function Topbar({ title, user, onMobileMenu }: { title: string; user: UsuarioSistema; onMobileMenu: () => void }) {
-  const now = new Date();
-  const fecha = now.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
-  return (
-    <header className="h-14 bg-white border-b border-border flex items-center px-5 gap-4 flex-shrink-0">
-      <button onClick={onMobileMenu} className="md:hidden text-muted-foreground hover:text-foreground">
-        <Menu size={20} />
-      </button>
-      <div className="flex-1">
-        <p className="font-semibold text-foreground text-sm">{title}</p>
-        <p className="text-[11px] text-muted-foreground capitalize">{fecha}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <button className="relative text-muted-foreground hover:text-foreground">
-          <Bell size={18} />
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#1A56DB] rounded-full"></span>
-        </button>
-        <div className="flex items-center gap-2 pl-3 border-l border-border">
-          <div className="w-7 h-7 rounded-full bg-[#1A56DB] flex items-center justify-center text-white text-xs font-bold">
-            {user.nombre.charAt(0)}
-          </div>
-          <div className="hidden sm:block">
-            <p className="text-xs font-medium leading-tight">{user.nombre.split(" ")[0]}</p>
-            <p className="text-[10px] text-muted-foreground">{user.rol}</p>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, sub, icon, color, trend }: {
-  label: string; value: string | number; sub?: string;
-  icon: React.ReactNode; color: string; trend?: string;
+// ─── FIELD HELPER ─────────────────────────────────────────────────────────────
+function Field({ label, value, onChange, type = "text", placeholder = "", required = false, icon }: {
+  label: string; value: string; onChange: (v: string) => void;
+  type?: string; placeholder?: string; required?: boolean; icon?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl p-5 border border-border shadow-sm">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-          {icon}
-        </div>
-        {trend && (
-          <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-600">
-            <ArrowUpRight size={12} />{trend}
-          </span>
-        )}
+    <div>
+      <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      <div className="relative">
+        {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60">{icon}</div>}
+        <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+          className={`w-full border border-border rounded-lg ${icon ? "pl-9" : "px-3"} pr-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB] transition-colors`} />
       </div>
-      <p className="text-2xl font-bold text-foreground">{value}</p>
-      <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-      {sub && <p className="text-[11px] text-muted-foreground mt-1 font-mono">{sub}</p>}
     </div>
   );
 }
 
-// ─── Dashboard Page ───────────────────────────────────────────────────────────
-
-function DashboardPage({ consentimientos, onNav }: { consentimientos: Consentimiento[]; onNav: (p: AppPage) => void }) {
-  const firmados = consentimientos.filter(c => c.estado === "FIRMADO").length;
-  const pendientes = consentimientos.filter(c => c.estado === "PENDIENTE").length;
-  const anulados = consentimientos.filter(c => c.estado === "ANULADO").length;
-  const recientes = [...consentimientos].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5);
-
+// ─── STEP DATOS PACIENTE (COMPLETO) ──────────────────────────────────────────
+function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: (d: DatosPaciente) => void }) {
+  const s = (k: keyof DatosPaciente) => (v: string) => onChange({ ...data, [k]: v });
   return (
-    <div className="p-5 lg:p-6 space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Consentimientos" value={consentimientos.length} icon={<ClipboardList size={18} className="text-[#1A56DB]" />} color="bg-[#1A56DB]/10" trend="+12%" />
-        <StatCard label="Firmados" value={firmados} sub={`${Math.round(firmados / consentimientos.length * 100)}% del total`} icon={<CheckCircle size={18} className="text-emerald-600" />} color="bg-emerald-50" trend="+8%" />
-        <StatCard label="Pendientes" value={pendientes} icon={<Clock size={18} className="text-amber-600" />} color="bg-amber-50" />
-        <StatCard label="Pacientes Registrados" value={5} icon={<Users size={18} className="text-purple-600" />} color="bg-purple-50" trend="+3%" />
+    <div className="space-y-4">
+      <div className="p-4 bg-[#EEF2F8] rounded-xl border border-[#1A56DB]/10">
+        <p className="text-[10px] font-bold text-[#1A56DB] uppercase tracking-wider mb-1">IPS {IPS.nombre} · NIT {IPS.nit}</p>
+        <p className="text-xs text-muted-foreground">{IPS.medico} · {IPS.rm}</p>
       </div>
 
-      {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white rounded-xl p-5 border border-border shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="font-semibold text-sm">Consentimientos por Mes</p>
-              <p className="text-xs text-muted-foreground">Firmados vs Pendientes — últimos 6 meses</p>
-            </div>
-            <BarChart3 size={16} className="text-muted-foreground" />
-          </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={CHART_MENSUAL}>
-              <defs>
-                <linearGradient id="gradFirmados" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1A56DB" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#1A56DB" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gradPendientes" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F8" />
-              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#5A6A85" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#5A6A85" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #EEF2F8" }} />
-              <Area type="monotone" dataKey="firmados" stroke="#1A56DB" strokeWidth={2} fill="url(#gradFirmados)" name="Firmados" />
-              <Area type="monotone" dataKey="pendientes" stroke="#F59E0B" strokeWidth={2} fill="url(#gradPendientes)" name="Pendientes" />
-            </AreaChart>
-          </ResponsiveContainer>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+            Tipo de Documento <span className="text-red-500">*</span>
+          </label>
+          <select value={data.tipoDoc} onChange={e => s("tipoDoc")(e.target.value)}
+            className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30">
+            <option value="CC">CC — Cédula Ciudadanía</option>
+            <option value="CE">CE — Cédula Extranjería</option>
+            <option value="PA">PA — Pasaporte</option>
+            <option value="TI">TI — Tarjeta Identidad</option>
+            <option value="RC">RC — Registro Civil</option>
+          </select>
         </div>
+        <Field label="No. Documento" value={data.documento} onChange={s("documento")} placeholder="Número de documento" required
+          icon={<Shield size={13} />} />
+      </div>
 
-        <div className="bg-white rounded-xl p-5 border border-border shadow-sm">
-          <p className="font-semibold text-sm mb-1">Por Tipo</p>
-          <p className="text-xs text-muted-foreground mb-4">Distribución de consentimientos</p>
-          <ResponsiveContainer width="100%" height={140}>
-            <PieChart>
-              <Pie data={CHART_TIPOS} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={2}>
-                {CHART_TIPOS.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Pie>
-              <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="space-y-1.5 mt-2">
-            {CHART_TIPOS.map(t => (
-              <div key={t.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full" style={{ background: t.color }}></span>
-                  <span className="text-[11px] text-muted-foreground">{t.name}</span>
-                </div>
-                <span className="text-[11px] font-mono font-medium">{t.value}%</span>
-              </div>
+      <Field label="Nombre completo del paciente" value={data.nombre} onChange={s("nombre")}
+        placeholder="Nombres y apellidos completos" required icon={<UserCheck size={13} />} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Teléfono / Celular" value={data.telefono} onChange={s("telefono")}
+          placeholder="Ej: 3001234567" type="tel" icon={<Phone size={13} />} />
+        <Field label="Correo electrónico" value={data.email} onChange={s("email")}
+          placeholder="correo@ejemplo.com" type="email" icon={<AtSign size={13} />} />
+      </div>
+
+      <Field label="Dirección de residencia" value={data.direccion} onChange={s("direccion")}
+        placeholder="Cra 45 #23-10, Ciudad" icon={<MapPin size={13} />} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Fecha de nacimiento" value={data.fechaNacimiento} onChange={s("fechaNacimiento")} type="date" />
+        <Field label="Fecha de consulta" value={data.fecha} onChange={s("fecha")} type="date" required />
+      </div>
+    </div>
+  );
+}
+
+// ─── STEP VITALES + ENFERMERA ─────────────────────────────────────────────────
+function StepVitalesEnfermera({ data, onChange, observaciones, onObservaciones, showExtra = false, extraContent }: {
+  data: DatosVitales; onChange: (d: DatosVitales) => void;
+  observaciones: string; onObservaciones: (v: string) => void;
+  showExtra?: boolean; extraContent?: React.ReactNode;
+}) {
+  const s = (k: keyof DatosVitales) => (v: string) => onChange({ ...data, [k]: v });
+
+  const VitalCard = ({ label, key_, placeholder, unit }: { label: string; key_: keyof DatosVitales; placeholder: string; unit: string }) => (
+    <div className="bg-white border border-border rounded-xl p-4 text-center hover:border-[#1A56DB]/30 transition-colors">
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">{label}</p>
+      <div className="relative">
+        <input value={data[key_]} onChange={e => s(key_)(e.target.value)} placeholder={placeholder}
+          className="w-full text-center text-lg font-bold border-b-2 border-[#1A56DB]/20 focus:border-[#1A56DB] focus:outline-none bg-transparent py-1" />
+        <span className="text-[10px] text-muted-foreground">{unit}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+        <Activity size={16} className="text-[#1A56DB]" />
+        <div>
+          <p className="text-xs font-semibold text-[#1A56DB]">Sección — Auxiliar de Enfermería</p>
+          <p className="text-[10px] text-muted-foreground">Registre los signos vitales y valores tomados antes del procedimiento</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <VitalCard label="Oximetría (SpO2)" key_="oximetria" placeholder="98" unit="%" />
+        <VitalCard label="Tensión Arterial" key_="tension" placeholder="120/80" unit="mmHg" />
+        <VitalCard label="Frec. Cardíaca" key_="frecuenciaCardiaca" placeholder="72" unit="lpm" />
+        <VitalCard label="Peso" key_="peso" placeholder="65" unit="kg" />
+        <VitalCard label="Talla" key_="talla" placeholder="165" unit="cm" />
+        <VitalCard label="Temperatura" key_="temperatura" placeholder="36.5" unit="°C" />
+      </div>
+
+      {showExtra && extraContent}
+
+      <div>
+        <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+          Observaciones de Enfermería
+        </label>
+        <textarea value={observaciones} onChange={e => onObservaciones(e.target.value)}
+          rows={3} placeholder="Anotaciones relevantes del personal de enfermería antes del procedimiento..."
+          className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 resize-none" />
+      </div>
+    </div>
+  );
+}
+
+// ─── STEP LEER CONSENTIMIENTO ─────────────────────────────────────────────────
+function StepLeerConsentimiento({ titulo, texto, leido, onLeido }: {
+  titulo: string; texto: string; leido: boolean; onLeido: (v: boolean) => void;
+}) {
+  const [scrolledToEnd, setScrolledToEnd] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 40;
+    if (atBottom) setScrolledToEnd(true);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+        <BookOpen size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-xs font-bold text-amber-800">Lectura obligatoria del Consentimiento</p>
+          <p className="text-[10px] text-amber-700 mt-0.5">El paciente debe leer y comprender el documento completo antes de firmar. Desplace el texto hasta el final para habilitar la firma.</p>
+        </div>
+      </div>
+
+      <div className="border-2 border-[#1A56DB]/20 rounded-xl overflow-hidden">
+        <div className="bg-[#0C1A35] px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] text-[#C8D6EF] font-bold uppercase tracking-wider">Consentimiento Informado</p>
+            <p className="text-xs text-white font-semibold mt-0.5">{titulo}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-[#C8D6EF] font-mono">{IPS.nombre} · NIT {IPS.nit}</p>
+            <p className="text-[10px] text-[#C8D6EF]">{IPS.medico}</p>
+          </div>
+        </div>
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="h-72 overflow-y-auto p-5 bg-white text-xs leading-relaxed text-foreground whitespace-pre-line"
+          style={{ fontFamily: "Inter, sans-serif" }}
+        >
+          {texto}
+          <div className="mt-6 pt-4 border-t border-dashed border-border text-center text-[10px] text-muted-foreground">
+            — Fin del documento de Consentimiento Informado — {IPS.nombre} · {new Date().getFullYear()} —
+          </div>
+        </div>
+        {!scrolledToEnd && (
+          <div className="bg-amber-50 border-t border-amber-200 px-4 py-2 flex items-center gap-2">
+            <Info size={12} className="text-amber-600" />
+            <p className="text-[10px] text-amber-700">Desplace el documento hasta el final para continuar</p>
+          </div>
+        )}
+        {scrolledToEnd && (
+          <div className="bg-emerald-50 border-t border-emerald-200 px-4 py-2 flex items-center gap-2">
+            <CheckCircle size={12} className="text-emerald-600" />
+            <p className="text-[10px] text-emerald-700">Ha leído el documento completo</p>
+          </div>
+        )}
+      </div>
+
+      {scrolledToEnd && (
+        <button
+          onClick={() => onLeido(true)}
+          className={`w-full flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all font-semibold text-sm
+            ${leido
+              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+              : "border-[#1A56DB] bg-[#1A56DB]/5 text-[#1A56DB] hover:bg-[#1A56DB]/10"}`}
+        >
+          <CheckCircle size={18} />
+          {leido ? "Documento leído y comprendido ✓" : "Confirmar que he leído y comprendido el documento"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── STEP FIRMA FINAL ─────────────────────────────────────────────────────────
+function StepFirmaFinal({ consentido, onConsentido, firmaLabel, firma, onFirma }: {
+  consentido: boolean | null; onConsentido: (v: boolean) => void;
+  firmaLabel: string; firma: string; onFirma: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start gap-3 p-4 bg-[#EEF2F8] rounded-xl border border-[#1A56DB]/10">
+        <Shield size={16} className="text-[#1A56DB] flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-xs font-bold text-[#1A56DB]">Decisión y Firma del Paciente</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Una vez seleccione su decisión y firme, el documento será enviado al médico para su visualización en el dashboard.</p>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Decisión del Paciente</p>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => onConsentido(true)}
+            className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all
+              ${consentido === true ? "border-emerald-500 bg-emerald-50" : "border-border hover:border-emerald-300"}`}>
+            <ThumbsUp size={22} className={consentido === true ? "text-emerald-600" : "text-muted-foreground"} />
+            <div className="text-left">
+              <p className={`text-sm font-bold ${consentido === true ? "text-emerald-700" : "text-muted-foreground"}`}>CONSIENTO</p>
+              <p className="text-[10px] text-muted-foreground">Autorizo el procedimiento</p>
+            </div>
+          </button>
+          <button onClick={() => onConsentido(false)}
+            className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all
+              ${consentido === false ? "border-red-500 bg-red-50" : "border-border hover:border-red-300"}`}>
+            <ThumbsDown size={22} className={consentido === false ? "text-red-600" : "text-muted-foreground"} />
+            <div className="text-left">
+              <p className={`text-sm font-bold ${consentido === false ? "text-red-700" : "text-muted-foreground"}`}>DISIENTO</p>
+              <p className="text-[10px] text-muted-foreground">NO autorizo el procedimiento</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <FirmaField label={firmaLabel} value={firma} onChange={onFirma} />
+
+      {firma && consentido !== null && (
+        <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2
+          ${consentido ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-red-50 border-red-300 text-red-800"}`}>
+          {consentido ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
+          {consentido
+            ? "El documento quedará firmado y disponible para revisión del médico."
+            : "El disentimiento quedará registrado. No se realizará el procedimiento."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CUESTIONARIO STEP ────────────────────────────────────────────────────────
+function StepCuestionario({ data, onChange }: { data: Record<string, "Si" | "No" | "">; onChange: (d: Record<string, "Si" | "No" | "">) => void }) {
+  const set = (q: string, v: "Si" | "No") => onChange({ ...data, [q]: v });
+  const answered = Object.values(data).filter(v => v !== "").length;
+  return (
+    <div className="space-y-3">
+      <div className="bg-[#EEF2F8] rounded-xl p-3 mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-[#1A56DB]">Test de Diagnóstico / Pronóstico / Contraindicantes y Seguridad</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Marque Si o No para cada pregunta</p>
+        </div>
+        <span className="text-xs font-bold text-[#1A56DB] bg-white px-2 py-1 rounded-lg border border-[#1A56DB]/20">
+          {answered}/{CUESTIONARIO_PREGUNTAS.length}
+        </span>
+      </div>
+      {CUESTIONARIO_PREGUNTAS.map((q, i) => (
+        <div key={`q-${i}`} className="flex items-start justify-between gap-3 p-3 bg-white border border-border rounded-xl hover:border-[#1A56DB]/30 transition-colors">
+          <p className="text-xs flex-1 leading-relaxed">{q}</p>
+          <div className="flex gap-1.5 flex-shrink-0">
+            {(["Si", "No"] as const).map(opt => (
+              <button key={opt} onClick={() => set(q, opt)}
+                className={`w-10 py-1.5 rounded-lg text-xs font-bold border transition-colors
+                  ${data[q] === opt
+                    ? opt === "Si" ? "bg-red-500 border-red-500 text-white" : "bg-emerald-500 border-emerald-500 text-white"
+                    : "border-border text-muted-foreground hover:border-[#1A56DB]/40"}`}>
+                {opt}
+              </button>
             ))}
           </div>
         </div>
-      </div>
+      ))}
+    </div>
+  );
+}
 
-      {/* Recent consents */}
-      <div className="bg-white rounded-xl border border-border shadow-sm">
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <div>
-            <p className="font-semibold text-sm">Consentimientos Recientes</p>
-            <p className="text-xs text-muted-foreground">Últimos {recientes.length} registros</p>
-          </div>
-          <button onClick={() => onNav("consentimientos")} className="text-xs text-[#1A56DB] font-medium hover:underline flex items-center gap-1">
-            Ver todos <ChevronRight size={13} />
-          </button>
+// ─── STEP WIZARD HEADER ───────────────────────────────────────────────────────
+function WizardHeader({ steps, current, titulo, icon }: {
+  steps: string[]; current: number; titulo: string; icon: React.ReactNode;
+}) {
+  return (
+    <div className="flex-shrink-0">
+      <div className="flex items-center gap-3 mb-4 px-5 pt-5">
+        <div className="w-9 h-9 rounded-xl bg-[#1A56DB]/10 flex items-center justify-center text-[#1A56DB]">{icon}</div>
+        <div>
+          <p className="font-bold text-sm">{titulo}</p>
+          <p className="text-[10px] text-muted-foreground">Paso {current} de {steps.length}: {steps[current - 1]}</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                {["Radicado", "Paciente", "Procedimiento", "Médico", "Fecha", "Estado"].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {recientes.map(c => (
-                <tr key={c.id} className="hover:bg-background/60 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-[#1A56DB] font-medium">{c.radicado}</td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-xs">{c.paciente.nombres} {c.paciente.apellidos}</p>
-                    <p className="text-[10px] text-muted-foreground font-mono">{c.paciente.documento}</p>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground max-w-[160px] truncate">{c.procedimiento}</td>
-                  <td className="px-4 py-3 text-xs">{c.medico}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{fmtFecha(c.fecha)}</td>
-                  <td className="px-4 py-3"><StatusBadge estado={c.estado} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      </div>
+      <div className="px-5 pb-4">
+        <div className="flex gap-1">
+          {steps.map((_, i) => (
+            <div key={i} className={`flex-1 h-1.5 rounded-full transition-all duration-300
+              ${i < current ? "bg-[#1A56DB]" : i === current - 1 ? "bg-[#1A56DB]/60" : "bg-border"}`} />
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Nuevo Consentimiento — Multi-step ───────────────────────────────────────
-
-interface NuevoConsentForm {
-  tipo: string;
-  pacienteId: string;
-  procedimiento: string;
-  diagnostico: string;
-  observaciones: string;
-  firma: string;
-  nombre_firmante: string;
-  doc_firmante: string;
+// ─── NAV BUTTONS ──────────────────────────────────────────────────────────────
+function NavButtons({ step, total, onBack, onNext, onFinish, canNext = true, finishing = false }: {
+  step: number; total: number; onBack: () => void; onNext: () => void; onFinish: () => void;
+  canNext?: boolean; finishing?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-5 py-4 border-t border-border flex-shrink-0">
+      {step > 1 && (
+        <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">
+          <ChevronLeft size={15} /> Anterior
+        </button>
+      )}
+      <div className="flex-1" />
+      {step < total ? (
+        <button onClick={onNext} disabled={!canNext}
+          className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold disabled:opacity-40 hover:bg-[#1648bf] transition-colors">
+          Siguiente <ChevronRight size={15} />
+        </button>
+      ) : (
+        <button onClick={onFinish} disabled={!canNext || finishing}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors">
+          {finishing ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Guardando...</> : <><CheckCircle size={15} /> Guardar y Enviar</>}
+        </button>
+      )}
+    </div>
+  );
 }
 
-function NuevoConsentimientoPage({
-  pacientes, user, onSave, onCancel, addToast, nextId
-}: {
-  pacientes: Paciente[];
-  user: UsuarioSistema;
-  onSave: (data: NuevoConsentForm) => void;
-  onCancel: () => void;
-  addToast: (t: "success" | "error" | "info", m: string) => void;
-  nextId: number;
+// ─── FORM WRAPPER ─────────────────────────────────────────────────────────────
+function FormWrapper({ onCancel, children }: { onCancel: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-3">
+      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-xl max-h-[95vh] flex flex-col">
+        <div className="flex items-center justify-end px-5 pt-4">
+          <button onClick={onCancel} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted">
+            <X size={16} className="text-muted-foreground" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── FORM ESCLEROTERAPIA ──────────────────────────────────────────────────────
+function FormEscleroterapia({ onSave, onCancel, addToast, nextId }: {
+  onSave: (r: ConsentRecord) => void; onCancel: () => void;
+  addToast: (t: "success" | "error" | "info", m: string) => void; nextId: number;
 }) {
+  const STEPS = ["Datos del Paciente", "Cuestionario Médico", "Vitales — Enfermería", "Leer Consentimiento", "Firma y Envío"];
   const [step, setStep] = useState(1);
-  const [showSig, setShowSig] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [form, setForm] = useState<NuevoConsentForm>({
-    tipo: "", pacienteId: "", procedimiento: "", diagnostico: "",
-    observaciones: "", firma: "", nombre_firmante: "", doc_firmante: ""
-  });
+  const [pac, setPac] = useState<DatosPaciente>({ nombre: "", documento: "", tipoDoc: "CC", telefono: "", email: "", direccion: "", fechaNacimiento: "", fecha: hoy() });
+  const [cuest, setCuest] = useState<Record<string, "Si" | "No" | "">>({});
+  const [vitales, setVitales] = useState<DatosVitales>({ oximetria: "", tension: "", peso: "", talla: "", frecuenciaCardiaca: "", temperatura: "" });
+  const [obs, setObs] = useState("");
+  const [leido, setLeido] = useState(false);
+  const [firmaP, setFirmaP] = useState("");
+  const [firmaM, setFirmaM] = useState("");
+  const [consentido, setConsentido] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const selectedPaciente = pacientes.find(p => p.id === form.pacienteId);
-
-  const set = (k: keyof NuevoConsentForm, v: string) => setForm(f => ({ ...f, [k]: v }));
-
-  const canNext1 = form.tipo && form.pacienteId;
-  const canNext2 = form.procedimiento && form.diagnostico;
-  const canSave = form.firma;
-
-  const handleSend = async () => {
-    setSending(true);
-    await new Promise(r => setTimeout(r, 1400));
-    setSending(false);
-    onSave(form);
-    addToast("success", "Consentimiento guardado y enviado al paciente");
+  const canNext = () => {
+    if (step === 1) return pac.nombre.trim() !== "" && pac.documento.trim() !== "";
+    if (step === 4) return leido;
+    if (step === 5) return firmaP !== "" && consentido !== null;
+    return true;
   };
 
-  const STEPS = ["Paciente y Tipo", "Procedimiento", "Firma y Envío"];
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      const r: ConsentRecord = {
+        id: String(Date.now()), tipo: "escleroterapia", radicado: genRadicado("escleroterapia", nextId),
+        fecha: hoy(), pacienteNombre: pac.nombre, pacienteDoc: pac.documento, pacienteTel: pac.telefono,
+        estado: "FIRMADO", enviado_email: false, enviado_whatsapp: false, pendienteMedico: true,
+        datos: { paciente: pac, cuestionario: cuest, vitales, firmaConsentimiento: firmaP, firmaMedico: firmaM, consentido, observacionesEnfermera: obs },
+      };
+      onSave(r);
+      addToast("success", `Consentimiento de Escleroterapia firmado — Notificado al médico`);
+      setSaving(false);
+    }, 900);
+  };
+
+  const stepContent = () => {
+    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} />;
+    if (step === 2) return <StepCuestionario data={cuest} onChange={setCuest} />;
+    if (step === 3) return <StepVitalesEnfermera data={vitales} onChange={setVitales} observaciones={obs} onObservaciones={setObs} />;
+    if (step === 4) return <StepLeerConsentimiento titulo="Escleroterapia (Inyección) de Várices" texto={TEXTO_ESCLEROTERAPIA} leido={leido} onLeido={setLeido} />;
+    if (step === 5) return <StepFirmaFinal consentido={consentido} onConsentido={setConsentido} firmaLabel="Firma del Paciente" firma={firmaP} onFirma={setFirmaP} />;
+    return null;
+  };
 
   return (
-    <div className="p-5 lg:p-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={onCancel} className="text-muted-foreground hover:text-foreground"><ChevronLeft size={20} /></button>
-        <div>
-          <h2 className="font-bold text-base">Nuevo Consentimiento Informado</h2>
-          <p className="text-xs text-muted-foreground">{genRadicado(nextId)} · {new Date().toLocaleDateString("es-CO")}</p>
+    <FormWrapper onCancel={onCancel}>
+      <WizardHeader steps={STEPS} current={step} titulo="Consentimiento de Escleroterapia" icon={<Syringe size={18} />} />
+      <div className="overflow-y-auto flex-1 px-5 pb-2">{stepContent()}</div>
+      <NavButtons step={step} total={5} onBack={() => setStep(s => s - 1)} onNext={() => setStep(s => s + 1)} onFinish={handleSave} canNext={canNext()} finishing={saving} />
+    </FormWrapper>
+  );
+}
+
+// ─── FORM SUEROTERAPIA ────────────────────────────────────────────────────────
+function FormSueroterapia({ onSave, onCancel, addToast, nextId }: {
+  onSave: (r: ConsentRecord) => void; onCancel: () => void;
+  addToast: (t: "success" | "error" | "info", m: string) => void; nextId: number;
+}) {
+  const STEPS = ["Datos del Paciente", "Vitales + Prescripción — Enfermería", "Leer Consentimiento", "Firma y Envío"];
+  const [step, setStep] = useState(1);
+  const [pac, setPac] = useState<DatosPaciente>({ nombre: "", documento: "", tipoDoc: "CC", telefono: "", email: "", direccion: "", fechaNacimiento: "", fecha: hoy() });
+  const [vitales, setVitales] = useState<DatosVitales>({ oximetria: "", tension: "", peso: "", talla: "", frecuenciaCardiaca: "", temperatura: "" });
+  const [obs, setObs] = useState("");
+  const [dosis_vitC, setDosisVitC] = useState("");
+  const [dosis_compB, setDosisCompB] = useState("");
+  const [traz, setTraz] = useState({ nacl: "", vitC: "", compB: "", jeringa: "", pericraneal: "", macrogotero: "" });
+  const [leido, setLeido] = useState(false);
+  const [firmaP, setFirmaP] = useState("");
+  const [firmaR, setFirmaR] = useState("");
+  const [consentido, setConsentido] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const canNext = () => {
+    if (step === 1) return pac.nombre.trim() !== "" && pac.documento.trim() !== "";
+    if (step === 3) return leido;
+    if (step === 4) return firmaP !== "" && consentido !== null;
+    return true;
+  };
+
+  const PrescripcionExtra = (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 p-3 bg-[#00B896]/10 border border-[#00B896]/30 rounded-xl">
+        <Droplets size={15} className="text-[#00B896]" />
+        <p className="text-xs font-semibold text-[#00B896]">Prescripción y Trazabilidad — Solo Enfermería</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Dosis Vitamina C (cc)" value={dosis_vitC} onChange={setDosisVitC} placeholder="Ej: 3cc" />
+        <Field label="Dosis Complejo B (cc)" value={dosis_compB} onChange={setDosisCompB} placeholder="Ej: 4cc" />
+      </div>
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Trazabilidad M/DM — Número de Lote</p>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ["NaCl 0.9%", "nacl"], ["Vitamina C", "vitC"], ["Complejo B", "compB"],
+            ["Jeringa 3ml", "jeringa"], ["Pericraneal", "pericraneal"], ["Macrogotero", "macrogotero"]
+          ] as [string, keyof typeof traz][]).map(([label, key]) => (
+            <div key={key}>
+              <label className="text-[10px] text-muted-foreground font-medium block mb-1">{label}</label>
+              <input value={traz[key]} onChange={e => setTraz({ ...traz, [key]: e.target.value })} placeholder="No. lote"
+                className="w-full border border-border rounded-lg px-2.5 py-2 text-xs bg-input-background focus:outline-none focus:ring-1 focus:ring-[#1A56DB]/30 font-mono" />
+            </div>
+          ))}
         </div>
       </div>
+    </div>
+  );
 
-      {/* Steps indicator */}
-      <div className="flex items-center mb-8">
-        {STEPS.map((s, i) => {
-          const n = i + 1;
-          const done = step > n;
-          const active = step === n;
-          return (
-            <div key={n} className="flex items-center flex-1 last:flex-none">
-              <div className={`flex items-center gap-2 ${active || done ? "text-[#1A56DB]" : "text-muted-foreground"}`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors
-                  ${done ? "bg-emerald-500 text-white" : active ? "bg-[#1A56DB] text-white" : "bg-muted text-muted-foreground"}`}>
-                  {done ? <Check size={13} /> : n}
-                </div>
-                <span className={`text-xs font-medium hidden sm:block ${active ? "text-[#1A56DB]" : done ? "text-emerald-600" : "text-muted-foreground"}`}>{s}</span>
-              </div>
-              {i < STEPS.length - 1 && <div className={`flex-1 h-px mx-3 ${step > n ? "bg-emerald-400" : "bg-border"}`} />}
-            </div>
-          );
-        })}
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      const r: ConsentRecord = {
+        id: String(Date.now()), tipo: "sueroterapia", radicado: genRadicado("sueroterapia", nextId),
+        fecha: hoy(), pacienteNombre: pac.nombre, pacienteDoc: pac.documento, pacienteTel: pac.telefono,
+        estado: "FIRMADO", enviado_email: false, enviado_whatsapp: false, pendienteMedico: true,
+        datos: { paciente: pac, vitales, dosis_vitC, dosis_compB, trazabilidad: traz, firmaConsentimiento: firmaP, firmaResponsable: firmaR, consentido, observacionesEnfermera: obs },
+      };
+      onSave(r);
+      addToast("success", "Consentimiento de Sueroterapia firmado — Notificado al médico");
+      setSaving(false);
+    }, 900);
+  };
+
+  const stepContent = () => {
+    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} />;
+    if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales} observaciones={obs} onObservaciones={setObs} showExtra extraContent={PrescripcionExtra} />;
+    if (step === 3) return <StepLeerConsentimiento titulo="Sueroterapia Vitamina C / Complejo B" texto={TEXTO_SUEROTERAPIA} leido={leido} onLeido={setLeido} />;
+    if (step === 4) return <StepFirmaFinal consentido={consentido} onConsentido={setConsentido} firmaLabel="Firma del Paciente" firma={firmaP} onFirma={setFirmaP} />;
+    return null;
+  };
+
+  return (
+    <FormWrapper onCancel={onCancel}>
+      <WizardHeader steps={STEPS} current={step} titulo="Consentimiento de Sueroterapia" icon={<Droplets size={18} />} />
+      <div className="overflow-y-auto flex-1 px-5 pb-2">{stepContent()}</div>
+      <NavButtons step={step} total={4} onBack={() => setStep(s => s - 1)} onNext={() => setStep(s => s + 1)} onFinish={handleSave} canNext={canNext()} finishing={saving} />
+    </FormWrapper>
+  );
+}
+
+// ─── FORM LASER ───────────────────────────────────────────────────────────────
+function FormLaser({ onSave, onCancel, addToast, nextId }: {
+  onSave: (r: ConsentRecord) => void; onCancel: () => void;
+  addToast: (t: "success" | "error" | "info", m: string) => void; nextId: number;
+}) {
+  const STEPS = ["Datos del Paciente", "Vitales + Parámetros — Enfermería", "Leer Consentimiento", "Firma y Envío"];
+  const [step, setStep] = useState(1);
+  const [pac, setPac] = useState<DatosPaciente>({ nombre: "", documento: "", tipoDoc: "CC", telefono: "", email: "", direccion: "", fechaNacimiento: "", fecha: hoy() });
+  const [vitales, setVitales] = useState<DatosVitales>({ oximetria: "", tension: "", peso: "", talla: "", frecuenciaCardiaca: "", temperatura: "" });
+  const [obs, setObs] = useState("");
+  const [params, setParams] = useState<LaserRow[]>([{ fototipo: "", pieza: "", modo: "", frecuencia: "", fluencia: "", energia: "", area: "", pases: "" }]);
+  const [leido, setLeido] = useState(false);
+  const [firmaP, setFirmaP] = useState("");
+  const [firmaM, setFirmaM] = useState("");
+  const [consentido, setConsentido] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const canNext = () => {
+    if (step === 1) return pac.nombre.trim() !== "" && pac.documento.trim() !== "";
+    if (step === 3) return leido;
+    if (step === 4) return firmaP !== "" && consentido !== null;
+    return true;
+  };
+
+  const addRow = () => setParams(p => [...p, { fototipo: "", pieza: "", modo: "", frecuencia: "", fluencia: "", energia: "", area: "", pases: "" }]);
+  const updRow = (i: number, k: keyof LaserRow, v: string) => setParams(p => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
+  const delRow = (i: number) => setParams(p => p.filter((_, idx) => idx !== i));
+
+  const ParamsExtra = (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg flex-1 mr-2">
+          <Zap size={14} className="text-amber-600" />
+          <p className="text-xs font-semibold text-amber-800">Parámetros ND-YAG — Técnico/Enfermería</p>
+        </div>
+        <button onClick={addRow} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#1A56DB] text-white text-xs font-medium hover:bg-[#1648bf]">
+          <Plus size={12} /> Fila
+        </button>
       </div>
-
-      <div className="bg-white rounded-xl border border-border shadow-sm p-6">
-        {/* Step 1 */}
-        {step === 1 && (
-          <div className="space-y-5">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Tipo de Consentimiento *</label>
-              <select value={form.tipo} onChange={e => set("tipo", e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]">
-                <option value="">Seleccionar tipo...</option>
-                {TIPOS_CONSENTIMIENTO.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Paciente *</label>
-              <select value={form.pacienteId} onChange={e => set("pacienteId", e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]">
-                <option value="">Buscar paciente...</option>
-                {pacientes.map(p => (
-                  <option key={p.id} value={p.id}>{p.nombres} {p.apellidos} — {p.tipo_doc}: {p.documento}</option>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-[10px]">
+          <thead>
+            <tr className="bg-[#0C1A35] text-[#C8D6EF]">
+              {["Fototipo", "Pieza", "Modo", "Frec. Hz", "Fluencia J/cm²", "Energía mJ", "Área cm²", "Pases", ""].map(h => (
+                <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {params.map((row, i) => (
+              <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-[#F8FAFF]"}>
+                {(["fototipo", "pieza", "modo", "frecuencia", "fluencia", "energia", "area", "pases"] as (keyof LaserRow)[]).map(k => (
+                  <td key={k} className="px-1 py-1">
+                    <input value={row[k]} onChange={e => updRow(i, k, e.target.value)}
+                      className="w-full min-w-[50px] border border-transparent focus:border-[#1A56DB]/40 rounded px-1.5 py-1 bg-transparent focus:bg-white focus:outline-none text-[10px] font-mono" />
+                  </td>
                 ))}
-              </select>
+                <td className="px-1 py-1">
+                  {params.length > 1 && (
+                    <button onClick={() => delRow(i)} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={10} /></button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      const r: ConsentRecord = {
+        id: String(Date.now()), tipo: "laser", radicado: genRadicado("laser", nextId),
+        fecha: hoy(), pacienteNombre: pac.nombre, pacienteDoc: pac.documento, pacienteTel: pac.telefono,
+        estado: "FIRMADO", enviado_email: false, enviado_whatsapp: false, pendienteMedico: true,
+        datos: { paciente: pac, vitales, parametros: params, firmaConsentimiento: firmaP, firmaMedico: firmaM, consentido, observacionesEnfermera: obs },
+      };
+      onSave(r);
+      addToast("success", "Consentimiento Láser Várices firmado — Notificado al médico");
+      setSaving(false);
+    }, 900);
+  };
+
+  const stepContent = () => {
+    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} />;
+    if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales} observaciones={obs} onObservaciones={setObs} showExtra extraContent={ParamsExtra} />;
+    if (step === 3) return <StepLeerConsentimiento titulo="Terapia Láser ND:YAG para Venas Várices" texto={TEXTO_LASER} leido={leido} onLeido={setLeido} />;
+    if (step === 4) return <StepFirmaFinal consentido={consentido} onConsentido={setConsentido} firmaLabel="Firma del Paciente" firma={firmaP} onFirma={setFirmaP} />;
+    return null;
+  };
+
+  return (
+    <FormWrapper onCancel={onCancel}>
+      <WizardHeader steps={STEPS} current={step} titulo="Consentimiento Láser Várices" icon={<Zap size={18} />} />
+      <div className="overflow-y-auto flex-1 px-5 pb-2">{stepContent()}</div>
+      <NavButtons step={step} total={4} onBack={() => setStep(s => s - 1)} onNext={() => setStep(s => s + 1)} onFinish={handleSave} canNext={canNext()} finishing={saving} />
+    </FormWrapper>
+  );
+}
+
+// ─── FORM PAQUETE ─────────────────────────────────────────────────────────────
+function FormPaquete({ onSave, onCancel, addToast, nextId }: {
+  onSave: (r: ConsentRecord) => void; onCancel: () => void;
+  addToast: (t: "success" | "error" | "info", m: string) => void; nextId: number;
+}) {
+  const STEPS = [
+    "Datos del Paciente", "Vitales — Enfermería",
+    "Valores Escleroterapia", "Valores Sueroterapia", "Valores Láser",
+    "Leer — Escleroterapia", "Leer — Sueroterapia", "Leer — Láser",
+    "Firmar — Escleroterapia", "Firmar — Sueroterapia", "Firmar — Láser",
+    "Resumen"
+  ];
+  const [step, setStep] = useState(1);
+  const [pac, setPac] = useState<DatosPaciente>({ nombre: "", documento: "", tipoDoc: "CC", telefono: "", email: "", direccion: "", fechaNacimiento: "", fecha: hoy() });
+  const [vitales, setVitales] = useState<DatosVitales>({ oximetria: "", tension: "", peso: "", talla: "", frecuenciaCardiaca: "", temperatura: "" });
+  const [obsGeneral, setObsGeneral] = useState("");
+  const [cuest, setCuest] = useState<Record<string, "Si" | "No" | "">>({});
+
+  // Valores específicos Sueroterapia
+  const [dosis_vitC, setDosisVitC] = useState("");
+  const [dosis_compB, setDosisCompB] = useState("");
+  const [traz, setTraz] = useState({ nacl: "", vitC: "", compB: "", jeringa: "", pericraneal: "", macrogotero: "" });
+
+  // Valores específicos Láser
+  const [params, setParams] = useState<LaserRow[]>([{ fototipo: "", pieza: "", modo: "", frecuencia: "", fluencia: "", energia: "", area: "", pases: "" }]);
+
+  // Lecturas
+  const [leidoEsc, setLeidoEsc] = useState(false);
+  const [leidoSue, setLeidoSue] = useState(false);
+  const [leidoLas, setLeidoLas] = useState(false);
+
+  // Firmas
+  const [firmaEsc, setFirmaEsc] = useState("");
+  const [firmaSue, setFirmaSue] = useState("");
+  const [firmaLas, setFirmaLas] = useState("");
+  const [consentidoEsc, setConsentidoEsc] = useState<boolean | null>(null);
+  const [consentidoSue, setConsentidoSue] = useState<boolean | null>(null);
+  const [consentidoLas, setConsentidoLas] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const addRow = () => setParams(p => [...p, { fototipo: "", pieza: "", modo: "", frecuencia: "", fluencia: "", energia: "", area: "", pases: "" }]);
+  const updRow = (i: number, k: keyof LaserRow, v: string) => setParams(p => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
+
+  const canNext = () => {
+    if (step === 1) return pac.nombre.trim() !== "" && pac.documento.trim() !== "";
+    if (step === 6) return leidoEsc;
+    if (step === 7) return leidoSue;
+    if (step === 8) return leidoLas;
+    if (step === 9) return firmaEsc !== "" && consentidoEsc !== null;
+    if (step === 10) return firmaSue !== "" && consentidoSue !== null;
+    if (step === 11) return firmaLas !== "" && consentidoLas !== null;
+    return true;
+  };
+
+  const SueroExtra = (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 p-2 bg-[#00B896]/10 border border-[#00B896]/30 rounded-lg">
+        <Droplets size={13} className="text-[#00B896]" />
+        <p className="text-xs font-semibold text-[#00B896]">Prescripción Sueroterapia</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Dosis Vitamina C (cc)" value={dosis_vitC} onChange={setDosisVitC} placeholder="Ej: 3cc" />
+        <Field label="Dosis Complejo B (cc)" value={dosis_compB} onChange={setDosisCompB} placeholder="Ej: 4cc" />
+      </div>
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Trazabilidad M/DM</p>
+        <div className="grid grid-cols-2 gap-2">
+          {([["NaCl 0.9%", "nacl"], ["Vitamina C", "vitC"], ["Complejo B", "compB"], ["Jeringa 3ml", "jeringa"], ["Pericraneal", "pericraneal"], ["Macrogotero", "macrogotero"]] as [string, keyof typeof traz][]).map(([label, key]) => (
+            <div key={key}>
+              <label className="text-[10px] text-muted-foreground font-medium block mb-1">{label}</label>
+              <input value={traz[key]} onChange={e => setTraz({ ...traz, [key]: e.target.value })} placeholder="No. lote"
+                className="w-full border border-border rounded-lg px-2.5 py-2 text-xs bg-input-background focus:outline-none focus:ring-1 focus:ring-[#1A56DB]/30 font-mono" />
             </div>
-            {selectedPaciente && (
-              <div className="p-4 bg-[#EEF2F8] rounded-lg grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Paciente</p>
-                  <p className="text-sm font-semibold mt-0.5">{selectedPaciente.nombres} {selectedPaciente.apellidos}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{selectedPaciente.tipo_doc}: {selectedPaciente.documento}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Contacto</p>
-                  <p className="text-xs mt-0.5 flex items-center gap-1"><Phone size={11} />{selectedPaciente.telefono}</p>
-                  <p className="text-xs flex items-center gap-1"><Mail size={11} />{selectedPaciente.email}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Edad</p>
-                  <p className="text-xs mt-0.5">{calcAge(selectedPaciente.fecha_nacimiento)} años</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Médico Tratante</p>
-                  <p className="text-xs mt-0.5">{user.nombre}</p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const LaserExtra = (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg flex-1 mr-2">
+          <Zap size={13} className="text-amber-600" />
+          <p className="text-xs font-semibold text-amber-800">Parámetros ND-YAG</p>
+        </div>
+        <button onClick={addRow} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#1A56DB] text-white text-xs font-medium">
+          <Plus size={12} /> Fila
+        </button>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-[10px]">
+          <thead><tr className="bg-[#0C1A35] text-[#C8D6EF]">
+            {["Fototipo", "Pieza", "Modo", "Hz", "J/cm²", "mJ", "cm²", "Pases"].map(h => (
+              <th key={h} className="px-2 py-2 text-left font-semibold">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {params.map((row, i) => (
+              <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-[#F8FAFF]"}>
+                {(["fototipo", "pieza", "modo", "frecuencia", "fluencia", "energia", "area", "pases"] as (keyof LaserRow)[]).map(k => (
+                  <td key={k} className="px-1 py-1">
+                    <input value={row[k]} onChange={e => updRow(i, k, e.target.value)}
+                      className="w-full min-w-[40px] border border-transparent focus:border-[#1A56DB]/40 rounded px-1 py-1 bg-transparent focus:bg-white focus:outline-none text-[10px] font-mono" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      const makeRec = (tipo: TipoConsent, datos: any, n: number): ConsentRecord => ({
+        id: String(Date.now() + n), tipo, radicado: genRadicado(tipo, nextId + n),
+        fecha: hoy(), pacienteNombre: pac.nombre, pacienteDoc: pac.documento, pacienteTel: pac.telefono,
+        estado: "FIRMADO", enviado_email: false, enviado_whatsapp: false, pendienteMedico: true, datos,
+      });
+      const r: ConsentRecord = {
+        id: String(Date.now()), tipo: "paquete", radicado: genRadicado("paquete", nextId),
+        fecha: hoy(), pacienteNombre: pac.nombre, pacienteDoc: pac.documento, pacienteTel: pac.telefono,
+        estado: "FIRMADO", enviado_email: false, enviado_whatsapp: false, pendienteMedico: true,
+        datos: [
+          makeRec("escleroterapia", { paciente: pac, cuestionario: cuest, vitales, firmaConsentimiento: firmaEsc, firmaMedico: "", consentido: consentidoEsc, observacionesEnfermera: obsGeneral }, 1),
+          makeRec("sueroterapia", { paciente: pac, vitales, dosis_vitC, dosis_compB, trazabilidad: traz, firmaConsentimiento: firmaSue, firmaResponsable: "", consentido: consentidoSue, observacionesEnfermera: obsGeneral }, 2),
+          makeRec("laser", { paciente: pac, vitales, parametros: params, firmaConsentimiento: firmaLas, firmaMedico: "", consentido: consentidoLas, observacionesEnfermera: obsGeneral }, 3),
+        ],
+      };
+      onSave(r);
+      addToast("success", "Paquete completo firmado (3 consentimientos) — Notificado al médico");
+      setSaving(false);
+    }, 1200);
+  };
+
+  const stepContent = () => {
+    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} />;
+    if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales} observaciones={obsGeneral} onObservaciones={setObsGeneral} />;
+    if (step === 3) return <StepCuestionario data={cuest} onChange={setCuest} />;
+    if (step === 4) return <StepVitalesEnfermera data={vitales} onChange={setVitales} observaciones={obsGeneral} onObservaciones={setObsGeneral} showExtra extraContent={SueroExtra} />;
+    if (step === 5) return <StepVitalesEnfermera data={vitales} onChange={setVitales} observaciones={obsGeneral} onObservaciones={setObsGeneral} showExtra extraContent={LaserExtra} />;
+    if (step === 6) return <StepLeerConsentimiento titulo="Escleroterapia — Paquete Completo" texto={TEXTO_ESCLEROTERAPIA} leido={leidoEsc} onLeido={setLeidoEsc} />;
+    if (step === 7) return <StepLeerConsentimiento titulo="Sueroterapia — Paquete Completo" texto={TEXTO_SUEROTERAPIA} leido={leidoSue} onLeido={setLeidoSue} />;
+    if (step === 8) return <StepLeerConsentimiento titulo="Láser Várices — Paquete Completo" texto={TEXTO_LASER} leido={leidoLas} onLeido={setLeidoLas} />;
+    if (step === 9) return <StepFirmaFinal consentido={consentidoEsc} onConsentido={setConsentidoEsc} firmaLabel="Firma — Escleroterapia" firma={firmaEsc} onFirma={setFirmaEsc} />;
+    if (step === 10) return <StepFirmaFinal consentido={consentidoSue} onConsentido={setConsentidoSue} firmaLabel="Firma — Sueroterapia" firma={firmaSue} onFirma={setFirmaSue} />;
+    if (step === 11) return <StepFirmaFinal consentido={consentidoLas} onConsentido={setConsentidoLas} firmaLabel="Firma — Láser Várices" firma={firmaLas} onFirma={setFirmaLas} />;
+    if (step === 12) return (
+      <div className="space-y-4">
+        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl">
+          <div className="flex items-center gap-2 mb-3"><CheckCircle size={18} className="text-emerald-600" /><p className="font-bold text-emerald-800 text-sm">Paquete Completo — Listo para Guardar</p></div>
+          <p className="text-xs text-emerald-700">Paciente: <span className="font-semibold">{pac.nombre}</span></p>
+          <p className="text-xs text-emerald-700">Doc: {pac.tipoDoc} {pac.documento}</p>
+        </div>
+        {[
+          { label: "Escleroterapia", firma: firmaEsc, consentido: consentidoEsc, icon: <Syringe size={13} /> },
+          { label: "Sueroterapia", firma: firmaSue, consentido: consentidoSue, icon: <Droplets size={13} /> },
+          { label: "Láser Várices", firma: firmaLas, consentido: consentidoLas, icon: <Zap size={13} /> },
+        ].map(({ label, firma, consentido, icon }) => (
+          <div key={label} className="flex items-center gap-3 p-3 bg-white border border-border rounded-xl">
+            <div className="w-8 h-8 rounded-lg bg-[#EEF2F8] flex items-center justify-center text-[#1A56DB]">{icon}</div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold">{label}</p>
+              <p className={`text-[10px] font-medium ${consentido ? "text-emerald-600" : "text-red-600"}`}>
+                {consentido ? "✓ Consentido" : "✗ Disentido"}
+              </p>
+            </div>
+            {firma && <img src={firma} alt="firma" className="h-8 bg-white border border-[#1A56DB]/20 rounded" />}
+          </div>
+        ))}
+      </div>
+    );
+    return null;
+  };
+
+  const stepLabel = () => {
+    const labels = ["Datos del Paciente", "Vitales Generales", "Cuestionario Escleroterapia", "Prescripción Sueroterapia", "Parámetros Láser", "Leer — Escleroterapia", "Leer — Sueroterapia", "Leer — Láser", "Firmar — Escleroterapia", "Firmar — Sueroterapia", "Firmar — Láser", "Resumen"];
+    return labels[step - 1];
+  };
+
+  return (
+    <FormWrapper onCancel={onCancel}>
+      <WizardHeader steps={STEPS} current={step} titulo="Paquete Completo — 3 Consentimientos" icon={<Package size={18} />} />
+      <div className="text-center pb-1">
+        <span className="text-[10px] text-muted-foreground font-medium">{stepLabel()}</span>
+      </div>
+      <div className="overflow-y-auto flex-1 px-5 pb-2">{stepContent()}</div>
+      <NavButtons step={step} total={12} onBack={() => setStep(s => s - 1)} onNext={() => setStep(s => s + 1)} onFinish={handleSave} canNext={canNext()} finishing={saving} />
+    </FormWrapper>
+  );
+}
+
+// ─── PDF VIEWER ───────────────────────────────────────────────────────────────
+function PDFModal({ record, onClose, onSendEmail, onSendWhatsApp }: {
+  record: ConsentRecord; onClose: () => void;
+  onSendEmail: () => void; onSendWhatsApp: () => void;
+}) {
+  const d = record.datos as any;
+  const pac = d.paciente as DatosPaciente;
+  const vitales = d.vitales as DatosVitales | undefined;
+  const TIPO_LABELS = {
+    escleroterapia: "ESCLEROTERAPIA (INYECCIÓN) DE VÁRICES",
+    sueroterapia: "SUEROTERAPIA VITAMINA C / COMPLEJO B",
+    laser: "TERAPIA LÁSER ND:YAG PARA VENAS VÁRICES",
+    paquete: "PAQUETE COMPLETO — 3 CONSENTIMIENTOS",
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[150] flex items-center justify-center p-3">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div>
+              <p className="font-bold text-sm">{record.radicado}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <StatusBadge estado={record.estado} />
+                <TipoBadge tipo={record.tipo} />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onSendWhatsApp}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366] text-white text-xs font-medium hover:bg-[#20ba5a] transition-colors">
+              <MessageSquare size={12} /> WhatsApp
+            </button>
+            <button onClick={onSendEmail}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A56DB] text-white text-xs font-medium hover:bg-[#1648bf] transition-colors">
+              <Mail size={12} /> Email
+            </button>
+            <button onClick={onClose}><X size={18} className="text-muted-foreground" /></button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-6 bg-gray-50">
+          <div className="bg-white rounded-xl shadow-sm p-7 max-w-[600px] mx-auto text-sm text-foreground">
+            <div className="flex items-start justify-between pb-5 mb-5 border-b-2 border-[#1A56DB]">
+              <div>
+                <p className="font-black text-xl text-[#1A56DB] tracking-tight">Med&Fis</p>
+                <p className="text-xs text-muted-foreground font-mono">NIT {IPS.nit}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-mono text-[#1A56DB] font-semibold">{record.radicado}</p>
+                <p className="text-[10px] text-muted-foreground">{fmtFecha(record.fecha)}</p>
+                <StatusBadge estado={record.estado} />
+              </div>
+            </div>
+
+            <h2 className="text-center font-black text-sm uppercase tracking-wide text-[#0C1A35] mb-1">CONSENTIMIENTO INFORMADO</h2>
+            <h3 className="text-center text-xs font-semibold text-[#1A56DB] mb-5">{TIPO_LABELS[record.tipo]}</h3>
+
+            {/* Datos paciente */}
+            <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-[#EEF2F8] rounded-lg">
+              <div>
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold mb-0.5">Paciente</p>
+                <p className="text-xs font-semibold">{pac?.nombre}</p>
+                <p className="text-[10px] text-muted-foreground font-mono">{pac?.tipoDoc}: {pac?.documento}</p>
+                <p className="text-[10px] text-muted-foreground">Tel: {pac?.telefono}</p>
+                {pac?.email && <p className="text-[10px] text-muted-foreground">{pac.email}</p>}
+                {pac?.direccion && <p className="text-[10px] text-muted-foreground">{pac.direccion}</p>}
+              </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold mb-0.5">Médico Tratante</p>
+                <p className="text-xs font-semibold">{IPS.medico}</p>
+                <p className="text-[10px] text-muted-foreground">{IPS.rm}</p>
+                <p className="text-[10px] text-muted-foreground">Fecha: {pac?.fecha && fmtFecha(pac.fecha)}</p>
+              </div>
+            </div>
+
+            {/* Vitales */}
+            {vitales && (
+              <div className="mb-4">
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Signos Vitales</p>
+                <div className="grid grid-cols-6 gap-1">
+                  {[["SpO2", vitales.oximetria + "%"], ["TA", vitales.tension], ["FC", vitales.frecuenciaCardiaca + " lpm"], ["Peso", vitales.peso + " kg"], ["Talla", vitales.talla + " cm"], ["Temp", vitales.temperatura + "°C"]].map(([l, v]) => (
+                    <div key={l} className="bg-[#EEF2F8] rounded-lg p-2 text-center">
+                      <p className="text-[8px] text-muted-foreground font-semibold">{l}</p>
+                      <p className="text-[10px] font-bold">{v || "—"}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* Step 2 */}
-        {step === 2 && (
-          <div className="space-y-5">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Procedimiento *</label>
-              <input type="text" placeholder="Ej: Apendicectomía laparoscópica" value={form.procedimiento}
-                onChange={e => set("procedimiento", e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Diagnóstico *</label>
-              <input type="text" placeholder="CIE-10 o descripción diagnóstica" value={form.diagnostico}
-                onChange={e => set("diagnostico", e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Observaciones del Médico</label>
-              <textarea rows={4} placeholder="Condiciones especiales, antecedentes relevantes, notas adicionales..." value={form.observaciones}
-                onChange={e => set("observaciones", e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB] resize-none" />
-            </div>
-            {/* Resumen */}
-            <div className="p-4 bg-[#EEF2F8] rounded-lg">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Resumen del consentimiento</p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div><span className="text-muted-foreground">Tipo:</span> <span className="font-medium">{form.tipo}</span></div>
-                <div><span className="text-muted-foreground">Paciente:</span> <span className="font-medium">{selectedPaciente?.nombres} {selectedPaciente?.apellidos}</span></div>
+            {/* Observaciones enfermería */}
+            {(d as any).observacionesEnfermera && (
+              <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Observaciones de Enfermería</p>
+                <p className="text-[10px]">{(d as any).observacionesEnfermera}</p>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Step 3 — Firma */}
-        {step === 3 && (
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Nombre del Firmante *</label>
-                <input type="text" placeholder="Nombre completo" value={form.nombre_firmante}
-                  onChange={e => set("nombre_firmante", e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Documento del Firmante *</label>
-                <input type="text" placeholder="No. cédula" value={form.doc_firmante}
-                  onChange={e => set("doc_firmante", e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Firma Digital *</label>
-              {form.firma ? (
-                <div className="border border-emerald-300 rounded-xl p-3 bg-emerald-50 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle size={18} className="text-emerald-600" />
-                    <div>
-                      <p className="text-xs font-semibold text-emerald-700">Firma registrada correctamente</p>
-                      <p className="text-[10px] text-emerald-600">Vista previa disponible</p>
+            {/* Firma y decisión */}
+            <div className="mt-6 pt-5 border-t border-dashed border-border">
+              <p className="text-[9px] text-center text-muted-foreground mb-4">
+                El paciente declara haber LEÍDO, COMPRENDIDO y tomado su decisión de manera LIBRE y VOLUNTARIA.
+              </p>
+              <div className="flex justify-center mb-3">
+                <div className="text-center max-w-[200px]">
+                  {d.firmaConsentimiento ? (
+                    <img src={d.firmaConsentimiento} alt="firma" className="w-full h-16 object-contain border border-[#1A56DB]/20 rounded-lg bg-white mb-1" />
+                  ) : (
+                    <div className="w-full h-16 border border-dashed border-[#1A56DB]/30 rounded-lg mb-1 flex items-center justify-center">
+                      <p className="text-[9px] text-muted-foreground">Pendiente</p>
                     </div>
+                  )}
+                  <div className="border-t border-foreground/30 pt-1">
+                    <p className="text-[10px] font-semibold">{pac?.nombre}</p>
+                    <p className="text-[9px] text-muted-foreground">{pac?.tipoDoc}: {pac?.documento}</p>
+                    <p className="text-[9px] text-muted-foreground">Firma del Paciente</p>
                   </div>
-                  <div className="flex gap-2">
-                    <img src={form.firma} alt="firma" className="h-12 border border-emerald-200 rounded bg-white" />
-                    <button onClick={() => set("firma", "")} className="text-xs text-red-500 hover:underline">Repetir</button>
-                  </div>
-                </div>
-              ) : (
-                <button onClick={() => setShowSig(true)}
-                  className="w-full border-2 border-dashed border-[#1A56DB]/40 rounded-xl p-6 flex flex-col items-center gap-2 hover:bg-[#1A56DB]/5 transition-colors">
-                  <Pen size={24} className="text-[#1A56DB]/60" />
-                  <p className="text-sm font-medium text-[#1A56DB]">Abrir panel de firma</p>
-                  <p className="text-xs text-muted-foreground">El paciente debe firmar digitalmente el documento</p>
-                </button>
-              )}
-            </div>
-
-            {/* Envío */}
-            <div className="border border-border rounded-xl p-4">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Canales de Envío</p>
-              <div className="flex gap-3">
-                <div className="flex-1 flex items-center gap-3 p-3 bg-[#EEF2F8] rounded-lg">
-                  <Mail size={16} className="text-[#1A56DB]" />
-                  <div>
-                    <p className="text-xs font-medium">Email</p>
-                    <p className="text-[10px] text-muted-foreground">{selectedPaciente?.email}</p>
-                  </div>
-                  <CheckCircle size={14} className="ml-auto text-emerald-500" />
-                </div>
-                <div className="flex-1 flex items-center gap-3 p-3 bg-[#EEF2F8] rounded-lg">
-                  <MessageSquare size={16} className="text-emerald-600" />
-                  <div>
-                    <p className="text-xs font-medium">WhatsApp</p>
-                    <p className="text-[10px] text-muted-foreground">{selectedPaciente?.telefono}</p>
-                  </div>
-                  <CheckCircle size={14} className="ml-auto text-emerald-500" />
                 </div>
               </div>
+              <div className={`mt-3 p-2.5 rounded-lg text-center text-xs font-bold
+                ${d.consentido === true ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : d.consentido === false ? "bg-red-50 text-red-700 border border-red-200"
+                : "bg-muted text-muted-foreground"}`}>
+                {d.consentido === true ? "✓ PACIENTE CONSINTIÓ EL PROCEDIMIENTO"
+                : d.consentido === false ? "✗ PACIENTE DISENTIÓ — NO AUTORIZA EL PROCEDIMIENTO"
+                : "Decisión no registrada"}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-border text-center">
+              <p className="text-[9px] text-muted-foreground">Documento digital firmado · {IPS.nombre} · NIT {IPS.nit} · {new Date().toLocaleDateString("es-CO")}</p>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between mt-6 pt-5 border-t border-border">
-          <button onClick={step > 1 ? () => setStep(s => s - 1) : onCancel}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">
-            <ChevronLeft size={15} />{step === 1 ? "Cancelar" : "Anterior"}
+        <div className="flex gap-2 p-4 border-t border-border flex-shrink-0">
+          <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted">
+            <Printer size={14} /> Imprimir
           </button>
-          {step < 3 ? (
-            <button onClick={() => setStep(s => s + 1)} disabled={step === 1 ? !canNext1 : !canNext2}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#1A56DB] text-white text-sm font-medium hover:bg-[#1648bf] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-              Siguiente <ChevronRight size={15} />
-            </button>
-          ) : (
-            <button onClick={handleSend} disabled={!canSave || sending}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#1A56DB] text-white text-sm font-medium hover:bg-[#1648bf] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-              {sending ? <><Loader2 size={15} className="animate-spin" />Guardando...</> : <><Send size={15} />Guardar y Enviar</>}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {showSig && <SignatureCanvas onSave={sig => { set("firma", sig); setShowSig(false); }} onCancel={() => setShowSig(false)} />}
-    </div>
-  );
-}
-
-// ─── Consentimientos Page ─────────────────────────────────────────────────────
-
-function ConsentimientosPage({
-  consentimientos, onNuevo, onDelete, addToast
-}: {
-  consentimientos: Consentimiento[];
-  onNuevo: () => void;
-  onDelete: (id: string) => void;
-  addToast: (t: "success" | "error" | "info", m: string) => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [filterEstado, setFilterEstado] = useState<string>("TODOS");
-  const [viewCons, setViewCons] = useState<Consentimiento | null>(null);
-  const [pdfCons, setPdfCons] = useState<Consentimiento | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
-
-  const filtered = consentimientos.filter(c => {
-    const q = search.toLowerCase();
-    const matchQ = !q || c.radicado.toLowerCase().includes(q)
-      || c.paciente.nombres.toLowerCase().includes(q)
-      || c.paciente.apellidos.toLowerCase().includes(q)
-      || c.paciente.documento.includes(q)
-      || c.procedimiento.toLowerCase().includes(q);
-    const matchE = filterEstado === "TODOS" || c.estado === filterEstado;
-    return matchQ && matchE;
-  });
-
-  const handleDelete = async (id: string) => {
-    setDeleting(id);
-    await new Promise(r => setTimeout(r, 800));
-    onDelete(id);
-    setDeleting(null);
-    addToast("success", "Consentimiento anulado correctamente");
-  };
-
-  const handleSend = async (c: Consentimiento) => {
-    addToast("info", `Enviando a ${c.paciente.email} y ${c.paciente.telefono}...`);
-    await new Promise(r => setTimeout(r, 1200));
-    addToast("success", "Consentimiento enviado por email y WhatsApp");
-  };
-
-  return (
-    <div className="p-5 lg:p-6 space-y-4">
-      {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por radicado, paciente, documento..."
-            className="w-full pl-9 pr-4 py-2.5 text-sm border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]" />
-        </div>
-        <div className="flex gap-2">
-          <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)}
-            className="px-3 py-2.5 text-sm border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30">
-            <option value="TODOS">Todos los estados</option>
-            <option value="FIRMADO">Firmados</option>
-            <option value="PENDIENTE">Pendientes</option>
-            <option value="ANULADO">Anulados</option>
-          </select>
-          <button onClick={onNuevo}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1A56DB] text-white text-sm font-medium rounded-lg hover:bg-[#1648bf] transition-colors whitespace-nowrap">
-            <Plus size={15} />Nuevo
+          <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted">
+            <Download size={14} /> Descargar PDF
+          </button>
+          <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-[#1A56DB] text-white text-sm font-medium hover:bg-[#1648bf]">
+            Cerrar
           </button>
         </div>
       </div>
-
-      {/* Stats mini */}
-      <div className="flex gap-3 flex-wrap">
-        {(["TODOS", "FIRMADO", "PENDIENTE", "ANULADO"] as const).map(e => {
-          const count = e === "TODOS" ? consentimientos.length : consentimientos.filter(c => c.estado === e).length;
-          const color = e === "FIRMADO" ? "text-emerald-600 bg-emerald-50 border-emerald-200" : e === "PENDIENTE" ? "text-amber-600 bg-amber-50 border-amber-200" : e === "ANULADO" ? "text-red-600 bg-red-50 border-red-200" : "text-[#1A56DB] bg-[#1A56DB]/5 border-[#1A56DB]/20";
-          return (
-            <button key={e} onClick={() => setFilterEstado(e)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${filterEstado === e ? color : "text-muted-foreground bg-white border-border hover:border-[#1A56DB]/30"}`}>
-              {e === "TODOS" ? "Todos" : e.charAt(0) + e.slice(1).toLowerCase()} · {count}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-background border-b border-border">
-                {["Radicado", "Paciente", "Tipo / Procedimiento", "Médico", "Fecha", "Estado", "Envíos", "Acciones"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground text-sm">
-                  <FileText size={32} className="mx-auto mb-2 opacity-30" />
-                  No se encontraron consentimientos
-                </td></tr>
-              )}
-              {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-background/60 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs font-medium text-[#1A56DB] whitespace-nowrap">{c.radicado}</td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-xs whitespace-nowrap">{c.paciente.nombres} {c.paciente.apellidos}</p>
-                    <p className="text-[10px] text-muted-foreground font-mono">{c.paciente.tipo_doc} {c.paciente.documento}</p>
-                  </td>
-                  <td className="px-4 py-3 max-w-[180px]">
-                    <p className="text-xs font-medium text-muted-foreground">{c.tipo}</p>
-                    <p className="text-xs truncate">{c.procedimiento}</p>
-                  </td>
-                  <td className="px-4 py-3 text-xs whitespace-nowrap">{c.medico}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtFecha(c.fecha)}</td>
-                  <td className="px-4 py-3"><StatusBadge estado={c.estado} /></td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span title="Email" className={`text-xs ${c.enviado_email ? "text-emerald-500" : "text-muted-foreground/40"}`}><Mail size={13} /></span>
-                      <span title="WhatsApp" className={`text-xs ${c.enviado_whatsapp ? "text-emerald-500" : "text-muted-foreground/40"}`}><MessageSquare size={13} /></span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => setViewCons(c)} title="Ver detalle"
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-[#1A56DB] hover:bg-[#1A56DB]/5 transition-colors">
-                        <Eye size={14} />
-                      </button>
-                      <button onClick={() => setPdfCons(c)} title="Ver PDF"
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-[#1A56DB] hover:bg-[#1A56DB]/5 transition-colors">
-                        <FileText size={14} />
-                      </button>
-                      <button onClick={() => handleSend(c)} title="Reenviar"
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
-                        <Send size={14} />
-                      </button>
-                      {c.estado !== "ANULADO" && (
-                        <button onClick={() => handleDelete(c.id)} title="Anular" disabled={deleting === c.id}
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40">
-                          {deleting === c.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-3 border-t border-border flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">{filtered.length} de {consentimientos.length} registros</p>
-        </div>
-      </div>
-
-      {/* Detail modal */}
-      {viewCons && (
-        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <div>
-                <p className="font-bold text-sm">{viewCons.radicado}</p>
-                <StatusBadge estado={viewCons.estado} />
-              </div>
-              <button onClick={() => setViewCons(null)}><X size={18} className="text-muted-foreground" /></button>
-            </div>
-            <div className="overflow-y-auto p-5 space-y-5">
-              <Section title="Paciente">
-                <Grid2>
-                  <Field label="Nombre completo" value={`${viewCons.paciente.nombres} ${viewCons.paciente.apellidos}`} />
-                  <Field label="Documento" value={`${viewCons.paciente.tipo_doc}: ${viewCons.paciente.documento}`} mono />
-                  <Field label="Email" value={viewCons.paciente.email} />
-                  <Field label="Teléfono" value={viewCons.paciente.telefono} mono />
-                </Grid2>
-              </Section>
-              <Section title="Procedimiento">
-                <Grid2>
-                  <Field label="Tipo" value={viewCons.tipo} />
-                  <Field label="Médico" value={viewCons.medico} />
-                  <Field label="Procedimiento" value={viewCons.procedimiento} />
-                  <Field label="Diagnóstico" value={viewCons.diagnostico} />
-                </Grid2>
-                {viewCons.observaciones && <Field label="Observaciones" value={viewCons.observaciones} />}
-              </Section>
-              <Section title="Notificaciones">
-                <div className="flex gap-3">
-                  <div className={`flex-1 flex items-center gap-2 p-3 rounded-lg ${viewCons.enviado_email ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
-                    <Mail size={14} /><span className="text-xs font-medium">Email {viewCons.enviado_email ? "enviado" : "pendiente"}</span>
-                  </div>
-                  <div className={`flex-1 flex items-center gap-2 p-3 rounded-lg ${viewCons.enviado_whatsapp ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
-                    <MessageSquare size={14} /><span className="text-xs font-medium">WhatsApp {viewCons.enviado_whatsapp ? "enviado" : "pendiente"}</span>
-                  </div>
-                </div>
-              </Section>
-            </div>
-            <div className="p-4 border-t border-border flex gap-2">
-              <button onClick={() => { setPdfCons(viewCons); setViewCons(null); }}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#1A56DB] text-white text-sm font-medium hover:bg-[#1648bf]">
-                <FileText size={14} />Ver PDF
-              </button>
-              <button onClick={() => setViewCons(null)}
-                className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted">
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {pdfCons && <PDFViewer consent={pdfCons} onClose={() => setPdfCons(null)} />}
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-3">{title}</p>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-function Grid2({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-3">{children}</div>;
-}
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="bg-background rounded-lg px-3 py-2.5">
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{label}</p>
-      <p className={`text-xs font-medium mt-0.5 ${mono ? "font-mono" : ""}`}>{value || "—"}</p>
-    </div>
-  );
-}
-
-// ─── Pacientes Page ───────────────────────────────────────────────────────────
-
-function PacientesPage({ pacientes, onAdd, onDelete, addToast }: {
-  pacientes: Paciente[];
-  onAdd: (p: Omit<Paciente, "id">) => void;
-  onDelete: (id: string) => void;
-  addToast: (t: "success" | "error" | "info", m: string) => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ tipo_doc: "CC", documento: "", nombres: "", apellidos: "", fecha_nacimiento: "", telefono: "", email: "", direccion: "" });
-
-  const filtered = pacientes.filter(p => {
-    const q = search.toLowerCase();
-    return !q || p.nombres.toLowerCase().includes(q) || p.apellidos.toLowerCase().includes(q) || p.documento.includes(q) || p.email.toLowerCase().includes(q);
-  });
-
-  const handleSave = async () => {
-    setSaving(true);
-    await new Promise(r => setTimeout(r, 800));
-    onAdd(form as Omit<Paciente, "id">);
-    setSaving(false);
-    setShowModal(false);
-    setForm({ tipo_doc: "CC", documento: "", nombres: "", apellidos: "", fecha_nacimiento: "", telefono: "", email: "", direccion: "" });
-    addToast("success", "Paciente registrado correctamente");
-  };
-
-  const sf = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
-
-  return (
-    <div className="p-5 lg:p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar paciente..."
-            className="w-full pl-9 pr-4 py-2.5 text-sm border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]" />
-        </div>
-        <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#1A56DB] text-white text-sm font-medium rounded-lg hover:bg-[#1648bf] transition-colors whitespace-nowrap">
-          <Plus size={15} />Nuevo Paciente
-        </button>
-      </div>
-
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-background border-b border-border">
-                {["Documento", "Nombre Completo", "Edad", "Teléfono", "Email", "Dirección", "Acciones"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map(p => (
-                <tr key={p.id} className="hover:bg-background/60 transition-colors">
-                  <td className="px-4 py-3">
-                    <span className="text-[10px] bg-[#1A56DB]/10 text-[#1A56DB] px-1.5 py-0.5 rounded font-mono font-medium">{p.tipo_doc}</span>
-                    <span className="text-xs font-mono ml-1">{p.documento}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-xs">{p.nombres} {p.apellidos}</p>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{calcAge(p.fecha_nacimiento)} años</td>
-                  <td className="px-4 py-3 text-xs font-mono">{p.telefono}</td>
-                  <td className="px-4 py-3 text-xs">{p.email}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate">{p.direccion}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button title="Eliminar" onClick={() => { onDelete(p.id); addToast("success", "Paciente eliminado"); }}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-3 border-t border-border">
-          <p className="text-xs text-muted-foreground">{filtered.length} pacientes registrados</p>
-        </div>
-      </div>
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <p className="font-bold text-sm">Nuevo Paciente</p>
-              <button onClick={() => setShowModal(false)}><X size={18} className="text-muted-foreground" /></button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Tipo Doc.</label>
-                  <select value={form.tipo_doc} onChange={e => sf("tipo_doc", e.target.value)}
-                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30">
-                    {["CC", "TI", "CE", "PA", "RC"].map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">No. Documento *</label>
-                  <input value={form.documento} onChange={e => sf("documento", e.target.value)} placeholder="1023456789"
-                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Nombres *</label>
-                  <input value={form.nombres} onChange={e => sf("nombres", e.target.value)} placeholder="María Isabel"
-                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Apellidos *</label>
-                  <input value={form.apellidos} onChange={e => sf("apellidos", e.target.value)} placeholder="García Torres"
-                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Fecha Nacimiento</label>
-                  <input type="date" value={form.fecha_nacimiento} onChange={e => sf("fecha_nacimiento", e.target.value)}
-                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Teléfono</label>
-                  <input value={form.telefono} onChange={e => sf("telefono", e.target.value)} placeholder="3001234567"
-                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Email</label>
-                <input type="email" value={form.email} onChange={e => sf("email", e.target.value)} placeholder="paciente@email.com"
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Dirección</label>
-                <input value={form.direccion} onChange={e => sf("direccion", e.target.value)} placeholder="Cra 45 #23-10, Medellín"
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-              </div>
-            </div>
-            <div className="flex gap-3 p-5 pt-0">
-              <button onClick={() => setShowModal(false)}
-                className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted">
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={!form.documento || !form.nombres || !form.apellidos || saving}
-                className="flex-1 py-2.5 rounded-lg bg-[#1A56DB] text-white text-sm font-medium hover:bg-[#1648bf] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {saving ? <><Loader2 size={14} className="animate-spin" />Guardando...</> : "Registrar Paciente"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Configuracion Page ───────────────────────────────────────────────────────
-
-function ConfiguracionPage({ user }: { user: UsuarioSistema }) {
-  return (
-    <div className="p-5 lg:p-6 max-w-2xl space-y-5">
-      <div className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-5">
-        <div>
-          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-3">Perfil de Usuario</p>
-          <div className="flex items-center gap-4 mb-5">
-            <div className="w-14 h-14 rounded-full bg-[#1A56DB] flex items-center justify-center text-white text-xl font-bold">{user.nombre.charAt(0)}</div>
-            <div>
-              <p className="font-bold">{user.nombre}</p>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
-              <span className="inline-block mt-1 text-[10px] px-2 py-0.5 bg-[#1A56DB]/10 text-[#1A56DB] rounded font-medium">{user.rol}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Nombre</label>
-              <input defaultValue={user.nombre} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Email</label>
-              <input defaultValue={user.email} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-4">
-        <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Configuración IPS</p>
-        <div className="grid grid-cols-2 gap-3">
-          {[["Nombre IPS", "IPS Salud Integral S.A.S."], ["NIT", "900.123.456-7"], ["Habilitación", "05001000001"], ["Ciudad", "Medellín, Antioquia"], ["Dirección", "Cll 49 #65-182"], ["Teléfono", "(604) 444-5566"]].map(([l, v]) => (
-            <div key={l}>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">{l}</label>
-              <input defaultValue={v} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-4">
-        <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Notificaciones</p>
-        <div className="space-y-3">
-          {[["Enviar PDF por email al paciente", true], ["Enviar PDF por WhatsApp al paciente", true], ["Notificar al médico por email", true], ["Copia al administrador", false]].map(([label, def]) => (
-            <div key={label as string} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-              <p className="text-sm">{label as string}</p>
-              <button className={`w-10 h-5 rounded-full transition-colors ${def ? "bg-[#1A56DB]" : "bg-muted"} flex items-center px-0.5`}>
-                <span className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${def ? "translate-x-5" : "translate-x-0"}`} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-4">
-        <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Seguridad</p>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Contraseña actual</label>
-            <input type="password" placeholder="••••••••" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Nueva contraseña</label>
-              <input type="password" placeholder="••••••••" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Confirmar</label>
-              <input type="password" placeholder="••••••••" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <button className="px-5 py-2.5 bg-[#1A56DB] text-white text-sm font-medium rounded-lg hover:bg-[#1648bf] transition-colors">
-        Guardar Cambios
-      </button>
-    </div>
-  );
-}
-
-// ─── Login Page ───────────────────────────────────────────────────────────────
-
-function LoginPage({ onLogin }: { onLogin: (u: UsuarioSistema) => void }) {
+// ─── LOGIN PAGE ───────────────────────────────────────────────────────────────
+function LoginPage({ onLogin }: { onLogin: (u: Usuario) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPass, setShowPass] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    const user = USUARIOS.find(u => u.email === email && u.password === password);
-    if (user) {
-      onLogin(user);
-    } else {
-      setError("Credenciales incorrectas. Verifique su email y contraseña.");
-    }
-    setLoading(false);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault(); setError(""); setLoading(true);
+    setTimeout(() => {
+      const user = USUARIOS.find(u => u.email === email && u.password === password);
+      if (user) { onLogin(user); }
+      else { setError("Credenciales incorrectas. Verifique su email y contraseña."); }
+      setLoading(false);
+    }, 600);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0C1A35] via-[#102043] to-[#0C2F5A] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
+    <div className="min-h-screen bg-[#0C1A35] flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#1A56DB] mb-4 shadow-lg">
-            <Stethoscope size={28} className="text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#1A56DB] mb-4">
+            <Stethoscope size={30} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">IPS Salud Integral</h1>
-          <p className="text-[#8BA5C8] text-sm mt-1">Sistema de Consentimientos Informados</p>
+          <h1 className="text-2xl font-black text-white">Med&Fis</h1>
+          <p className="text-[#C8D6EF] text-sm mt-1">Sistema de Consentimientos Informados</p>
+          <p className="text-[#8899BB] text-[10px] mt-0.5 font-mono">NIT {IPS.nit}</p>
         </div>
-
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <h2 className="font-bold text-base text-foreground mb-1">Iniciar Sesión</h2>
-          <p className="text-xs text-muted-foreground mb-6">Ingrese con sus credenciales institucionales</p>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Email institucional</label>
-              <div className="relative">
-                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="usuario@ips.com"
-                  className="w-full pl-9 pr-4 py-2.5 border border-border rounded-lg text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Contraseña</label>
-              <div className="relative">
-                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input type={showPass ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
-                  className="w-full pl-9 pr-10 py-2.5 border border-border rounded-lg text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB]" />
-                <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  <Eye size={14} />
-                </button>
-              </div>
-            </div>
-
+        <div className="bg-white rounded-2xl p-6 shadow-2xl">
+          <h2 className="text-sm font-bold text-foreground mb-5">Iniciar Sesión</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Field label="Correo electrónico" value={email} onChange={setEmail} type="email" placeholder="usuario@medfis.com" required />
+            <Field label="Contraseña" value={password} onChange={setPassword} type="password" placeholder="••••••••" required />
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-                <AlertCircle size={13} className="flex-shrink-0" />{error}
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-medium">
+                <XCircle size={14} /> {error}
               </div>
             )}
-
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-[#1A56DB] text-white font-semibold rounded-lg hover:bg-[#1648bf] transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-              {loading ? <><Loader2 size={16} className="animate-spin" />Verificando...</> : "Ingresar al Sistema"}
+              className="w-full py-3 rounded-xl bg-[#1A56DB] text-white font-semibold text-sm disabled:opacity-60 hover:bg-[#1648bf] transition-colors flex items-center justify-center gap-2">
+              {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Verificando...</> : "Ingresar"}
             </button>
           </form>
-
-          {/* Hint */}
-          <div className="mt-6 p-3 bg-background rounded-lg border border-border">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-2">Usuarios de prueba</p>
-            <div className="space-y-1">
-              {USUARIOS.map(u => (
-                <button key={u.id} type="button" onClick={() => { setEmail(u.email); setPassword(u.password); }}
-                  className="w-full text-left px-2 py-1 rounded hover:bg-muted transition-colors">
-                  <span className="text-xs text-foreground font-medium">{u.email}</span>
-                  <span className="text-[10px] text-muted-foreground ml-2">({u.rol})</span>
-                </button>
-              ))}
-            </div>
+          <div className="mt-5 pt-4 border-t border-border">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-2">Accesos de prueba:</p>
+            {USUARIOS.map(u => (
+              <button key={u.id} onClick={() => { setEmail(u.email); setPassword(u.password); }}
+                className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors mb-1">
+                <p className="text-[10px] font-semibold text-foreground">{u.nombre}</p>
+                <p className="text-[10px] text-muted-foreground font-mono">{u.email} · {u.password}</p>
+              </button>
+            ))}
           </div>
         </div>
-
-        <p className="text-center text-[#8BA5C8] text-xs mt-5">
-          © {new Date().getFullYear()} IPS Salud Integral · Versión 1.0.0 · Spring Boot + React
-        </p>
+        <p className="text-center text-[#8899BB] text-[10px] mt-4">{IPS.medico} · {IPS.rm}</p>
       </div>
     </div>
   );
 }
 
-// ─── Page Titles ──────────────────────────────────────────────────────────────
+// ─── SIDEBAR ──────────────────────────────────────────────────────────────────
+function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose }: {
+  page: AppPage; onPage: (p: AppPage) => void; user: Usuario; onLogout: () => void;
+  records: ConsentRecord[]; mobileOpen: boolean; onClose: () => void;
+}) {
+  const pendientes = records.filter(r => r.pendienteMedico).length;
+  const nav = [
+    { id: "dashboard" as AppPage, label: "Dashboard", icon: <LayoutDashboard size={17} /> },
+    { id: "historial" as AppPage, label: "Historial", icon: <ClipboardList size={17} /> },
+    { id: "form" as AppPage, label: "Nuevo Consentimiento", icon: <Plus size={17} /> },
+  ];
 
-const PAGE_TITLES: Record<AppPage, string> = {
-  login: "Login",
-  dashboard: "Dashboard",
-  consentimientos: "Consentimientos Informados",
-  "nuevo-consentimiento": "Nuevo Consentimiento",
-  firma: "Firma Digital",
-  pacientes: "Gestión de Pacientes",
-  configuracion: "Configuración",
-};
+  return (
+    <>
+      {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />}
+      <aside className={`fixed top-0 left-0 h-full w-60 bg-[#0C1A35] z-50 flex flex-col transition-transform duration-300
+        ${mobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
+        <div className="px-5 py-5 border-b border-white/8">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#1A56DB] flex items-center justify-center">
+              <Stethoscope size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="font-black text-white text-sm">Med&Fis</p>
+              <p className="text-[10px] text-[#8899BB] font-mono">NIT {IPS.nit}</p>
+            </div>
+          </div>
+        </div>
 
-// ─── Root App ─────────────────────────────────────────────────────────────────
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          {nav.map(item => (
+            <button key={item.id} onClick={() => { onPage(item.id); onClose(); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors relative
+                ${page === item.id ? "bg-[#1A56DB] text-white" : "text-[#C8D6EF] hover:bg-white/8"}`}>
+              {item.icon}
+              {item.label}
+              {item.id === "dashboard" && pendientes > 0 && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {pendientes}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
 
+        <div className="px-3 pb-5 border-t border-white/8 pt-4">
+          <div className="px-3 py-2 mb-2">
+            <p className="text-[10px] text-white font-semibold truncate">{user.nombre}</p>
+            <p className="text-[10px] text-[#8899BB]">{user.rol}</p>
+          </div>
+          <button onClick={onLogout}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C8D6EF] hover:bg-white/8 text-sm font-medium transition-colors">
+            <LogOut size={15} /> Cerrar Sesión
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ─── DASHBOARD PAGE ───────────────────────────────────────────────────────────
+function DashboardPage({ records, onNewForm, user, addToast }: {
+  records: ConsentRecord[]; onNewForm: (t: TipoConsent) => void; user: Usuario;
+  addToast: (t: "success" | "error" | "info", m: string) => void;
+}) {
+  const firmados = records.filter(r => r.estado === "FIRMADO").length;
+  const pendientesMedico = records.filter(r => r.pendienteMedico);
+  const hoyCount = records.filter(r => r.fecha === hoy()).length;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">Bienvenido, {user.nombre}</p>
+      </div>
+
+      {/* Alertas pendientes para el médico */}
+      {pendientesMedico.length > 0 && (user.rol === "MÉDICO" || user.rol === "ADMINISTRADOR") && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Bell size={16} className="text-amber-600" />
+            <p className="text-sm font-bold text-amber-800">Firmas pendientes de revisión</p>
+            <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full px-2 py-0.5">{pendientesMedico.length}</span>
+          </div>
+          <div className="space-y-2">
+            {pendientesMedico.slice(0, 4).map(r => (
+              <div key={r.id} className="flex items-center justify-between bg-white rounded-xl p-3 border border-amber-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                    {r.tipo === "escleroterapia" ? <Syringe size={14} className="text-amber-700" />
+                    : r.tipo === "sueroterapia" ? <Droplets size={14} className="text-amber-700" />
+                    : r.tipo === "laser" ? <Zap size={14} className="text-amber-700" />
+                    : <Package size={14} className="text-amber-700" />}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">{r.pacienteNombre}</p>
+                    <p className="text-[10px] text-muted-foreground">{r.radicado} · {fmtFecha(r.fecha)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TipoBadge tipo={r.tipo} />
+                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                </div>
+              </div>
+            ))}
+            {pendientesMedico.length > 4 && (
+              <p className="text-[10px] text-amber-700 text-center font-medium">+{pendientesMedico.length - 4} más en el historial</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "Total Consentimientos", value: records.length, icon: <FileText size={18} />, color: "text-[#1A56DB]", bg: "bg-[#1A56DB]/10" },
+          { label: "Firmados", value: firmados, icon: <CheckCircle size={18} />, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Hoy", value: hoyCount, icon: <Clock size={18} />, color: "text-amber-600", bg: "bg-amber-50" },
+          { label: "Pendientes Médico", value: pendientesMedico.length, icon: <Bell size={18} />, color: "text-red-600", bg: "bg-red-50" },
+        ].map(s => (
+          <div key={s.label} className="bg-card rounded-2xl p-4 border border-border">
+            <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center ${s.color} mb-3`}>{s.icon}</div>
+            <p className="text-2xl font-black text-foreground">{s.value}</p>
+            <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Nuevo consentimiento */}
+      <div>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Crear Nuevo Consentimiento</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {([
+            { tipo: "escleroterapia" as TipoConsent, label: "Escleroterapia", sub: "Inyección de Várices", icon: <Syringe size={22} />, color: "bg-[#1A56DB]", light: "bg-[#1A56DB]/8 hover:bg-[#1A56DB]/12 border-[#1A56DB]/20" },
+            { tipo: "sueroterapia" as TipoConsent, label: "Sueroterapia", sub: "Vit C / Complejo B", icon: <Droplets size={22} />, color: "bg-[#00B896]", light: "bg-[#00B896]/8 hover:bg-[#00B896]/12 border-[#00B896]/20" },
+            { tipo: "laser" as TipoConsent, label: "Láser Várices", sub: "Terapia ND:YAG", icon: <Zap size={22} />, color: "bg-amber-500", light: "bg-amber-50 hover:bg-amber-100 border-amber-200" },
+            { tipo: "paquete" as TipoConsent, label: "Paquete Completo", sub: "Los 3 consentimientos", icon: <Package size={22} />, color: "bg-purple-600", light: "bg-purple-50 hover:bg-purple-100 border-purple-200" },
+          ]).map(item => (
+            <button key={item.tipo} onClick={() => onNewForm(item.tipo)}
+              className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center transition-all active:scale-95 ${item.light}`}>
+              <div className={`w-12 h-12 rounded-2xl ${item.color} flex items-center justify-center text-white shadow-sm`}>
+                {item.icon}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground">{item.label}</p>
+                <p className="text-[10px] text-muted-foreground">{item.sub}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Últimos registros */}
+      {records.length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Últimos Registros</p>
+          <div className="bg-card rounded-2xl border border-border overflow-hidden">
+            {records.slice(-5).reverse().map((r, i) => (
+              <div key={r.id} className={`flex items-center gap-3 px-4 py-3 ${i < 4 ? "border-b border-border" : ""}`}>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                  {r.tipo === "escleroterapia" ? <Syringe size={14} className="text-[#1A56DB]" />
+                  : r.tipo === "sueroterapia" ? <Droplets size={14} className="text-[#00B896]" />
+                  : r.tipo === "laser" ? <Zap size={14} className="text-amber-600" />
+                  : <Package size={14} className="text-purple-600" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold truncate">{r.pacienteNombre}</p>
+                  <p className="text-[10px] text-muted-foreground">{r.radicado} · {fmtFecha(r.fecha)}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {r.pendienteMedico && <div className="w-2 h-2 rounded-full bg-amber-500" title="Pendiente revisión médico" />}
+                  <StatusBadge estado={r.estado} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Charts */}
+      {records.length >= 3 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="bg-card rounded-2xl p-5 border border-border">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">Tendencia Mensual</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={CHART_MENSUAL}>
+                <defs>
+                  <linearGradient id="gEsc" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#1A56DB" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#1A56DB" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F4" />
+                <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                <Area type="monotone" dataKey="escler" stroke="#1A56DB" fill="url(#gEsc)" strokeWidth={2} name="Escleroterapia" />
+                <Area type="monotone" dataKey="suero" stroke="#00B896" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Sueroterapia" />
+                <Area type="monotone" dataKey="laser" stroke="#F59E0B" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Láser" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="bg-card rounded-2xl p-5 border border-border">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">Distribución por Tipo</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <PieChart>
+                <Pie data={CHART_TIPOS} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={3} dataKey="value">
+                  {CHART_TIPOS.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex justify-center gap-4 mt-2">
+              {CHART_TIPOS.map(t => (
+                <div key={t.name} className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full" style={{ background: t.color }} />
+                  <span className="text-[10px] text-muted-foreground">{t.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── HISTORIAL PAGE ───────────────────────────────────────────────────────────
+function HistorialPage({ records, onView, onDelete, onMarkReviewed, addToast, user }: {
+  records: ConsentRecord[]; onView: (r: ConsentRecord) => void;
+  onDelete: (id: string) => void; onMarkReviewed: (id: string) => void;
+  addToast: (t: "success" | "error" | "info", m: string) => void; user: Usuario;
+}) {
+  const [q, setQ] = useState("");
+  const [filterTipo, setFilterTipo] = useState<"todos" | TipoConsent>("todos");
+  const [filterEstado, setFilterEstado] = useState<"todos" | EstadoConsent>("todos");
+
+  const filtered = records.filter(r => {
+    const matchQ = q === "" || r.pacienteNombre.toLowerCase().includes(q.toLowerCase()) || r.radicado.toLowerCase().includes(q.toLowerCase()) || r.pacienteDoc.includes(q);
+    const matchTipo = filterTipo === "todos" || r.tipo === filterTipo;
+    const matchEstado = filterEstado === "todos" || r.estado === filterEstado;
+    return matchQ && matchTipo && matchEstado;
+  }).reverse();
+
+  const handleWA = (r: ConsentRecord) => {
+    const msg = encodeURIComponent(`*${IPS.nombre}* — Consentimiento Informado\n\nEstimado/a ${r.pacienteNombre},\n\nSu consentimiento informado ha sido procesado exitosamente.\n\n📋 Radicado: ${r.radicado}\n📅 Fecha: ${fmtFecha(r.fecha)}\n✅ Estado: ${r.estado}\n\nPara mayor información comuníquese con nosotros.\n\n_${IPS.nombre} · NIT ${IPS.nit}_`);
+    const tel = r.pacienteTel.replace(/[^0-9]/g, "");
+    window.open(`https://wa.me/57${tel}?text=${msg}`, "_blank");
+    addToast("info", `Abriendo WhatsApp para ${r.pacienteNombre}`);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Historial de Consentimientos</h1>
+          <p className="text-sm text-muted-foreground">{filtered.length} registros</p>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre, radicado o cédula..."
+            className="w-full border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30" />
+        </div>
+        <select value={filterTipo} onChange={e => setFilterTipo(e.target.value as any)}
+          className="border border-border rounded-xl px-3 py-2.5 text-sm bg-card focus:outline-none">
+          <option value="todos">Todos los tipos</option>
+          <option value="escleroterapia">Escleroterapia</option>
+          <option value="sueroterapia">Sueroterapia</option>
+          <option value="laser">Láser Várices</option>
+          <option value="paquete">Paquete</option>
+        </select>
+        <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as any)}
+          className="border border-border rounded-xl px-3 py-2.5 text-sm bg-card focus:outline-none">
+          <option value="todos">Todos los estados</option>
+          <option value="FIRMADO">Firmado</option>
+          <option value="PENDIENTE">Pendiente</option>
+          <option value="ANULADO">Anulado</option>
+        </select>
+      </div>
+
+      {/* Lista */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <FileText size={36} className="mx-auto mb-3 opacity-30" />
+          <p className="font-semibold">Sin registros</p>
+          <p className="text-sm">No se encontraron consentimientos con los filtros actuales</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(r => (
+            <div key={r.id} className={`bg-card rounded-2xl border border-border p-4 flex items-center gap-4 hover:border-[#1A56DB]/30 transition-colors
+              ${r.pendienteMedico ? "border-l-4 border-l-amber-400" : ""}`}>
+              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                {r.tipo === "escleroterapia" ? <Syringe size={17} className="text-[#1A56DB]" />
+                : r.tipo === "sueroterapia" ? <Droplets size={17} className="text-[#00B896]" />
+                : r.tipo === "laser" ? <Zap size={17} className="text-amber-600" />
+                : <Package size={17} className="text-purple-600" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="font-semibold text-sm truncate">{r.pacienteNombre}</p>
+                  {r.pendienteMedico && <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">PENDIENTE MÉDICO</span>}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[10px] text-muted-foreground font-mono">{r.radicado}</p>
+                  <p className="text-[10px] text-muted-foreground">·</p>
+                  <p className="text-[10px] text-muted-foreground">{fmtFecha(r.fecha)}</p>
+                  <p className="text-[10px] text-muted-foreground">·</p>
+                  <p className="text-[10px] text-muted-foreground">Doc: {r.pacienteDoc}</p>
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <StatusBadge estado={r.estado} />
+                  <TipoBadge tipo={r.tipo} />
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {r.pendienteMedico && (user.rol === "MÉDICO" || user.rol === "ADMINISTRADOR") && (
+                  <button onClick={() => { onMarkReviewed(r.id); addToast("success", `Firma de ${r.pacienteNombre} revisada`); }}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-semibold hover:bg-amber-200 transition-colors">
+                    <UserCheck size={11} /> Revisado
+                  </button>
+                )}
+                <button onClick={() => handleWA(r)}
+                  className="p-2 rounded-lg bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 transition-colors" title="WhatsApp">
+                  <MessageSquare size={14} />
+                </button>
+                <button onClick={() => onView(r)}
+                  className="p-2 rounded-lg bg-[#1A56DB]/8 text-[#1A56DB] hover:bg-[#1A56DB]/15 transition-colors" title="Ver documento">
+                  <Eye size={14} />
+                </button>
+                {(user.rol === "ADMINISTRADOR" || user.rol === "MÉDICO") && (
+                  <button onClick={() => onDelete(r.id)}
+                    className="p-2 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors" title="Anular">
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── FORM SELECTOR ────────────────────────────────────────────────────────────
+function FormSelector({ tipo, onSave, onCancel, addToast, nextId }: {
+  tipo: TipoConsent; onSave: (r: ConsentRecord) => void; onCancel: () => void;
+  addToast: (t: "success" | "error" | "info", m: string) => void; nextId: number;
+}) {
+  if (tipo === "escleroterapia") return <FormEscleroterapia onSave={onSave} onCancel={onCancel} addToast={addToast} nextId={nextId} />;
+  if (tipo === "sueroterapia") return <FormSueroterapia onSave={onSave} onCancel={onCancel} addToast={addToast} nextId={nextId} />;
+  if (tipo === "laser") return <FormLaser onSave={onSave} onCancel={onCancel} addToast={addToast} nextId={nextId} />;
+  if (tipo === "paquete") return <FormPaquete onSave={onSave} onCancel={onCancel} addToast={addToast} nextId={nextId} />;
+  return null;
+}
+
+// ─── TIPO SELECTOR PAGE ───────────────────────────────────────────────────────
+function TipoSelectorPage({ onSelect }: { onSelect: (t: TipoConsent) => void }) {
+  const options = [
+    { tipo: "escleroterapia" as TipoConsent, label: "Escleroterapia", sub: "Inyección de Várices Miembros Inferiores", icon: <Syringe size={28} />, color: "border-[#1A56DB] bg-[#1A56DB]/5", iconBg: "bg-[#1A56DB]" },
+    { tipo: "sueroterapia" as TipoConsent, label: "Sueroterapia", sub: "Vitamina C y/o Complejo B IV", icon: <Droplets size={28} />, color: "border-[#00B896] bg-[#00B896]/5", iconBg: "bg-[#00B896]" },
+    { tipo: "laser" as TipoConsent, label: "Láser Várices", sub: "Terapia ND:YAG Control Venas", icon: <Zap size={28} />, color: "border-amber-400 bg-amber-50", iconBg: "bg-amber-500" },
+    { tipo: "paquete" as TipoConsent, label: "Paquete Completo", sub: "Los 3 consentimientos juntos", icon: <Package size={28} />, color: "border-purple-400 bg-purple-50", iconBg: "bg-purple-600" },
+  ];
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-xl font-bold">Nuevo Consentimiento</h1>
+        <p className="text-sm text-muted-foreground">Seleccione el tipo de procedimiento</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {options.map(o => (
+          <button key={o.tipo} onClick={() => onSelect(o.tipo)}
+            className={`flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all hover:scale-[1.02] active:scale-95 ${o.color}`}>
+            <div className={`w-14 h-14 rounded-2xl ${o.iconBg} flex items-center justify-center text-white flex-shrink-0 shadow-sm`}>
+              {o.icon}
+            </div>
+            <div>
+              <p className="font-bold text-foreground text-base">{o.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{o.sub}</p>
+            </div>
+            <ChevronRight size={18} className="ml-auto text-muted-foreground" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── APP ROOT ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<UsuarioSistema | null>(null);
-  const [page, setPage] = useState<AppPage>("login");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileSidebar, setMobileSidebar] = useState(false);
-  const [pacientes, setPacientes] = useState<Paciente[]>(PACIENTES_INIT);
-  const [consentimientos, setConsentimientos] = useState<Consentimiento[]>(CONSENTIMIENTOS_INIT);
+  const [user, setUser] = useState<Usuario | null>(null);
+  const [page, setPage] = useState<AppPage>("dashboard");
+  const [records, setRecords] = useState<ConsentRecord[]>([]);
+  const [activeForm, setActiveForm] = useState<TipoConsent | null>(null);
+  const [viewRecord, setViewRecord] = useState<ConsentRecord | null>(null);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const nextIdRef = useRef(1);
 
-  const addToast = useCallback((type: "success" | "error" | "info", msg: string) => {
+  const addToast = (type: "success" | "error" | "info", msg: string) => {
     const id = Date.now();
     setToasts(t => [...t, { id, type, msg }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
-  }, []);
-
-  const handleLogin = (user: UsuarioSistema) => {
-    setCurrentUser(user);
-    setPage("dashboard");
-    addToast("success", `Bienvenido, ${user.nombre.split(" ")[0]}`);
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setPage("login");
+  const handleSave = (r: ConsentRecord) => {
+    setRecords(prev => [...prev, r]);
+    nextIdRef.current += 1;
+    setActiveForm(null);
+    setPage("historial");
   };
 
-  const handleSaveConsent = (data: NuevoConsentForm) => {
-    const paciente = pacientes.find(p => p.id === data.pacienteId)!;
-    const newC: Consentimiento = {
-      id: String(consentimientos.length + 1),
-      radicado: genRadicado(consentimientos.length + 1),
-      paciente,
-      tipo: data.tipo,
-      medico: currentUser?.nombre || "",
-      fecha: new Date().toISOString().split("T")[0],
-      estado: data.firma ? "FIRMADO" : "PENDIENTE",
-      procedimiento: data.procedimiento,
-      diagnostico: data.diagnostico,
-      observaciones: data.observaciones,
-      enviado_email: true,
-      enviado_whatsapp: true,
-      firma_url: data.firma,
-    };
-    setConsentimientos(prev => [newC, ...prev]);
-    setPage("consentimientos");
+  const handleDelete = (id: string) => {
+    setRecords(prev => prev.map(r => r.id === id ? { ...r, estado: "ANULADO" as EstadoConsent, pendienteMedico: false } : r));
+    addToast("info", "Consentimiento anulado");
   };
 
-  const handleDeleteConsent = (id: string) => {
-    setConsentimientos(prev => prev.map(c => c.id === id ? { ...c, estado: "ANULADO" as const } : c));
+  const handleMarkReviewed = (id: string) => {
+    setRecords(prev => prev.map(r => r.id === id ? { ...r, pendienteMedico: false } : r));
   };
 
-  const handleAddPaciente = (data: Omit<Paciente, "id">) => {
-    setPacientes(prev => [...prev, { ...data, id: String(prev.length + 1) }]);
+  const handleSendEmail = () => {
+    if (!viewRecord) return;
+    setRecords(prev => prev.map(r => r.id === viewRecord.id ? { ...r, enviado_email: true } : r));
+    addToast("success", `Email enviado a ${viewRecord.pacienteNombre}`);
   };
 
-  const handleDeletePaciente = (id: string) => {
-    setPacientes(prev => prev.filter(p => p.id !== id));
+  const handleSendWhatsApp = () => {
+    if (!viewRecord) return;
+    const msg = encodeURIComponent(`*${IPS.nombre}* — Consentimiento Informado\n\nEstimado/a ${viewRecord.pacienteNombre},\n\nSu consentimiento ha sido registrado.\n\n📋 Radicado: ${viewRecord.radicado}\n📅 Fecha: ${fmtFecha(viewRecord.fecha)}\n✅ Estado: ${viewRecord.estado}\n\n_${IPS.nombre} · NIT ${IPS.nit}_`);
+    const tel = viewRecord.pacienteTel.replace(/[^0-9]/g, "");
+    window.open(`https://wa.me/57${tel}?text=${msg}`, "_blank");
+    setRecords(prev => prev.map(r => r.id === viewRecord.id ? { ...r, enviado_whatsapp: true } : r));
+    addToast("info", "Abriendo WhatsApp...");
   };
 
-  // Login screen
-  if (!currentUser) return (
-    <>
-      <LoginPage onLogin={handleLogin} />
-      <Toast toasts={toasts} remove={id => setToasts(t => t.filter(x => x.id !== id))} />
-    </>
-  );
+  if (!user) return <LoginPage onLogin={u => { setUser(u); addToast("success", `Bienvenido, ${u.nombre}`); }} />;
 
   return (
-    <div className="flex h-screen overflow-hidden font-['Inter']">
-      {/* Mobile overlay */}
-      {mobileSidebar && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setMobileSidebar(false)} />
-      )}
-
-      {/* Sidebar — desktop always visible, mobile as drawer */}
-      <div className={`
-        fixed md:relative inset-y-0 left-0 z-50 md:z-auto flex-shrink-0
-        transition-transform duration-300
-        ${mobileSidebar ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-      `}>
-        <Sidebar
-          page={page}
-          onNav={p => { setPage(p); setMobileSidebar(false); }}
-          user={currentUser}
-          onLogout={handleLogout}
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(s => !s)}
-        />
-      </div>
+    <div className="min-h-screen bg-background flex">
+      <Sidebar
+        page={page} onPage={setPage} user={user}
+        onLogout={() => { setUser(null); setPage("dashboard"); setRecords([]); addToast("info", "Sesión cerrada"); }}
+        records={records} mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
+      />
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Topbar title={PAGE_TITLES[page]} user={currentUser} onMobileMenu={() => setMobileSidebar(true)} />
-        <main className="flex-1 overflow-y-auto">
+      <div className="flex-1 lg:ml-60 min-h-screen flex flex-col">
+        {/* Topbar mobile */}
+        <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-card border-b border-border">
+          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-muted">
+            <Menu size={18} />
+          </button>
+          <p className="font-bold text-sm">Med&Fis</p>
+          <div className="flex items-center gap-2">
+            {records.filter(r => r.pendienteMedico).length > 0 && (
+              <span className="bg-red-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {records.filter(r => r.pendienteMedico).length}
+              </span>
+            )}
+            <div className="w-7 h-7 rounded-full bg-[#1A56DB] flex items-center justify-center text-white text-xs font-bold">
+              {user.nombre.charAt(0)}
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <main className="flex-1 p-4 sm:p-6 max-w-5xl mx-auto w-full">
           {page === "dashboard" && (
-            <DashboardPage consentimientos={consentimientos} onNav={setPage} />
+            <DashboardPage records={records} onNewForm={(t) => { setActiveForm(t); setPage("form"); }} user={user} addToast={addToast} />
           )}
-          {page === "consentimientos" && (
-            <ConsentimientosPage
-              consentimientos={consentimientos}
-              onNuevo={() => setPage("nuevo-consentimiento")}
-              onDelete={handleDeleteConsent}
-              addToast={addToast}
-            />
+          {page === "form" && !activeForm && (
+            <TipoSelectorPage onSelect={t => setActiveForm(t)} />
           )}
-          {page === "nuevo-consentimiento" && (
-            <NuevoConsentimientoPage
-              pacientes={pacientes}
-              user={currentUser}
-              onSave={handleSaveConsent}
-              onCancel={() => setPage("consentimientos")}
-              addToast={addToast}
-              nextId={consentimientos.length + 1}
-            />
-          )}
-          {page === "pacientes" && (
-            <PacientesPage
-              pacientes={pacientes}
-              onAdd={handleAddPaciente}
-              onDelete={handleDeletePaciente}
-              addToast={addToast}
-            />
-          )}
-          {page === "configuracion" && (
-            <ConfiguracionPage user={currentUser} />
+          {page === "historial" && (
+            <HistorialPage records={records} onView={setViewRecord} onDelete={handleDelete} onMarkReviewed={handleMarkReviewed} addToast={addToast} user={user} />
           )}
         </main>
       </div>
+
+      {/* Form modals */}
+      {activeForm && (
+        <FormSelector tipo={activeForm} onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} />
+      )}
+
+      {/* PDF modal */}
+      {viewRecord && (
+        <PDFModal record={viewRecord} onClose={() => setViewRecord(null)} onSendEmail={handleSendEmail} onSendWhatsApp={handleSendWhatsApp} />
+      )}
 
       <Toast toasts={toasts} remove={id => setToasts(t => t.filter(x => x.id !== id))} />
     </div>
