@@ -9,7 +9,7 @@ import {
   Activity, MapPin, AtSign, UserCheck, AlertTriangle,
   Info, Users, Heart, Settings, Save, UserPlus,
   CheckSquare, XSquare, Lock, Unlock, BellRing,
-  CalendarCheck, UserCog, RefreshCw
+  CalendarCheck, UserCog, RefreshCw, BarChart2, Edit3, KeyRound
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -62,7 +62,7 @@ const IPSContext = createContext<IPSConfig>(DEFAULT_IPS);
 const useIPS = () => useContext(IPSContext);
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
-type AppPage = "dashboard" | "form" | "historial" | "staff" | "notificaciones";
+type AppPage = "dashboard" | "form" | "historial" | "staff" | "admin" | "notificaciones";
 type TipoConsent = "escleroterapia" | "sueroterapia" | "laser" | "paquete";
 type EstadoConsent = "FIRMADO" | "PENDIENTE" | "APROBADO" | "RECHAZADO" | "ANULADO";
 type RolUsuario = "MÉDICO" | "ADMINISTRADOR" | "AUXILIAR" | "ENFERMERA" | "TÉCNICO";
@@ -343,20 +343,20 @@ function SignatureCanvas({ label, onSave, onCancel }: { label: string; onSave: (
   const clear = () => { const c = canvasRef.current!; const ctx = c.getContext("2d")!; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height); setHasDrawn(false); };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[300] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+    <div className="fixed inset-0 bg-black/70 z-[300] flex items-end sm:items-center justify-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-[#1A56DB]/10 flex items-center justify-center"><Pen size={15} className="text-[#1A56DB]"/></div>
-            <div><p className="font-semibold text-sm">{label}</p><p className="text-[10px] text-muted-foreground">Firme con dedo en tablet o mouse en PC</p></div>
+            <div><p className="font-semibold text-sm">{label}</p><p className="text-[10px] text-muted-foreground">Firme con dedo en móvil/tablet o mouse en PC</p></div>
           </div>
           <button onClick={onCancel}><X size={18} className="text-muted-foreground"/></button>
         </div>
-        <div className="p-5">
+        <div className="p-4 sm:p-5">
           <div className="border-2 border-dashed border-[#1A56DB]/30 rounded-xl overflow-hidden bg-[#f8faff]">
-            <canvas ref={canvasRef} width={600} height={240} className="w-full cursor-crosshair" style={{ touchAction: "none" }}/>
+            <canvas ref={canvasRef} width={600} height={220} className="w-full cursor-crosshair" style={{ touchAction: "none" }}/>
           </div>
-          <p className="text-[11px] text-center text-muted-foreground mt-2">Optimizado para tablet — dedo o lápiz táctil</p>
+          <p className="text-[11px] text-center text-muted-foreground mt-2">Dibuje su firma — funciona con dedo, lápiz táctil o mouse</p>
           <div className="grid grid-cols-3 gap-2 mt-4">
             <button onClick={clear} className="py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted">Limpiar</button>
             <button onClick={onCancel} className="py-2.5 rounded-lg border border-border text-sm font-medium">Cancelar</button>
@@ -440,7 +440,7 @@ function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: 
       </div>
       <div>
         <p className="text-[10px] font-bold text-[#1A56DB] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Shield size={11}/> Identificación</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Tipo Doc <span className="text-red-500">*</span></label>
             <select value={data.tipoDoc} onChange={e => s("tipoDoc")(e.target.value)}
@@ -452,18 +452,18 @@ function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: 
           <Field label="No. Documento" value={data.documento} onChange={s("documento")} placeholder="Número" required icon={<Shield size={13}/>}/>
         </div>
         <div className="mt-3"><Field label="Nombre completo" value={data.nombre} onChange={s("nombre")} placeholder="Nombres y apellidos completos" required icon={<UserCheck size={13}/>}/></div>
-        <div className="grid grid-cols-2 gap-3 mt-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
           <Field label="Fecha de nacimiento" value={data.fechaNacimiento} onChange={s("fechaNacimiento")} type="date"/>
           <Field label="Fecha de consulta" value={data.fecha} onChange={s("fecha")} type="date" required/>
         </div>
       </div>
       <div>
         <p className="text-[10px] font-bold text-[#1A56DB] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Phone size={11}/> Contacto</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Teléfono / Celular" value={data.telefono} onChange={s("telefono")} placeholder="3001234567" type="tel" icon={<Phone size={13}/>} required/>
           <Field label="Correo electrónico" value={data.email} onChange={s("email")} placeholder="correo@ejemplo.com" type="email" icon={<AtSign size={13}/>}/>
         </div>
-        <div className="grid grid-cols-2 gap-3 mt-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
           <Field label="Dirección" value={data.direccion} onChange={s("direccion")} placeholder="Cra 45 #23-10" icon={<MapPin size={13}/>}/>
           <Field label="Ciudad" value={data.ciudad} onChange={s("ciudad")} placeholder="Medellín"/>
         </div>
@@ -472,7 +472,7 @@ function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: 
         <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-3 flex items-center gap-1.5"><Heart size={11}/> Contacto de Emergencia</p>
         <div className="space-y-3">
           <Field label="Nombre del contacto" value={data.contactoNombre} onChange={s("contactoNombre")} placeholder="Nombre completo" icon={<Users size={13}/>} required/>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Parentesco <span className="text-red-500">*</span></label>
               <select value={data.contactoParentesco} onChange={e => s("contactoParentesco")(e.target.value)}
@@ -522,7 +522,7 @@ function StepVitalesEnfermera({ data, onChange, extraContent }: {
       </div>
       <div>
         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Signos Vitales</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Vital label="SpO2" k="oximetria" placeholder="98" unit="%" color="border-blue-200"/>
           <Vital label="Tensión Arterial" k="tension" placeholder="120/80" unit="mmHg" color="border-red-200"/>
           <Vital label="Frec. Cardíaca" k="frecuenciaCardiaca" placeholder="72" unit="lpm" color="border-pink-200"/>
@@ -533,7 +533,7 @@ function StepVitalesEnfermera({ data, onChange, extraContent }: {
       </div>
       <div>
         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Antropometría</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Vital label="Peso" k="peso" placeholder="65" unit="kg" color="border-emerald-200"/>
           <Vital label="Talla" k="talla" placeholder="165" unit="cm" color="border-teal-200"/>
           <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-3 text-center">
@@ -870,16 +870,16 @@ function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClos
     addToast("info", "Abriendo WhatsApp...");
   };
   return (
-    <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-3">
-      <div className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-border rounded-t-2xl flex-shrink-0">
+    <div className="fixed inset-0 bg-black/70 z-[200] flex items-end sm:items-center justify-center sm:p-3">
+      <div className="bg-gray-50 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl h-[95vh] sm:max-h-[94vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-white border-b border-border rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3">
             <FileText size={16} className="text-[#1A56DB]"/>
-            <div><p className="font-bold text-sm">{record.radicado}</p><div className="flex items-center gap-2"><StatusBadge estado={record.estado}/><TipoBadge tipo={record.tipo}/></div></div>
+            <div><p className="font-bold text-sm">{record.radicado}</p><div className="flex items-center gap-2 flex-wrap"><StatusBadge estado={record.estado}/><TipoBadge tipo={record.tipo}/></div></div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"><X size={16} className="text-muted-foreground"/></button>
         </div>
-        <div className="overflow-y-auto flex-1 p-4">
+        <div className="overflow-y-auto flex-1 p-3 sm:p-4">
           <PDFViewer record={record} onSendEmail={() => addToast("success", `Email enviado`)} onSendWhatsApp={handleWA}/>
         </div>
       </div>
@@ -892,10 +892,13 @@ function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClos
 // ═══════════════════════════════════════════════════════════════════════════════
 function WizardHeader({ steps, current, titulo, icon }: { steps: string[]; current: number; titulo: string; icon: React.ReactNode }) {
   return (
-    <div className="flex-shrink-0 px-5 pt-5 pb-3">
+    <div className="flex-shrink-0 px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-9 h-9 rounded-xl bg-[#1A56DB]/10 flex items-center justify-center text-[#1A56DB]">{icon}</div>
-        <div><p className="font-bold text-sm">{titulo}</p><p className="text-[10px] text-muted-foreground">Paso {current}/{steps.length}: {steps[current - 1]}</p></div>
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#1A56DB]/10 flex items-center justify-center text-[#1A56DB] flex-shrink-0">{icon}</div>
+        <div className="min-w-0">
+          <p className="font-bold text-sm truncate">{titulo}</p>
+          <p className="text-[10px] text-muted-foreground">Paso {current}/{steps.length}: <span className="hidden xs:inline">{steps[current - 1]}</span></p>
+        </div>
       </div>
       <div className="flex gap-1">{steps.map((_, i) => <div key={i} className={`flex-1 h-1.5 rounded-full transition-all ${i < current ? "bg-[#1A56DB]" : "bg-border"}`}/>)}</div>
     </div>
@@ -906,14 +909,14 @@ function NavButtons({ step, total, onBack, onNext, onFinish, canNext = true, fin
   step: number; total: number; onBack: () => void; onNext: () => void; onFinish: () => void; canNext?: boolean; finishing?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 px-5 py-4 border-t border-border flex-shrink-0">
-      {step > 1 && <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"><ChevronLeft size={15}/> Anterior</button>}
+    <div className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 sm:py-4 border-t border-border flex-shrink-0">
+      {step > 1 && <button onClick={onBack} className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"><ChevronLeft size={15}/> <span className="hidden sm:inline">Anterior</span></button>}
       <div className="flex-1"/>
       {step < total ? (
-        <button onClick={onNext} disabled={!canNext} className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold disabled:opacity-40 hover:bg-[#1648bf] transition-colors">Siguiente <ChevronRight size={15}/></button>
+        <button onClick={onNext} disabled={!canNext} className="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold disabled:opacity-40 hover:bg-[#1648bf] transition-colors">Siguiente <ChevronRight size={15}/></button>
       ) : (
-        <button onClick={onFinish} disabled={!canNext || finishing} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors">
-          {finishing ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/> Guardando...</> : <><CheckCircle size={15}/> Guardar y Notificar Médico</>}
+        <button onClick={onFinish} disabled={!canNext || finishing} className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors">
+          {finishing ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/> Guardando...</> : <><CheckCircle size={15}/> <span className="hidden sm:inline">Guardar y </span>Notificar Médico</>}
         </button>
       )}
     </div>
@@ -922,9 +925,11 @@ function NavButtons({ step, total, onBack, onNext, onFinish, canNext = true, fin
 
 function FormWrapper({ onCancel, children }: { onCancel: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-3">
-      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-xl max-h-[96vh] flex flex-col">
-        <div className="flex items-center justify-end px-5 pt-4 flex-shrink-0">
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-end sm:items-center justify-center sm:p-3">
+      <div className="bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-xl h-[95vh] sm:max-h-[96vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-5 pt-4 flex-shrink-0">
+          <div className="w-10 h-1 bg-border rounded-full mx-auto sm:hidden"/>
+          <div className="hidden sm:block"/>
           <button onClick={onCancel} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"><X size={16} className="text-muted-foreground"/></button>
         </div>
         {children}
@@ -935,13 +940,13 @@ function FormWrapper({ onCancel, children }: { onCancel: () => void; children: R
 
 function PDFWrapper({ onCancel, children, titulo }: { onCancel: () => void; children: React.ReactNode; titulo: string }) {
   return (
-    <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-3">
-      <div className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[96vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-border rounded-t-2xl flex-shrink-0">
+    <div className="fixed inset-0 bg-black/70 z-[100] flex items-end sm:items-center justify-center sm:p-3">
+      <div className="bg-gray-50 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl h-[95vh] sm:max-h-[96vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-white border-b border-border rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-600"/><p className="font-bold text-sm text-emerald-700">{titulo}</p></div>
           <button onClick={onCancel} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"><X size={16} className="text-muted-foreground"/></button>
         </div>
-        <div className="overflow-y-auto flex-1 p-4">{children}</div>
+        <div className="overflow-y-auto flex-1 p-3 sm:p-4">{children}</div>
       </div>
     </div>
   );
@@ -1044,7 +1049,7 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName }: {
   const PrescripcionExtra = (
     <div className="space-y-4 mt-4 pt-4 border-t border-border">
       <div className="flex items-center gap-2 p-2 bg-[#00B896]/10 border border-[#00B896]/30 rounded-xl"><Droplets size={14} className="text-[#00B896]"/><p className="text-xs font-bold text-[#00B896]">Prescripción Médica — Sueroterapia</p></div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Dosis Vitamina C (cc)" value={dosis_vitC} onChange={setDosisVitC} placeholder="Ej: 3 cc"/>
         <Field label="Dosis Complejo B (cc)" value={dosis_compB} onChange={setDosisCompB} placeholder="Ej: 4 cc"/>
       </div>
@@ -1056,7 +1061,7 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName }: {
       </div>
       <div>
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Trazabilidad M/DM — Lotes</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {([["NaCl 0.9%","nacl"],["Vitamina C","vitC"],["Complejo B","compB"],["Jeringa 3ml","jeringa"],["Pericraneal","pericraneal"],["Macrogotero","macrogotero"]] as [string, keyof typeof traz][]).map(([label,key]) => (
             <div key={key}><label className="text-[10px] text-muted-foreground font-medium block mb-1">{label}</label><input value={traz[key]} onChange={e => setTraz({...traz,[key]:e.target.value})} placeholder="No. lote" className="w-full border border-border rounded-lg px-2.5 py-2 text-xs bg-input-background focus:outline-none font-mono"/></div>
           ))}
@@ -1321,8 +1326,8 @@ function AprobacionModal({ record, medicoNombre, onAprobar, onRechazar, onClose 
   const pac = d.paciente;
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-[250] flex items-center justify-center p-3">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/80 z-[250] flex items-end sm:items-center justify-center sm:p-3">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center"><BellRing size={17} className="text-amber-600"/></div>
@@ -1360,7 +1365,7 @@ function AprobacionModal({ record, medicoNombre, onAprobar, onRechazar, onClose 
           {d.vitales && (
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Signos Vitales</p>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 sm:grid-cols-3 gap-1.5">
                 {[["SpO2", d.vitales.oximetria + "%"], ["T.A.", d.vitales.tension], ["F.C.", d.vitales.frecuenciaCardiaca + " lpm"], ["Peso", d.vitales.peso + " kg"], ["Talla", d.vitales.talla + " cm"], ["IMC", d.vitales.imc]].map(([l,v]) => (
                   <div key={l} className="bg-[#EEF2F8] rounded-lg p-2 text-center"><p className="text-[8px] text-muted-foreground font-bold">{l}</p><p className="text-[10px] font-bold">{v || "—"}</p></div>
                 ))}
@@ -1414,7 +1419,7 @@ function NotificationPanel({ notifs, onClose, onMarkRead, onMarkAllRead, onOpenC
   const noLeidas = notifs.filter(n => !n.leida).length;
   return (
     <div className="fixed inset-0 z-[200]" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="absolute right-4 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-border overflow-hidden">
+      <div className="absolute right-2 sm:right-4 top-14 w-[calc(100vw-16px)] sm:w-80 bg-white rounded-2xl shadow-2xl border border-border overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-[#0C1A35]">
           <div className="flex items-center gap-2">
             <Bell size={15} className="text-[#1A56DB]"/>
@@ -1455,22 +1460,42 @@ function NotificationPanel({ notifs, onClose, onMarkRead, onMarkAllRead, onOpenC
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GESTIÓN DE STAFF — Solo ADMINISTRADOR
+// GESTIÓN DE STAFF — Solo ADMINISTRADOR (CRUD completo)
 // ═══════════════════════════════════════════════════════════════════════════════
-function StaffPage({ usuarios, onAddUser, onToggleActivo, addToast }: {
-  usuarios: Usuario[]; onAddUser: (u: Usuario) => void;
+function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePassword, addToast }: {
+  usuarios: Usuario[];
+  onAddUser: (u: Usuario) => void;
   onToggleActivo: (id: string) => void;
+  onEditUser: (u: Usuario) => void;
+  onChangePassword: (userId: string, pwd: string) => void;
   addToast: (t: "success"|"error"|"info"|"warning", m: string) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [editingUser, setEditingUser] = useState<Usuario | null>(null);
+  const [pwdUser, setPwdUser] = useState<Usuario | null>(null);
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [rol, setRol] = useState<RolUsuario>("AUXILIAR");
   const [password, setPassword] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmNewPwd, setConfirmNewPwd] = useState("");
   const [q, setQ] = useState("");
 
-  const filtered = usuarios.filter(u => q === "" || u.nombre.toLowerCase().includes(q.toLowerCase()) || u.email.toLowerCase().includes(q.toLowerCase()) || u.rol.toLowerCase().includes(q.toLowerCase()));
+  const filtered = usuarios.filter(u =>
+    q === "" ||
+    u.nombre.toLowerCase().includes(q.toLowerCase()) ||
+    u.email.toLowerCase().includes(q.toLowerCase()) ||
+    u.rol.toLowerCase().includes(q.toLowerCase())
+  );
+
+  const ROL_OPTS: { value: RolUsuario; label: string }[] = [
+    { value: "MÉDICO",        label: "MÉDICO — Aprueba consentimientos y ve citas" },
+    { value: "AUXILIAR",      label: "AUXILIAR — Crea consentimientos" },
+    { value: "ENFERMERA",     label: "ENFERMERA — Crea consentimientos y toma vitales" },
+    { value: "TÉCNICO",       label: "TÉCNICO — Crea consentimientos (Láser)" },
+    { value: "ADMINISTRADOR", label: "ADMINISTRADOR — Control total del sistema" },
+  ];
 
   const handleAdd = () => {
     if (!nombre.trim() || !email.trim() || !password.trim()) { addToast("error", "Completar todos los campos requeridos"); return; }
@@ -1483,13 +1508,51 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, addToast }: {
     setNombre(""); setEmail(""); setPassword(""); setConfirmPwd(""); setRol("AUXILIAR"); setShowForm(false);
   };
 
+  const handleEdit = () => {
+    if (!editingUser) return;
+    if (!nombre.trim() || !email.trim()) { addToast("error", "Nombre y correo son requeridos"); return; }
+    if (usuarios.find(u => u.email.toLowerCase() === email.toLowerCase() && u.id !== editingUser.id)) {
+      addToast("error", "Ese correo ya está en uso"); return;
+    }
+    onEditUser({ ...editingUser, nombre: nombre.trim(), email: email.trim().toLowerCase(), rol });
+    addToast("success", `Usuario ${nombre.trim()} actualizado`);
+    setEditingUser(null); setNombre(""); setEmail(""); setRol("AUXILIAR");
+  };
+
+  const openEdit = (u: Usuario) => {
+    setEditingUser(u); setNombre(u.nombre); setEmail(u.email); setRol(u.rol);
+    setShowForm(false); setPwdUser(null);
+  };
+
+  const openPwd = (u: Usuario) => {
+    setPwdUser(u); setNewPwd(""); setConfirmNewPwd("");
+    setShowForm(false); setEditingUser(null);
+  };
+
+  const handleChangePwd = () => {
+    if (!pwdUser) return;
+    if (newPwd.length < 6) { addToast("error", "La contraseña debe tener al menos 6 caracteres"); return; }
+    if (newPwd !== confirmNewPwd) { addToast("error", "Las contraseñas no coinciden"); return; }
+    onChangePassword(pwdUser.id, newPwd);
+    setPwdUser(null); setNewPwd(""); setConfirmNewPwd("");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-xl font-bold">Gestión de Personal</h1><p className="text-sm text-muted-foreground">{usuarios.length} usuarios registrados</p></div>
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
+        <div>
+          <h1 className="text-xl font-bold">Gestión de Personal</h1>
+          <p className="text-sm text-muted-foreground">{usuarios.length} usuarios · {usuarios.filter(u=>u.activo).length} activos</p>
+        </div>
+        <button onClick={() => { setShowForm(true); setEditingUser(null); setPwdUser(null); setNombre(""); setEmail(""); setPassword(""); setConfirmPwd(""); setRol("AUXILIAR"); }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
           <UserPlus size={16}/> Agregar Usuario
         </button>
+      </div>
+
+      <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-start gap-2">
+        <Shield size={14} className="text-purple-700 mt-0.5 flex-shrink-0"/>
+        <p className="text-[11px] text-purple-800 font-semibold">Solo el <strong>Administrador</strong> puede agregar, editar, cambiar contraseñas y activar/desactivar personal del sistema.</p>
       </div>
 
       {/* Formulario nuevo usuario */}
@@ -1499,10 +1562,7 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, addToast }: {
             <p className="font-bold text-sm flex items-center gap-2"><UserPlus size={16} className="text-[#1A56DB]"/> Nuevo Usuario del Sistema</p>
             <button onClick={() => setShowForm(false)}><X size={16} className="text-muted-foreground"/></button>
           </div>
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-            <p className="text-[10px] text-amber-800 font-semibold flex items-center gap-1.5"><Shield size={11}/> Solo el Administrador puede agregar, editar o desactivar personal</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nombre completo" value={nombre} onChange={setNombre} placeholder="Dr. Nombre Apellido" required icon={<UserCheck size={13}/>}/>
             <Field label="Correo electrónico" value={email} onChange={setEmail} placeholder="usuario@medfis.com" type="email" required icon={<AtSign size={13}/>}/>
           </div>
@@ -1510,21 +1570,64 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, addToast }: {
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Rol en el Sistema <span className="text-red-500">*</span></label>
             <select value={rol} onChange={e => setRol(e.target.value as RolUsuario)}
               className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30">
-              <option value="MÉDICO">MÉDICO — Puede aprobar consentimientos y ver citas</option>
-              <option value="AUXILIAR">AUXILIAR — Puede crear consentimientos</option>
-              <option value="ENFERMERA">ENFERMERA — Puede crear consentimientos y tomar vitales</option>
-              <option value="TÉCNICO">TÉCNICO — Puede crear consentimientos (Láser)</option>
-              <option value="ADMINISTRADOR">ADMINISTRADOR — Acceso completo + gestión de staff</option>
+              {ROL_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Contraseña" value={password} onChange={setPassword} type="password" placeholder="Min. 6 caracteres" required icon={<Lock size={13}/>}/>
             <Field label="Confirmar contraseña" value={confirmPwd} onChange={setConfirmPwd} type="password" placeholder="Repetir contraseña" required icon={<Lock size={13}/>}/>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => { setShowForm(false); setNombre(""); setEmail(""); setPassword(""); setConfirmPwd(""); }} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
+            <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
             <button onClick={handleAdd} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
               <Save size={14}/> Crear Usuario
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Formulario editar usuario */}
+      {editingUser && (
+        <div className="bg-card border-2 border-amber-300 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="font-bold text-sm flex items-center gap-2"><Edit3 size={16} className="text-amber-600"/> Editar: {editingUser.nombre}</p>
+            <button onClick={() => setEditingUser(null)}><X size={16} className="text-muted-foreground"/></button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Nombre completo" value={nombre} onChange={setNombre} placeholder="Nombre completo" required icon={<UserCheck size={13}/>}/>
+            <Field label="Correo electrónico" value={email} onChange={setEmail} placeholder="correo@medfis.com" type="email" required icon={<AtSign size={13}/>}/>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Rol</label>
+            <select value={rol} onChange={e => setRol(e.target.value as RolUsuario)}
+              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-amber-300">
+              {ROL_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setEditingUser(null)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
+            <button onClick={handleEdit} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors">
+              <Save size={14}/> Guardar Cambios
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Formulario cambiar contraseña */}
+      {pwdUser && (
+        <div className="bg-card border-2 border-red-300 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="font-bold text-sm flex items-center gap-2"><Lock size={16} className="text-red-600"/> Cambiar Contraseña — {pwdUser.nombre}</p>
+            <button onClick={() => setPwdUser(null)}><X size={16} className="text-muted-foreground"/></button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Nueva contraseña" value={newPwd} onChange={setNewPwd} type="password" placeholder="Min. 6 caracteres" required icon={<Lock size={13}/>}/>
+            <Field label="Confirmar contraseña" value={confirmNewPwd} onChange={setConfirmNewPwd} type="password" placeholder="Repetir contraseña" required icon={<Lock size={13}/>}/>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setPwdUser(null)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
+            <button onClick={handleChangePwd} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors">
+              <Save size={14}/> Cambiar Contraseña
             </button>
           </div>
         </div>
@@ -1540,39 +1643,251 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, addToast }: {
       {/* Lista de usuarios */}
       <div className="space-y-2">
         {filtered.map(u => (
-          <div key={u.id} className={`bg-card rounded-2xl border border-border p-4 flex items-center gap-4 ${!u.activo ? "opacity-60" : ""}`}>
-            <div className="w-10 h-10 rounded-xl bg-[#1A56DB]/10 flex items-center justify-center flex-shrink-0 text-[#1A56DB] font-black text-sm">
+          <div key={u.id} className={`bg-card rounded-2xl border border-border p-4 flex items-center gap-4 transition-all ${!u.activo ? "opacity-55" : ""} ${editingUser?.id===u.id||pwdUser?.id===u.id?"border-[#1A56DB]":""}`}>
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-black text-sm ${u.activo?"bg-[#1A56DB]":"bg-gray-400"}`}>
               {u.nombre.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-sm truncate">{u.nombre}</p>
+                <p className="font-semibold text-sm">{u.nombre}</p>
                 <RolBadge rol={u.rol}/>
-                {!u.activo && <span className="text-[9px] bg-gray-100 text-gray-500 font-bold px-1.5 py-0.5 rounded-full">INACTIVO</span>}
+                {!u.activo && <span className="text-[9px] bg-gray-200 text-gray-600 font-bold px-1.5 py-0.5 rounded-full">INACTIVO</span>}
               </div>
               <p className="text-[10px] text-muted-foreground mt-0.5">{u.email}</p>
-              <p className="text-[9px] text-muted-foreground">Creado: {fmtFecha(u.createdAt)}</p>
+              <p className="text-[9px] text-muted-foreground">Desde: {fmtFecha(u.createdAt)}</p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+              <button onClick={() => openEdit(u)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors">
+                <Edit3 size={10}/> Editar
+              </button>
+              <button onClick={() => openPwd(u)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors">
+                <Lock size={10}/> Contraseña
+              </button>
               {u.rol !== "ADMINISTRADOR" && (
-                <button onClick={() => { onToggleActivo(u.id); addToast(u.activo ? "warning" : "success", `Usuario ${u.activo ? "desactivado" : "activado"}: ${u.nombre}`); }}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-semibold transition-colors ${u.activo ? "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"}`}>
-                  {u.activo ? <><Lock size={11}/> Desactivar</> : <><Unlock size={11}/> Activar</>}
+                <button onClick={() => { onToggleActivo(u.id); addToast(u.activo ? "warning" : "success", `${u.activo ? "Desactivado" : "Activado"}: ${u.nombre}`); }}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors border ${u.activo ? "bg-red-50 text-red-600 hover:bg-red-100 border-red-200" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"}`}>
+                  {u.activo ? <><Lock size={10}/> Desactivar</> : <><Unlock size={10}/> Activar</>}
                 </button>
               )}
             </div>
           </div>
         ))}
+        {filtered.length === 0 && <p className="text-sm text-center text-muted-foreground py-8">Sin resultados para "{q}"</p>}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN STATS PAGE — Estadísticas completas para el Administrador
+// ═══════════════════════════════════════════════════════════════════════════════
+function AdminStatsPage({ records, usuarios }: { records: ConsentRecord[]; usuarios: Usuario[] }) {
+  const total       = records.length;
+  const firmados    = records.filter(r => r.estado === "FIRMADO").length;
+  const aprobados   = records.filter(r => r.estado === "APROBADO").length;
+  const rechazados  = records.filter(r => r.estado === "RECHAZADO").length;
+  const anulados    = records.filter(r => r.estado === "ANULADO").length;
+  const pendientes  = records.filter(r => r.pendienteMedico && r.estado === "FIRMADO").length;
+  const hoyCount    = records.filter(r => r.fecha === hoy()).length;
+  const pacientesUnicos = new Set(records.map(r => r.pacienteDoc)).size;
+  const staff       = usuarios.length;
+  const staffActivo = usuarios.filter(u => u.activo).length;
+
+  const porTipo = [
+    { tipo: "Escleroterapia", count: records.filter(r=>r.tipo==="escleroterapia").length, color:"#1A56DB" },
+    { tipo: "Sueroterapia",   count: records.filter(r=>r.tipo==="sueroterapia").length,   color:"#00B896" },
+    { tipo: "Láser ND:YAG",   count: records.filter(r=>r.tipo==="laser").length,          color:"#F59E0B" },
+    { tipo: "Paquete",        count: records.filter(r=>r.tipo==="paquete").length,         color:"#8B5CF6" },
+  ];
+
+  const porEstado = [
+    { name: "Aprobados",  value: aprobados,  fill: "#10b981" },
+    { name: "Firmados",   value: firmados,   fill: "#3b82f6" },
+    { name: "Rechazados", value: rechazados, fill: "#ef4444" },
+    { name: "Anulados",   value: anulados,   fill: "#6b7280" },
+  ].filter(e => e.value > 0);
+
+  // Últimos 7 días
+  const last7: { dia: string; count: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const label = d.toLocaleDateString("es-CO", { weekday: "short", day: "numeric" });
+    last7.push({ dia: label, count: records.filter(r => r.fecha === key).length });
+  }
+
+  // Por creador
+  const porCreador: Record<string, number> = {};
+  records.forEach(r => { if (r.creadoPor) porCreador[r.creadoPor] = (porCreador[r.creadoPor] || 0) + 1; });
+  const creadorList = Object.entries(porCreador).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  const KPI = ({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) => (
+    <div className={`bg-card rounded-2xl border border-border p-4 border-l-4`} style={{ borderLeftColor: color }}>
+      <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{label}</p>
+      <p className="text-2xl font-black mt-1" style={{ color }}>{value}</p>
+      {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold">Panel de Administración</h1>
+        <p className="text-sm text-muted-foreground">Control total del sistema · {new Date().toLocaleDateString("es-CO", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}</p>
       </div>
 
-      {/* Nota backend */}
-      <div className="p-4 bg-[#EEF2F8] rounded-2xl border border-[#1A56DB]/20">
-        <p className="text-[10px] font-bold text-[#1A56DB] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Info size={11}/> Integración Spring Boot + PostgreSQL</p>
-        <div className="space-y-1 text-[10px] text-muted-foreground font-mono">
-          <p><span className="text-emerald-600 font-bold">POST</span>  /api/usuarios — Crear usuario</p>
-          <p><span className="text-blue-600 font-bold">GET</span>   /api/usuarios — Listar staff</p>
-          <p><span className="text-amber-600 font-bold">PATCH</span> /api/usuarios/&#123;id&#125;/toggle — Activar/Desactivar</p>
-          <p><span className="text-purple-600 font-bold">PUT</span>   /api/usuarios/&#123;id&#125; — Editar usuario</p>
+      {/* KPIs principales */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KPI label="Consentimientos" value={total} sub={`${hoyCount} hoy`} color="#1A56DB"/>
+        <KPI label="Pacientes únicos" value={pacientesUnicos} sub="documentos distintos" color="#8B5CF6"/>
+        <KPI label="Aprobados" value={aprobados} sub={total>0?`${Math.round(aprobados/total*100)}% del total`:"-"} color="#10b981"/>
+        <KPI label="Pendientes médico" value={pendientes} sub={pendientes>0?"⚠ Requieren Visto Bueno":"Al día"} color={pendientes>0?"#f59e0b":"#10b981"}/>
+      </div>
+
+      {/* Tendencia semanal */}
+      <div className="bg-card rounded-2xl border border-border p-4">
+        <p className="text-sm font-bold mb-3">Consentimientos — Últimos 7 días</p>
+        <div className="flex items-end gap-2 h-28">
+          {last7.map((d, i) => {
+            const max = Math.max(...last7.map(x=>x.count), 1);
+            const pct = (d.count / max) * 100;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <span className="text-[9px] font-bold text-muted-foreground">{d.count > 0 ? d.count : ""}</span>
+                <div className="w-full rounded-t-md transition-all" style={{ height:`${Math.max(pct, 4)}%`, background: d.count>0?"#1A56DB":"#e5e7eb" }}/>
+                <span className="text-[8px] text-muted-foreground text-center leading-tight">{d.dia}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Por tipo */}
+        <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
+          <p className="text-sm font-bold">Por tipo de procedimiento</p>
+          {porTipo.map(t => (
+            <div key={t.tipo}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium">{t.tipo}</span>
+                <span className="text-xs font-bold">{t.count}</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: total>0?`${(t.count/total)*100}%`:"0%", background: t.color }}/>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Por estado */}
+        <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
+          <p className="text-sm font-bold">Por estado</p>
+          {porEstado.length === 0 && <p className="text-xs text-muted-foreground">Sin datos aún</p>}
+          {porEstado.map(e => (
+            <div key={e.name} className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: e.fill }}/>
+              <div className="flex-1">
+                <div className="flex justify-between text-xs mb-0.5">
+                  <span>{e.name}</span>
+                  <span className="font-bold">{e.value} ({total>0?Math.round(e.value/total*100):0}%)</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full">
+                  <div className="h-full rounded-full" style={{ width:`${total>0?(e.value/total)*100:0}%`, background:e.fill }}/>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Top creadores */}
+      {creadorList.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border p-4">
+          <p className="text-sm font-bold mb-3">Top creadores de consentimientos</p>
+          <div className="space-y-2">
+            {creadorList.map(([nombre, count], i) => (
+              <div key={nombre} className="flex items-center gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#1A56DB]/10 text-[#1A56DB] text-[10px] font-black flex items-center justify-center">{i+1}</span>
+                <span className="flex-1 text-xs font-medium">{nombre}</span>
+                <span className="text-xs font-bold text-[#1A56DB]">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Staff summary */}
+      <div className="bg-card rounded-2xl border border-border p-4">
+        <p className="text-sm font-bold mb-3">Resumen del Personal</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="text-center p-3 bg-[#1A56DB]/5 rounded-xl">
+            <p className="text-2xl font-black text-[#1A56DB]">{staff}</p>
+            <p className="text-[10px] text-muted-foreground">Total Staff</p>
+          </div>
+          <div className="text-center p-3 bg-emerald-50 rounded-xl">
+            <p className="text-2xl font-black text-emerald-600">{staffActivo}</p>
+            <p className="text-[10px] text-muted-foreground">Activos</p>
+          </div>
+          <div className="text-center p-3 bg-red-50 rounded-xl">
+            <p className="text-2xl font-black text-red-500">{staff - staffActivo}</p>
+            <p className="text-[10px] text-muted-foreground">Inactivos</p>
+          </div>
+        </div>
+        <div className="mt-3 space-y-1">
+          {(["MÉDICO","AUXILIAR","ENFERMERA","TÉCNICO","ADMINISTRADOR"] as RolUsuario[]).map(r => {
+            const cnt = usuarios.filter(u => u.rol === r).length;
+            if (cnt === 0) return null;
+            return (
+              <div key={r} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2"><RolBadge rol={r}/></span>
+                <span className="font-bold">{cnt} usuario{cnt!==1?"s":""}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN CHANGE OWN PASSWORD MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+function AdminChangePwdModal({ user, onSave, onClose }: { user: Usuario; onSave: (newPwd: string) => void; onClose: () => void }) {
+  const [current, setCurrent] = useState("");
+  const [newPwd, setNewPwd]   = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [err, setErr]         = useState("");
+
+  const handleSave = () => {
+    setErr("");
+    if (current !== user.password) { setErr("La contraseña actual es incorrecta"); return; }
+    if (newPwd.length < 6)         { setErr("La nueva contraseña debe tener al menos 6 caracteres"); return; }
+    if (newPwd !== confirm)        { setErr("Las contraseñas nuevas no coinciden"); return; }
+    onSave(newPwd);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[300] flex items-end sm:items-center justify-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center"><KeyRound size={15} className="text-indigo-600"/></div>
+            <div><p className="font-bold text-sm">Cambiar mi Contraseña</p><p className="text-[10px] text-muted-foreground">Administrador: {user.nombre}</p></div>
+          </div>
+          <button onClick={onClose}><X size={18} className="text-muted-foreground"/></button>
+        </div>
+        <div className="p-5 space-y-4">
+          {err && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">{err}</div>}
+          <Field label="Contraseña actual" value={current} onChange={setCurrent} type="password" placeholder="Tu contraseña actual" required icon={<Lock size={13}/>}/>
+          <Field label="Nueva contraseña" value={newPwd} onChange={setNewPwd} type="password" placeholder="Min. 6 caracteres" required icon={<Lock size={13}/>}/>
+          <Field label="Confirmar nueva contraseña" value={confirm} onChange={setConfirm} type="password" placeholder="Repetir nueva contraseña" required icon={<Lock size={13}/>}/>
+        </div>
+        <div className="flex gap-2 px-5 pb-5">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors"><Save size={14}/> Cambiar Contraseña</button>
         </div>
       </div>
     </div>
@@ -1586,9 +1901,9 @@ function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c
   const [form, setForm] = useState<IPSConfig>({ ...ips });
   const s = (k: keyof IPSConfig) => (v: string) => setForm(f => ({ ...f, [k]: v }));
   return (
-    <div className="fixed inset-0 bg-black/70 z-[300] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+    <div className="fixed inset-0 bg-black/70 z-[300] flex items-end sm:items-center justify-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-white z-10">
           <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-[#1A56DB]/10 flex items-center justify-center"><Settings size={15} className="text-[#1A56DB]"/></div><div><p className="font-bold text-sm">Configuración IPS</p><p className="text-[10px] text-muted-foreground">Constantes del sistema — solo Administrador</p></div></div>
           <button onClick={onClose}><X size={18} className="text-muted-foreground"/></button>
         </div>
@@ -1676,9 +1991,10 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
 }
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
-function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, onSettings, notifCount }: {
+function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, onSettings, onChangePwd, notifCount }: {
   page: AppPage; onPage: (p: AppPage) => void; user: Usuario; onLogout: () => void;
   records: ConsentRecord[]; mobileOpen: boolean; onClose: () => void; onSettings: () => void;
+  onChangePwd: () => void;
   notifCount: number;
 }) {
   const ips = useIPS();
@@ -1706,15 +2022,20 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
               {(item.badge ?? 0) > 0 && <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">{item.badge}</span>}
             </button>
           ))}
-          {user.rol === "ADMINISTRADOR" && (
+          {user.rol === "ADMINISTRADOR" && (<>
+            <button onClick={() => { onPage("admin"); onClose(); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="admin"?"bg-[#1A56DB] text-white":"text-[#C8D6EF] hover:bg-white/8"}`}>
+              <BarChart2 size={17}/> Panel Admin
+            </button>
             <button onClick={() => { onPage("staff"); onClose(); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="staff"?"bg-[#1A56DB] text-white":"text-[#C8D6EF] hover:bg-white/8"}`}>
               <UserCog size={17}/> Gestión de Staff
             </button>
-          )}
+          </>)}
         </nav>
         <div className="px-3 pb-5 border-t border-white/8 pt-4 space-y-1">
-          {(user.rol === "ADMINISTRADOR") && <button onClick={onSettings} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C8D6EF] hover:bg-white/8 text-sm font-medium transition-colors"><Settings size={15}/> Config. IPS</button>}
+          {user.rol === "ADMINISTRADOR" && <button onClick={onSettings} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C8D6EF] hover:bg-white/8 text-sm font-medium transition-colors"><Settings size={15}/> Config. IPS</button>}
+          {user.rol === "ADMINISTRADOR" && <button onClick={onChangePwd} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C8D6EF] hover:bg-white/8 text-sm font-medium transition-colors"><Lock size={15}/> Mi Contraseña</button>}
           <div className="px-3 py-2">
             <p className="text-[10px] text-white font-semibold truncate">{user.nombre}</p>
             <p className="text-[10px] text-[#8899BB]">{user.rol}</p>
@@ -1915,18 +2236,20 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
     <div className="space-y-5">
       <div><h1 className="text-xl font-bold">Historial</h1><p className="text-sm text-muted-foreground">{filtered.length} registros encontrados</p></div>
 
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+        <div className="relative flex-1 min-w-0">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre, radicado o cédula..."
             className="w-full border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30"/>
         </div>
-        <select value={fTipo} onChange={e => setFTipo(e.target.value as any)} className="border border-border rounded-xl px-3 py-2.5 text-sm bg-card focus:outline-none">
-          <option value="todos">Todos los tipos</option><option value="escleroterapia">Escleroterapia</option><option value="sueroterapia">Sueroterapia</option><option value="laser">Láser</option><option value="paquete">Paquete</option>
-        </select>
-        <select value={fEst} onChange={e => setFEst(e.target.value as any)} className="border border-border rounded-xl px-3 py-2.5 text-sm bg-card focus:outline-none">
-          <option value="todos">Todos los estados</option><option value="FIRMADO">Firmado · Pendiente</option><option value="APROBADO">Aprobado</option><option value="RECHAZADO">Rechazado</option><option value="ANULADO">Anulado</option>
-        </select>
+        <div className="flex gap-2">
+          <select value={fTipo} onChange={e => setFTipo(e.target.value as any)} className="flex-1 border border-border rounded-xl px-2.5 py-2.5 text-sm bg-card focus:outline-none">
+            <option value="todos">Todos tipos</option><option value="escleroterapia">Escleroterapia</option><option value="sueroterapia">Sueroterapia</option><option value="laser">Láser</option><option value="paquete">Paquete</option>
+          </select>
+          <select value={fEst} onChange={e => setFEst(e.target.value as any)} className="flex-1 border border-border rounded-xl px-2.5 py-2.5 text-sm bg-card focus:outline-none">
+            <option value="todos">Todos estados</option><option value="FIRMADO">Firmado</option><option value="APROBADO">Aprobado</option><option value="RECHAZADO">Rechazado</option><option value="ANULADO">Anulado</option>
+          </select>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -1937,34 +2260,40 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
             const d = r.datos as any;
             const pac = d.paciente;
             return (
-              <div key={r.id} className={`bg-card rounded-2xl border border-border p-4 transition-colors hover:border-[#1A56DB]/30 ${r.pendienteMedico && r.estado === "FIRMADO" ? "border-l-4 border-l-amber-400" : ""} ${r.estado === "APROBADO" ? "border-l-4 border-l-emerald-500" : ""} ${r.estado === "RECHAZADO" ? "border-l-4 border-l-red-400" : ""}`}>
+              <div key={r.id} className={`bg-card rounded-2xl border border-border p-3 sm:p-4 transition-colors hover:border-[#1A56DB]/30 ${r.pendienteMedico && r.estado === "FIRMADO" ? "border-l-4 border-l-amber-400" : ""} ${r.estado === "APROBADO" ? "border-l-4 border-l-emerald-500" : ""} ${r.estado === "RECHAZADO" ? "border-l-4 border-l-red-400" : ""}`}>
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                    {r.tipo==="escleroterapia"?<Syringe size={16} className="text-[#1A56DB]"/>:r.tipo==="sueroterapia"?<Droplets size={16} className="text-[#00B896]"/>:r.tipo==="laser"?<Zap size={16} className="text-amber-600"/>:<Package size={16} className="text-purple-600"/>}
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                    {r.tipo==="escleroterapia"?<Syringe size={15} className="text-[#1A56DB]"/>:r.tipo==="sueroterapia"?<Droplets size={15} className="text-[#00B896]"/>:r.tipo==="laser"?<Zap size={15} className="text-amber-600"/>:<Package size={15} className="text-purple-600"/>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="font-semibold text-sm">{r.pacienteNombre}</p>
-                      {r.pendienteMedico && r.estado === "FIRMADO" && <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">⏳ PENDIENTE MÉDICO</span>}
-                      {r.estado === "APROBADO" && <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded-full">✓ CITA HABILITADA</span>}
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{r.pacienteNombre}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{r.radicado} · {fmtFecha(r.fecha)}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <StatusBadge estado={r.estado}/>
+                        <TipoBadge tipo={r.tipo}/>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground font-mono">{r.radicado} · {fmtFecha(r.fecha)}</p>
+                    {r.pendienteMedico && r.estado === "FIRMADO" && <span className="inline-block text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full mb-1">⏳ PENDIENTE MÉDICO</span>}
+                    {r.estado === "APROBADO" && <span className="inline-block text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded-full mb-1">✓ CITA HABILITADA</span>}
                     {pac?.telefono && <p className="text-[10px] text-muted-foreground">Tel: {pac.telefono}</p>}
-                    {r.creadoPor && <p className="text-[10px] text-muted-foreground">Registrado por: {r.creadoPor}</p>}
-                    {r.aprobadoPor && <p className="text-[10px] text-emerald-700 font-semibold">Aprobado por: {r.aprobadoPor}</p>}
-                    {r.motivoRechazo && <p className="text-[10px] text-red-600">Rechazado: {r.motivoRechazo}</p>}
-                    <div className="flex items-center gap-2 mt-1.5"><StatusBadge estado={r.estado}/><TipoBadge tipo={r.tipo}/></div>
-                  </div>
-                  <div className="flex flex-col gap-1.5 flex-shrink-0">
-                    <button onClick={() => onView(r)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#1A56DB] text-white text-[10px] font-semibold hover:bg-[#1648bf] transition-colors"><Eye size={11}/> Ver PDF</button>
-                    {r.pendienteMedico && r.estado === "FIRMADO" && user.rol === "MÉDICO" && (
-                      <button onClick={() => setAprobandoRecord(r)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 transition-colors"><CalendarCheck size={11}/> Visto Bueno</button>
-                    )}
-                    <button onClick={() => { const d2 = r.datos as any; const p = d2.paciente; const msg = encodeURIComponent(`*${ips.nombre}* - Radicado: ${r.radicado}\nEstado: ${r.estado}`); window.open(`https://wa.me/57${(p?.telefono||"").replace(/[^0-9]/g,"")}?text=${msg}`,"_blank"); addToast("info","Abriendo WhatsApp..."); }}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#25D366] text-white text-[10px] font-semibold hover:bg-[#20ba5a] transition-colors"><MessageSquare size={11}/> WhatsApp</button>
-                    {(user.rol==="ADMINISTRADOR"||user.rol==="MÉDICO") && (
-                      <button onClick={() => { onDelete(r.id); addToast("info","Consentimiento anulado"); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"><Trash2 size={13}/></button>
-                    )}
+                    {r.creadoPor && <p className="text-[10px] text-muted-foreground hidden sm:block">Por: {r.creadoPor}</p>}
+                    {r.aprobadoPor && <p className="text-[10px] text-emerald-700 font-semibold">✓ {r.aprobadoPor}</p>}
+                    {r.motivoRechazo && <p className="text-[10px] text-red-600 truncate">✕ {r.motivoRechazo}</p>}
+                    {/* Botones en fila para mobile */}
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      <button onClick={() => onView(r)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#1A56DB] text-white text-[10px] font-semibold hover:bg-[#1648bf] transition-colors"><Eye size={11}/> PDF</button>
+                      {r.pendienteMedico && r.estado === "FIRMADO" && user.rol === "MÉDICO" && (
+                        <button onClick={() => setAprobandoRecord(r)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 transition-colors"><CalendarCheck size={11}/> Visto Bueno</button>
+                      )}
+                      <button onClick={() => { const d2 = r.datos as any; const p = d2.paciente; const msg = encodeURIComponent(`*${ips.nombre}* - Radicado: ${r.radicado}\nEstado: ${r.estado}`); window.open(`https://wa.me/57${(p?.telefono||"").replace(/[^0-9]/g,"")}?text=${msg}`,"_blank"); addToast("info","Abriendo WhatsApp..."); }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#25D366] text-white text-[10px] font-semibold hover:bg-[#20ba5a] transition-colors"><MessageSquare size={11}/> WA</button>
+                      {(user.rol==="ADMINISTRADOR"||user.rol==="MÉDICO") && (
+                        <button onClick={() => { onDelete(r.id); addToast("info","Consentimiento anulado"); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"><Trash2 size={12}/></button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2031,15 +2360,23 @@ export default function App() {
   });
   const [user,          setUser]          = useState<Usuario | null>(null);
   const [page,          setPage]          = useState<AppPage>("dashboard");
-  const [records,       setRecords]       = useState<ConsentRecord[]>([]);
+  const [records,       setRecords]       = useState<ConsentRecord[]>(() => {
+    try { const s = localStorage.getItem("medfis_records"); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
   const [activeForm,    setActiveForm]    = useState<TipoConsent | null>(null);
   const [viewRecord,    setViewRecord]    = useState<ConsentRecord | null>(null);
   const [toasts,        setToasts]        = useState<ToastMsg[]>([]);
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
   const [showSettings,  setShowSettings]  = useState(false);
-  const [notificaciones,setNotificaciones]= useState<Notificacion[]>([]);
+  const [notificaciones,setNotificaciones]= useState<Notificacion[]>(() => {
+    try { const s = localStorage.getItem("medfis_notificaciones"); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
   const [showNotifs,    setShowNotifs]    = useState(false);
-  const nextIdRef = useRef(1);
+  const [showChangePwd, setShowChangePwd] = useState(false);
+  const getInitialId = (): number => {
+    try { const s = localStorage.getItem("medfis_records"); const a = s ? JSON.parse(s) : []; return a.length + 1; } catch { return 1; }
+  };
+  const nextIdRef = useRef<number>(getInitialId());
 
   const addToast = useCallback((type: "success"|"error"|"info"|"warning", msg: string) => {
     const id = Date.now();
@@ -2053,37 +2390,59 @@ export default function App() {
   }, []);
 
   const handleSave = (r: ConsentRecord) => {
-    setRecords(prev => [...prev, r]);
+    setRecords(prev => {
+      const updated = [...prev, r];
+      localStorage.setItem("medfis_records", JSON.stringify(updated));
+      return updated;
+    });
     nextIdRef.current += 1;
     setActiveForm(null);
     setPage("historial");
-
-    // Notificar al médico
-    addNotificacion({
-      tipo: "NUEVO_CONSENTIMIENTO",
-      titulo: "Consentimiento pendiente de Visto Bueno",
-      mensaje: `${r.pacienteNombre} · ${r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1)} · Radicado: ${r.radicado}. Revise y otorgue el Visto Bueno para proceder con la cita.`,
-      consentId: r.id,
-      paraRol: "MÉDICO",
+    const baseMsg = `${r.pacienteNombre} · ${r.tipo} · Radicado: ${r.radicado}. Revise y otorgue el Visto Bueno.`;
+    const notifMedico: Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: "Consentimiento pendiente de Visto Bueno", mensaje: baseMsg, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "MÉDICO" };
+    const notifAdmin:  Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: `Nuevo consentimiento — ${r.pacienteNombre}`, mensaje: `Registrado por: ${r.creadoPor ?? "—"} · ${r.radicado} · Pendiente aprobación médica.`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "ADMINISTRADOR" };
+    setNotificaciones(prev => {
+      const updated = [...prev, notifMedico, notifAdmin];
+      localStorage.setItem("medfis_notificaciones", JSON.stringify(updated));
+      return updated;
     });
+    addToast("success", `Consentimiento ${r.radicado} guardado`);
   };
 
   const handleAprobar = (id: string) => {
-    setRecords(prev => prev.map(r => r.id === id ? {
-      ...r, estado: "APROBADO" as EstadoConsent, pendienteMedico: false,
-      aprobadoPor: user?.nombre, fechaAprobacion: hoy(),
-    } : r));
+    setRecords(prev => {
+      const updated = prev.map(r => r.id === id ? { ...r, estado: "APROBADO" as EstadoConsent, pendienteMedico: false, aprobadoPor: user?.nombre, fechaAprobacion: hoy() } : r);
+      localStorage.setItem("medfis_records", JSON.stringify(updated));
+      return updated;
+    });
     const r = records.find(x => x.id === id);
-    if (r) addNotificacion({ tipo: "APROBADO", titulo: "Visto Bueno otorgado", mensaje: `${r.pacienteNombre} — ${r.radicado} fue aprobado. La cita de consulta ya puede proceder.`, consentId: r.id, paraRol: "TODOS" });
+    if (r) {
+      const notif: Notificacion = { id: genId(), tipo: "APROBADO", titulo: "Visto Bueno otorgado", mensaje: `${r.pacienteNombre} — ${r.radicado} aprobado. La cita puede proceder.`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "TODOS" };
+      setNotificaciones(prev => { const updated = [...prev, notif]; localStorage.setItem("medfis_notificaciones", JSON.stringify(updated)); return updated; });
+    }
   };
 
   const handleRechazar = (id: string, motivo: string) => {
-    setRecords(prev => prev.map(r => r.id === id ? { ...r, estado: "RECHAZADO" as EstadoConsent, pendienteMedico: false, motivoRechazo: motivo } : r));
+    setRecords(prev => {
+      const updated = prev.map(r => r.id === id ? { ...r, estado: "RECHAZADO" as EstadoConsent, pendienteMedico: false, motivoRechazo: motivo } : r);
+      localStorage.setItem("medfis_records", JSON.stringify(updated));
+      return updated;
+    });
     const r = records.find(x => x.id === id);
-    if (r) addNotificacion({ tipo: "RECHAZADO", titulo: "Consentimiento rechazado por el médico", mensaje: `${r.pacienteNombre} — ${r.radicado}. Motivo: ${motivo}`, consentId: r.id, paraRol: "TODOS" });
+    if (r) {
+      const notif: Notificacion = { id: genId(), tipo: "RECHAZADO", titulo: "Consentimiento rechazado", mensaje: `${r.pacienteNombre} — ${r.radicado}. Motivo: ${motivo}`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "TODOS" };
+      setNotificaciones(prev => { const updated = [...prev, notif]; localStorage.setItem("medfis_notificaciones", JSON.stringify(updated)); return updated; });
+    }
   };
 
-  const handleDelete = (id: string) => { setRecords(prev => prev.map(r => r.id===id ? {...r, estado:"ANULADO" as EstadoConsent, pendienteMedico:false} : r)); addToast("info","Consentimiento anulado"); };
+  const handleDelete = (id: string) => {
+    setRecords(prev => {
+      const updated = prev.map(r => r.id===id ? {...r, estado:"ANULADO" as EstadoConsent, pendienteMedico:false} : r);
+      localStorage.setItem("medfis_records", JSON.stringify(updated));
+      return updated;
+    });
+    addToast("info","Consentimiento anulado");
+  };
 
   const handleAddUser = (u: Usuario) => {
     const updated = [...usuarios, u];
@@ -2091,7 +2450,23 @@ export default function App() {
     localStorage.setItem("medfis_usuarios", JSON.stringify(updated));
   };
 
+  const handleEditUser = (updatedUser: Usuario) => {
+    const list = usuarios.map(u => u.id === updatedUser.id ? updatedUser : u);
+    setUsuarios(list);
+    localStorage.setItem("medfis_usuarios", JSON.stringify(list));
+    if (user?.id === updatedUser.id) setUser(updatedUser);
+  };
+
+  const handleChangeUserPassword = (userId: string, newPassword: string) => {
+    const list = usuarios.map(u => u.id === userId ? { ...u, password: newPassword } : u);
+    setUsuarios(list);
+    localStorage.setItem("medfis_usuarios", JSON.stringify(list));
+    addToast("success", "Contraseña actualizada correctamente");
+  };
+
   const handleToggleActivo = (id: string) => {
+    const target = usuarios.find(u => u.id === id);
+    if (target?.rol === "ADMINISTRADOR") { addToast("error", "No se puede desactivar al Administrador"); return; }
     const updated = usuarios.map(u => u.id === id ? { ...u, activo: !u.activo } : u);
     setUsuarios(updated);
     localStorage.setItem("medfis_usuarios", JSON.stringify(updated));
@@ -2122,9 +2497,9 @@ export default function App() {
     <IPSContext.Provider value={ips}>
       <div className="min-h-screen bg-background flex">
         <Sidebar page={page} onPage={setPage} user={user}
-          onLogout={() => { setUser(null); setPage("dashboard"); setRecords([]); setNotificaciones([]); addToast("info","Sesión cerrada"); }}
+          onLogout={() => { setUser(null); setPage("dashboard"); addToast("info","Sesión cerrada"); }}
           records={records} mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
-          onSettings={() => setShowSettings(true)} notifCount={notifCount}/>
+          onSettings={() => setShowSettings(true)} onChangePwd={() => setShowChangePwd(true)} notifCount={notifCount}/>
 
         <div className="flex-1 lg:ml-60 min-h-screen flex flex-col">
           {/* Topbar */}
@@ -2148,7 +2523,7 @@ export default function App() {
             </div>
           </div>
 
-          <main className="flex-1 p-4 sm:p-6 max-w-5xl mx-auto w-full">
+          <main className="flex-1 p-3 sm:p-5 lg:p-6 max-w-5xl mx-auto w-full">
             {page==="dashboard" && (
               <DashboardPage records={records} onNewForm={t => { setActiveForm(t); setPage("form"); }}
                 user={user} onViewRecord={setViewRecord} onAprobar={handleAprobar} onRechazar={handleRechazar} addToast={addToast}/>
@@ -2158,8 +2533,18 @@ export default function App() {
               <HistorialPage records={records} onView={setViewRecord} onDelete={handleDelete}
                 onAprobar={handleAprobar} onRechazar={handleRechazar} addToast={addToast} user={user}/>
             )}
+            {page==="admin" && user.rol === "ADMINISTRADOR" && (
+              <AdminStatsPage records={records} usuarios={usuarios}/>
+            )}
             {page==="staff" && user.rol === "ADMINISTRADOR" && (
-              <StaffPage usuarios={usuarios} onAddUser={handleAddUser} onToggleActivo={handleToggleActivo} addToast={addToast}/>
+              <StaffPage
+                usuarios={usuarios}
+                onAddUser={handleAddUser}
+                onToggleActivo={handleToggleActivo}
+                onEditUser={handleEditUser}
+                onChangePassword={handleChangeUserPassword}
+                addToast={addToast}
+              />
             )}
           </main>
         </div>
@@ -2172,6 +2557,13 @@ export default function App() {
 
         {viewRecord && <PDFModal record={viewRecord} onClose={() => setViewRecord(null)} addToast={addToast}/>}
         {showSettings && user.rol === "ADMINISTRADOR" && <IPSSettingsModal ips={ips} onSave={saveIPS} onClose={() => setShowSettings(false)}/>}
+        {showChangePwd && user.rol === "ADMINISTRADOR" && (
+          <AdminChangePwdModal
+            user={user}
+            onSave={(newPwd) => { handleChangeUserPassword(user.id, newPwd); setShowChangePwd(false); }}
+            onClose={() => setShowChangePwd(false)}
+          />
+        )}
         {showNotifs && (
           <NotificationPanel
             notifs={myNotifs}
