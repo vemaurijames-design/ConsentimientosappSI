@@ -1,0 +1,446 @@
+{
+  "info": {
+    "name": "Med&Fis — API Completa v2",
+    "_postman_id": "medfis-api-v2",
+    "description": "Colección completa Med&Fis. Base URL: http://localhost:8080/api\n\nFLUJO DE PRUEBA:\n1. AUTH → Login Auxiliar → token se guarda automáticamente\n2. CONSENTIMIENTOS → Crear Escleroterapia → consent_id se guarda\n3. AUTH → Login Médico → nuevo token\n4. NOTIFICACIONES → GET → ver alerta\n5. CONSENTIMIENTOS → Aprobar (Visto Bueno)\n6. NOTIFICACIONES → GET → ver aprobación\n\nCuentas:\n- rafael.marrero@medfis.com / medico123 (MÉDICO)\n- admin@medfis.com / admin123 (ADMINISTRADOR)\n- auxiliar@medfis.com / auxiliar123 (AUXILIAR)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",   "value": "http://localhost:8080/api", "type": "string" },
+    { "key": "token",      "value": "", "type": "string" },
+    { "key": "consent_id", "value": "", "type": "string" },
+    { "key": "user_id",    "value": "", "type": "string" },
+    { "key": "notif_id",   "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "🔐 AUTH",
+      "item": [
+        {
+          "name": "Login — Médico",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "var r = pm.response.json();",
+            "if (r.token) pm.collectionVariables.set('token', r.token);",
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Token recibido', () => pm.expect(r.token).to.be.a('string'));",
+            "pm.test('Rol es MEDICO', () => pm.expect(r.rol).to.equal('MEDICO'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"rafael.marrero@medfis.com\",\n  \"password\": \"medico123\"\n}" }
+          }
+        },
+        {
+          "name": "Login — Administrador",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "var r = pm.response.json();",
+            "if (r.token) pm.collectionVariables.set('token', r.token);",
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Rol es ADMINISTRADOR', () => pm.expect(r.rol).to.equal('ADMINISTRADOR'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@medfis.com\",\n  \"password\": \"admin123\"\n}" }
+          }
+        },
+        {
+          "name": "Login — Auxiliar",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "var r = pm.response.json();",
+            "if (r.token) pm.collectionVariables.set('token', r.token);",
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Rol es AUXILIAR', () => pm.expect(r.rol).to.equal('AUXILIAR'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"auxiliar@medfis.com\",\n  \"password\": \"auxiliar123\"\n}" }
+          }
+        },
+        {
+          "name": "Login — Credenciales inválidas (→ 401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"nadie@medfis.com\",\n  \"password\": \"wrong\"\n}" }
+          }
+        },
+        {
+          "name": "GET /auth/me — Perfil actual",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Tiene email', () => pm.expect(pm.response.json()).to.have.property('email'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/auth/me"
+          }
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 USUARIOS (Solo Administrador)",
+      "item": [
+        {
+          "name": "GET /usuarios — Listar todos",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Es array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+            "pm.test('Al menos 3 usuarios', () => pm.expect(pm.response.json().length).to.be.at.least(3));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/usuarios"
+          }
+        },
+        {
+          "name": "POST /usuarios — Crear Enfermera (Admin token)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "var r = pm.response.json();",
+            "if (r.id) pm.collectionVariables.set('user_id', r.id);",
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('Rol correcto', () => pm.expect(r.rol).to.equal('ENFERMERA'));",
+            "pm.test('Activo por defecto', () => pm.expect(r.activo).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/usuarios",
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Enfermera María López\",\n  \"email\": \"maria.lopez@medfis.com\",\n  \"password\": \"enfermera123\",\n  \"rol\": \"ENFERMERA\"\n}" }
+          }
+        },
+        {
+          "name": "PUT /usuarios/{id} — Actualizar usuario",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/usuarios/{{user_id}}",
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Enfermera María López (Actualizada)\",\n  \"email\": \"maria.lopez@medfis.com\",\n  \"password\": \"\",\n  \"rol\": \"ENFERMERA\"\n}" }
+          }
+        },
+        {
+          "name": "PATCH /usuarios/{id}/toggle — Desactivar/Activar",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "var r = pm.response.json();",
+            "pm.test('activo cambió', () => pm.expect(r).to.have.property('activo'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/usuarios/{{user_id}}/toggle"
+          }
+        },
+        {
+          "name": "POST /usuarios — Sin token (→ 401/403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Sin auth falla', () => pm.expect(pm.response.code).to.be.oneOf([401, 403]));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/usuarios",
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Test\",\n  \"email\": \"test@test.com\",\n  \"password\": \"test123\",\n  \"rol\": \"AUXILIAR\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 CONSENTIMIENTOS",
+      "item": [
+        {
+          "name": "GET /consentimientos — Listar todos",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Es array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/consentimientos"
+          }
+        },
+        {
+          "name": "GET /consentimientos?q=María — Buscar",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/consentimientos?q=Mar%C3%ADa",
+              "host": ["{{base_url}}"], "path": ["consentimientos"],
+              "query": [{ "key": "q", "value": "María" }]
+            }
+          }
+        },
+        {
+          "name": "GET /consentimientos/estadisticas",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "var r = pm.response.json();",
+            "pm.test('Tiene total', () => pm.expect(r).to.have.property('total'));",
+            "pm.test('Tiene firmados', () => pm.expect(r).to.have.property('firmados'));",
+            "pm.test('Tiene aprobados', () => pm.expect(r).to.have.property('aprobados'));",
+            "pm.test('Tiene hoy', () => pm.expect(r).to.have.property('hoy'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/consentimientos/estadisticas"
+          }
+        },
+        {
+          "name": "GET /consentimientos/pendientes — Cola médico",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Es array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/consentimientos/pendientes"
+          }
+        },
+        {
+          "name": "POST — Crear Escleroterapia ⭐",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "var r = pm.response.json();",
+            "if (r.id) pm.collectionVariables.set('consent_id', r.id);",
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('Estado FIRMADO', () => pm.expect(r.estado).to.equal('FIRMADO'));",
+            "pm.test('pendienteMedico TRUE', () => pm.expect(r.pendienteMedico).to.be.true);",
+            "pm.test('Radicado comienza ESC', () => pm.expect(r.radicado).to.include('ESC'));",
+            "console.log('consent_id guardado:', r.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/consentimientos",
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"escleroterapia\",\n  \"pacienteNombre\": \"María Fernanda López Gómez\",\n  \"pacienteDoc\": \"1234567890\",\n  \"pacienteTel\": \"3001234567\",\n  \"datos\": {\n    \"paciente\": {\n      \"tipoDoc\": \"CC\",\n      \"documento\": \"1234567890\",\n      \"nombre\": \"María Fernanda López Gómez\",\n      \"telefono\": \"3001234567\",\n      \"email\": \"maria@ejemplo.com\",\n      \"fechaNacimiento\": \"1990-05-15\",\n      \"fecha\": \"2026-08-03\",\n      \"contactoNombre\": \"Carlos López\",\n      \"contactoParentesco\": \"Esposo\",\n      \"contactoTelefono\": \"3009876543\"\n    },\n    \"vitales\": {\n      \"oximetria\": \"98\",\n      \"tension\": \"120/80\",\n      \"frecuenciaCardiaca\": \"72\",\n      \"frecuenciaRespiratoria\": \"16\",\n      \"temperatura\": \"36.5\",\n      \"peso\": \"65\",\n      \"talla\": \"165\",\n      \"imc\": \"23.9\",\n      \"glucemia\": \"90\",\n      \"observaciones\": \"Paciente refiere cansancio en piernas\"\n    },\n    \"cuestionario\": {\n      \"¿Enfermedad como diabetes?\": \"No\",\n      \"¿Cansancio en piernas?\": \"Si\",\n      \"¿Visibilidad de venas várices?\": \"Si\",\n      \"¿Alergias a Medicamentos?\": \"No\"\n    },\n    \"firmaConsentimiento\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\",\n    \"consentido\": true\n  }\n}" }
+          }
+        },
+        {
+          "name": "POST — Crear Sueroterapia",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "var r = pm.response.json();",
+            "pm.test('Radicado SUE', () => pm.expect(r.radicado).to.include('SUE'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/consentimientos",
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"sueroterapia\",\n  \"pacienteNombre\": \"Juan Pablo Torres Restrepo\",\n  \"pacienteDoc\": \"9876543210\",\n  \"pacienteTel\": \"3112233445\",\n  \"datos\": {\n    \"paciente\": {\n      \"nombre\": \"Juan Pablo Torres Restrepo\",\n      \"tipoDoc\": \"CC\",\n      \"documento\": \"9876543210\",\n      \"telefono\": \"3112233445\",\n      \"contactoNombre\": \"Ana Torres\",\n      \"contactoParentesco\": \"Madre\",\n      \"contactoTelefono\": \"3001111111\"\n    },\n    \"vitales\": {\n      \"oximetria\": \"97\",\n      \"tension\": \"110/70\",\n      \"frecuenciaCardiaca\": \"68\",\n      \"peso\": \"75\",\n      \"talla\": \"178\",\n      \"imc\": \"23.7\",\n      \"temperatura\": \"36.8\"\n    },\n    \"dosis_vitC\": \"3 cc\",\n    \"dosis_compB\": \"4 cc\",\n    \"viaPrescripcion\": \"Intravenosa\",\n    \"trazabilidad\": {\n      \"nacl\": \"LOT-2026-001\",\n      \"vitC\": \"LOT-2026-002\",\n      \"compB\": \"LOT-2026-003\",\n      \"jeringa\": \"LOT-2026-004\",\n      \"pericraneal\": \"LOT-2026-005\",\n      \"macrogotero\": \"LOT-2026-006\"\n    },\n    \"firmaConsentimiento\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\",\n    \"consentido\": true\n  }\n}" }
+          }
+        },
+        {
+          "name": "POST — Crear Láser ND:YAG",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('Radicado LAS', () => pm.expect(pm.response.json().radicado).to.include('LAS'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/consentimientos",
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"laser\",\n  \"pacienteNombre\": \"Sandra Milena Reyes Vargas\",\n  \"pacienteDoc\": \"5556789012\",\n  \"pacienteTel\": \"3205678901\",\n  \"datos\": {\n    \"paciente\": {\n      \"nombre\": \"Sandra Milena Reyes Vargas\",\n      \"tipoDoc\": \"CC\",\n      \"documento\": \"5556789012\",\n      \"telefono\": \"3205678901\",\n      \"contactoNombre\": \"Jorge Reyes\",\n      \"contactoParentesco\": \"Esposo\",\n      \"contactoTelefono\": \"3209999999\"\n    },\n    \"vitales\": { \"oximetria\": \"99\", \"tension\": \"115/75\", \"peso\": \"60\", \"talla\": \"162\", \"imc\": \"22.9\" },\n    \"parametros\": [\n      { \"fototipo\": \"III\", \"pieza\": \"Muslo Derecho\", \"modo\": \"Single\", \"frecuencia\": \"1\", \"fluencia\": \"30\", \"energia\": \"15\", \"area\": \"0.5\", \"pases\": \"3\" },\n      { \"fototipo\": \"III\", \"pieza\": \"Pantorrilla D\", \"modo\": \"Single\", \"frecuencia\": \"1\", \"fluencia\": \"28\", \"energia\": \"14\", \"area\": \"0.5\", \"pases\": \"2\" }\n    ],\n    \"firmaConsentimiento\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\",\n    \"consentido\": true\n  }\n}" }
+          }
+        },
+        {
+          "name": "POST — Crear Paquete Completo",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('Radicado PAQ', () => pm.expect(pm.response.json().radicado).to.include('PAQ'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/consentimientos",
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"paquete\",\n  \"pacienteNombre\": \"Claudia Patricia Mendoza\",\n  \"pacienteDoc\": \"7771234567\",\n  \"pacienteTel\": \"3007654321\",\n  \"datos\": {\n    \"paciente\": {\n      \"nombre\": \"Claudia Patricia Mendoza\",\n      \"tipoDoc\": \"CC\",\n      \"documento\": \"7771234567\",\n      \"telefono\": \"3007654321\",\n      \"contactoNombre\": \"Roberto Mendoza\",\n      \"contactoParentesco\": \"Hijo\",\n      \"contactoTelefono\": \"3008888888\"\n    },\n    \"vitales\": { \"oximetria\": \"98\", \"tension\": \"118/78\", \"peso\": \"68\", \"talla\": \"160\", \"imc\": \"26.6\", \"temperatura\": \"36.6\" },\n    \"cuestionario\": {\n      \"¿Cansancio en piernas?\": \"Si\",\n      \"¿Visibilidad de venas várices?\": \"Si\",\n      \"¿Realiza ejercicio?\": \"No\"\n    },\n    \"dosis_vitC\": \"5 cc\",\n    \"dosis_compB\": \"4 cc\",\n    \"viaPrescripcion\": \"Intravenosa\",\n    \"trazabilidad\": { \"nacl\": \"LOT-A\", \"vitC\": \"LOT-B\", \"compB\": \"LOT-C\", \"jeringa\": \"LOT-D\", \"pericraneal\": \"LOT-E\", \"macrogotero\": \"LOT-F\" },\n    \"parametros\": [{ \"fototipo\": \"IV\", \"pieza\": \"Muslo D\", \"modo\": \"Single\", \"frecuencia\": \"1\", \"fluencia\": \"25\", \"energia\": \"12\", \"area\": \"0.5\", \"pases\": \"3\" }],\n    \"firmaConsentimiento\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\",\n    \"consentido\": true\n  }\n}" }
+          }
+        },
+        {
+          "name": "GET /consentimientos/{id} — Detalle",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Tiene datos', () => pm.expect(pm.response.json()).to.have.property('datos'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/consentimientos/{{consent_id}}"
+          }
+        },
+        {
+          "name": "POST /{id}/aprobar — Visto Bueno Médico ⭐",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "var r = pm.response.json();",
+            "pm.test('Estado APROBADO', () => pm.expect(r.estado).to.equal('APROBADO'));",
+            "pm.test('pendienteMedico FALSE', () => pm.expect(r.pendienteMedico).to.be.false);",
+            "pm.test('aprobadoPor tiene valor', () => pm.expect(r.aprobadoPor).to.be.a('string'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/consentimientos/{{consent_id}}/aprobar"
+          }
+        },
+        {
+          "name": "POST /{id}/rechazar — Rechazo Médico",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Estado RECHAZADO', () => pm.expect(pm.response.json().estado).to.equal('RECHAZADO'));",
+            "pm.test('motivoRechazo presente', () => pm.expect(pm.response.json().motivoRechazo).to.be.a('string'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/consentimientos/{{consent_id}}/rechazar",
+            "body": { "mode": "raw", "raw": "{\n  \"motivo\": \"Paciente presenta contraindicación: anticoagulantes activos. Debe suspender tratamiento 7 días antes.\"\n}" }
+          }
+        },
+        {
+          "name": "PATCH /{id}/anular — Anular consentimiento",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Estado ANULADO', () => pm.expect(pm.response.json().estado).to.equal('ANULADO'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/consentimientos/{{consent_id}}/anular"
+          }
+        },
+        {
+          "name": "POST /{id}/aprobar — Con token Auxiliar (→ 403)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Auxiliar no puede aprobar → 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/consentimientos/{{consent_id}}/aprobar"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔔 NOTIFICACIONES",
+      "item": [
+        {
+          "name": "GET /notificaciones — Mis notificaciones",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Es array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+            "var arr = pm.response.json();",
+            "if (arr.length > 0) {",
+            "  pm.collectionVariables.set('notif_id', arr[0].id);",
+            "  console.log('notif_id:', arr[0].id, '| tipo:', arr[0].tipo, '| leida:', arr[0].leida);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/notificaciones"
+          }
+        },
+        {
+          "name": "GET /notificaciones/count — No leídas",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "var r = pm.response.json();",
+            "pm.test('Tiene noLeidas', () => pm.expect(r).to.have.property('noLeidas'));",
+            "pm.test('noLeidas es número', () => pm.expect(r.noLeidas).to.be.a('number'));",
+            "console.log('Notificaciones no leídas:', r.noLeidas);"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/notificaciones/count"
+          }
+        },
+        {
+          "name": "PATCH /{id}/leer — Marcar una leída",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('leida = true', () => pm.expect(pm.response.json().leida).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/notificaciones/{{notif_id}}/leer"
+          }
+        },
+        {
+          "name": "PATCH /leer-todas — Marcar todas leídas",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Tiene marcadas', () => pm.expect(pm.response.json()).to.have.property('marcadas'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/notificaciones/leer-todas"
+          }
+        },
+        {
+          "name": "DELETE /{id} — Eliminar notificación",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/notificaciones/{{notif_id}}"
+          }
+        }
+      ]
+    }
+  ]
+}
