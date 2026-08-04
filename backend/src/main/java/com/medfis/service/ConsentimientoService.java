@@ -64,6 +64,14 @@ public class ConsentimientoService {
         return repo.save(c);
     }
 
+    @Transactional
+    public void marcarEmailEnviado(UUID id, String emailPaciente) {
+        Consentimiento c = buscar(id);
+        c.setEmailEnviado(true);
+        if (emailPaciente != null && !emailPaciente.isBlank()) c.setEmailPaciente(emailPaciente);
+        repo.save(c);
+    }
+
     public long countHoy()       { return repo.countByFecha(LocalDate.now()); }
     public long countAprobados() { return repo.countByEstado(EstadoConsent.APROBADO); }
     public long countFirmados()  { return repo.countByEstado(EstadoConsent.FIRMADO); }

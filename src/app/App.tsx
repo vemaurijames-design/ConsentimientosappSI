@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, createContext, useContext, useCallback } from "react";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import medfisLogo from "@/imports/medfis_logo.png";
+import { subirPDF } from "@/app/lib/supabaseClient";
+import { generarPDFConsentimiento } from "@/app/lib/pdfService";
+import { enviarEmailPaciente, enviarEmailClinica } from "@/app/lib/emailService";
 import {
   FileText, LogOut, Plus, Search, Eye, Trash2, Download,
   CheckCircle, Clock, XCircle, Mail, MessageSquare,
@@ -118,14 +121,16 @@ interface ConsentRecord {
   aprobadoPor?: string;
   fechaAprobacion?: string;
   creadoPor?: string;
+  emailEnviado?: boolean;
+  emailPaciente?: string;
+  whatsappEnviado?: boolean;
+  pdfUrl?: string;
   datos: DatosPaquete | Record<string, unknown>;
 }
 
 // ─── ESTADO INICIAL USUARIOS ──────────────────────────────────────────────────
 const USUARIOS_INICIALES: Usuario[] = [
-  { id: "1", nombre: "Dr. Rafael Eduardo Marrero Padilla", email: "rafael.marrero@medfis.com", rol: "MÉDICO",        password: "medico123",   activo: true, createdAt: "2024-01-01" },
-  { id: "2", nombre: "Administrador Med&Fis",               email: "admin@medfis.com",          rol: "ADMINISTRADOR", password: "admin123",    activo: true, createdAt: "2024-01-01" },
-  { id: "3", nombre: "Auxiliar Recepción",                  email: "auxiliar@medfis.com",        rol: "AUXILIAR",      password: "auxiliar123", activo: true, createdAt: "2024-01-01" },
+  { id: "1", nombre: "Administrador Med&Fis", email: "medfissaludintensa@gmail.com", rol: "ADMINISTRADOR", password: "admin123456", activo: true, createdAt: "2024-01-01" },
 ];
 
 const CUESTIONARIO_PREGUNTAS = [
@@ -476,9 +481,82 @@ const PACIENTE_EMPTY: DatosPaciente = {
   contactoNombre: "", contactoParentesco: "", contactoTelefono: "",
 };
 
-function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: (d: DatosPaciente) => void }) {
+function PacienteHistorialAlert({ documento, records }: { documento: string; records: ConsentRecord[] }) {
+  const visitas = records.filter(r => r.pacienteDoc === documento.trim() && documento.trim().length >= 5);
+  if (!visitas.length) return null;
+  const tipoLabel = { escleroterapia: "Escleroterapia", sueroterapia: "Sueroterapia", laser: "Láser", paquete: "Paquete" };
+  const colorEstado = { FIRMADO: "text-amber-700 bg-amber-50 border-amber-300", APROBADO: "text-emerald-700 bg-emerald-50 border-emerald-300", RECHAZADO: "text-red-700 bg-red-50 border-red-300", ANULADO: "text-gray-500 bg-gray-50 border-gray-300", PENDIENTE: "text-amber-700 bg-amber-50 border-amber-300" };
+  return (
+    <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 overflow-hidden">
+      {/* Cabecera de alerta */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-amber-400">
+        <AlertTriangle size={18} className="text-white flex-shrink-0"/>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-black text-white">¡Paciente registrado anteriormente!</p>
+          <p className="text-[11px] text-amber-100">
+            Se encontraron <strong>{visitas.length}</strong> visita{visitas.length > 1 ? "s" : ""} previas con este documento.
+            Los datos se han cargado automáticamente.
+          </p>
+        </div>
+        <span className="flex-shrink-0 bg-white text-amber-700 font-black text-sm rounded-full w-8 h-8 flex items-center justify-center">{visitas.length}</span>
+      </div>
+      {/* Historial de visitas */}
+      <div className="px-4 py-3 space-y-2 max-h-52 overflow-y-auto">
+        <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center gap-1"><ClipboardList size={10}/> Historial de visitas del paciente</p>
+        {visitas.slice().reverse().map(v => (
+          <div key={v.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-xl border text-[11px] ${colorEstado[v.estado] ?? "text-gray-600 bg-gray-50 border-gray-200"}`}>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold truncate">{tipoLabel[v.tipo] ?? v.tipo} <span className="font-mono">· {v.radicado}</span></p>
+              <p className="opacity-80">{fmtFecha(v.fecha)}{v.creadoPor ? ` · ${v.creadoPor}` : ""}</p>
+            </div>
+            <div className="flex-shrink-0 text-right">
+              <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black border ${colorEstado[v.estado] ?? ""}`}>{v.estado}</span>
+              {v.aprobadoPor && <p className="text-[9px] opacity-70 mt-0.5">✓ {v.aprobadoPor}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="px-4 py-2 bg-amber-100 border-t border-amber-300">
+        <p className="text-[10px] text-amber-800">
+          <strong>✓ Datos del paciente cargados.</strong> Verifique que la información esté actualizada antes de continuar.
+          Puede editar cualquier campo si ha cambiado.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function StepDatosPaciente({ data, onChange, records }: { data: DatosPaciente; onChange: (d: DatosPaciente) => void; records: ConsentRecord[] }) {
   const ips = useIPS();
   const s = (k: keyof DatosPaciente) => (v: string) => onChange({ ...data, [k]: v });
+
+  // Auto-completar datos del paciente si el documento ya existe
+  const handleDocChange = (doc: string) => {
+    onChange({ ...data, documento: doc });
+    if (doc.trim().length < 5) return;
+    const previo = records.find(r => r.pacienteDoc === doc.trim());
+    if (previo) {
+      const d = (previo.datos as any)?.paciente;
+      if (d) {
+        onChange({
+          ...data,
+          documento:          doc,
+          nombre:             d.nombre             ?? data.nombre,
+          tipoDoc:            d.tipoDoc            ?? data.tipoDoc,
+          telefono:           d.telefono           ?? data.telefono,
+          email:              d.email              ?? data.email,
+          direccion:          d.direccion          ?? data.direccion,
+          ciudad:             d.ciudad             ?? data.ciudad,
+          fechaNacimiento:    d.fechaNacimiento    ?? data.fechaNacimiento,
+          contactoNombre:     d.contactoNombre     ?? data.contactoNombre,
+          contactoParentesco: d.contactoParentesco ?? data.contactoParentesco,
+          contactoTelefono:   d.contactoTelefono   ?? data.contactoTelefono,
+          fecha: hoy(), // siempre la fecha de hoy para la nueva visita
+        });
+      }
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="p-3 bg-[#031CA6] rounded-xl flex items-center gap-3">
@@ -488,6 +566,10 @@ function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: 
           <p className="text-[10px] text-[#7A94C5]">{ips.medico} · {ips.rm}</p>
         </div>
       </div>
+
+      {/* Alerta + historial del paciente si el doc ya existe */}
+      <PacienteHistorialAlert documento={data.documento} records={records}/>
+
       <div>
         <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Shield size={11}/> Identificación</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -499,7 +581,15 @@ function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: 
               <option value="PA">PA — Pasaporte</option><option value="TI">TI — Tarjeta Identidad</option><option value="RC">RC — Registro Civil</option>
             </select>
           </div>
-          <Field label="No. Documento" value={data.documento} onChange={s("documento")} placeholder="Número" required icon={<Shield size={13}/>}/>
+          <div>
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">No. Documento <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <Shield size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
+              <input value={data.documento} onChange={e => handleDocChange(e.target.value)}
+                placeholder="Número" required
+                className="w-full border border-border rounded-lg pl-8 pr-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"/>
+            </div>
+          </div>
         </div>
         <div className="mt-3"><Field label="Nombre completo" value={data.nombre} onChange={s("nombre")} placeholder="Nombres y apellidos completos" required icon={<UserCheck size={13}/>}/></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
@@ -1008,9 +1098,9 @@ function PDFWrapper({ onCancel, children, titulo }: { onCancel: () => void; chil
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORM ESCLEROTERAPIA
 // ═══════════════════════════════════════════════════════════════════════════════
-function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName }: {
+function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, records }: {
   onSave: (r: ConsentRecord) => void; onCancel: () => void;
-  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string;
+  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string; records: ConsentRecord[];
 }) {
   const ips = useIPS();
   const STEPS = ["Datos del Paciente", "Vitales — Enfermería", "Cuestionario Médico", "Leer Consentimiento", "Firma del Paciente"];
@@ -1053,7 +1143,7 @@ function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName }: {
   );
 
   const content = () => {
-    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac}/>;
+    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} records={records}/>;
     if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales}/>;
     if (step === 3) return <StepCuestionario data={cuest} onChange={setCuest}/>;
     if (step === 4) return <StepLeerConsentimiento titulo="Escleroterapia de Várices" texto={makeTextoEscleroterapia(ips)} leido={leido} onLeido={setLeido}/>;
@@ -1073,9 +1163,9 @@ function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName }: {
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORM SUEROTERAPIA
 // ═══════════════════════════════════════════════════════════════════════════════
-function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName }: {
+function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, records }: {
   onSave: (r: ConsentRecord) => void; onCancel: () => void;
-  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string;
+  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string; records: ConsentRecord[];
 }) {
   const ips = useIPS();
   const STEPS = ["Datos del Paciente", "Vitales + Prescripción", "Leer Consentimiento", "Firma del Paciente"];
@@ -1145,7 +1235,7 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName }: {
   );
 
   const content = () => {
-    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac}/>;
+    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} records={records}/>;
     if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales} extraContent={PrescripcionExtra}/>;
     if (step === 3) return <StepLeerConsentimiento titulo="Sueroterapia Vitamina C / Complejo B" texto={makeTextoSueroterapia(ips)} leido={leido} onLeido={setLeido}/>;
     if (step === 4) return <StepFirmaFinal consentido={consentido} onConsentido={setConsentido} firma={firma} onFirma={setFirma} nombrePaciente={pac.nombre}/>;
@@ -1164,9 +1254,9 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName }: {
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORM LASER
 // ═══════════════════════════════════════════════════════════════════════════════
-function FormLaser({ onSave, onCancel, addToast, nextId, userName }: {
+function FormLaser({ onSave, onCancel, addToast, nextId, userName, records }: {
   onSave: (r: ConsentRecord) => void; onCancel: () => void;
-  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string;
+  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string; records: ConsentRecord[];
 }) {
   const ips = useIPS();
   const STEPS = ["Datos del Paciente", "Vitales + Parámetros", "Leer Consentimiento", "Firma del Paciente"];
@@ -1236,7 +1326,7 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName }: {
   );
 
   const content = () => {
-    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac}/>;
+    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} records={records}/>;
     if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales} extraContent={ParamsExtra}/>;
     if (step === 3) return <StepLeerConsentimiento titulo="Terapia Láser ND:YAG" texto={makeTextoLaser(ips)} leido={leido} onLeido={setLeido}/>;
     if (step === 4) return <StepFirmaFinal consentido={consentido} onConsentido={setConsentido} firma={firma} onFirma={setFirma} nombrePaciente={pac.nombre}/>;
@@ -1255,9 +1345,9 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName }: {
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORM PAQUETE COMPLETO
 // ═══════════════════════════════════════════════════════════════════════════════
-function FormPaquete({ onSave, onCancel, addToast, nextId, userName }: {
+function FormPaquete({ onSave, onCancel, addToast, nextId, userName, records }: {
   onSave: (r: ConsentRecord) => void; onCancel: () => void;
-  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string;
+  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string; records: ConsentRecord[];
 }) {
   const ips = useIPS();
   const STEPS = ["Datos del Paciente","Vitales + Cuestionario","Suero + Láser","Leer · Escleroterapia","Leer · Sueroterapia","Leer · Láser","Firma del Paciente"];
@@ -1337,7 +1427,7 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName }: {
   );
 
   const content = () => {
-    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac}/>;
+    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} records={records}/>;
     if (step === 2) return <div className="space-y-6"><StepVitalesEnfermera data={vitales} onChange={setVitales}/><div className="border-t border-border pt-5"><div className="flex items-center gap-2 p-2.5 bg-[#0D51D9]/8 border border-[#0D51D9]/20 rounded-xl mb-4"><Syringe size={14} className="text-[#0D51D9]"/><p className="text-xs font-bold text-[#0D51D9]">Cuestionario — Escleroterapia</p></div><StepCuestionario data={cuest} onChange={setCuest}/></div></div>;
     if (step === 3) return SueroLaserExtra;
     if (step === 4) return <div><div className="flex items-center gap-2 mb-3 p-2 bg-[#0D51D9]/8 rounded-lg"><Syringe size={14} className="text-[#0D51D9]"/><p className="text-xs font-bold text-[#0D51D9]">1 de 3 — Escleroterapia</p></div><StepLeerConsentimiento titulo="Escleroterapia de Várices" texto={makeTextoEscleroterapia(ips)} leido={leido1} onLeido={setLeido1}/></div>;
@@ -2246,22 +2336,33 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4">Tendencia Mensual</p>
             <ResponsiveContainer width="100%" height={150}>
               <AreaChart data={CHART_MENSUAL}>
-                <defs><linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0D51D9" stopOpacity={0.15}/><stop offset="95%" stopColor="#0D51D9" stopOpacity={0}/></linearGradient></defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F4"/>
-                <XAxis dataKey="mes" tick={{ fontSize:10 }}/><YAxis tick={{ fontSize:10 }}/>
-                <Tooltip contentStyle={{ fontSize:11, borderRadius:8 }}/>
-                <Area type="monotone" dataKey="escler" stroke="#0D51D9" fill="url(#gE)" strokeWidth={2} name="Escleroterapia"/>
-                <Area type="monotone" dataKey="suero"  stroke="#0D8BD9" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Sueroterapia"/>
-                <Area type="monotone" dataKey="laser"  stroke="#F59E0B" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Láser"/>
+                <defs>
+                  <linearGradient id="gradMedfisEscler" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#0D51D9" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="#0D51D9" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid key="grid"    strokeDasharray="3 3" stroke="#E2E8F4"/>
+                <XAxis         key="xaxis"   dataKey="mes" tick={{ fontSize:10 }}/>
+                <YAxis         key="yaxis"   tick={{ fontSize:10 }}/>
+                <Tooltip       key="tooltip" contentStyle={{ fontSize:11, borderRadius:8 }}/>
+                <Area key="area-escler" type="monotone" dataKey="escler" stroke="#0D51D9" fill="url(#gradMedfisEscler)" strokeWidth={2} name="Escleroterapia"/>
+                <Area key="area-suero"  type="monotone" dataKey="suero"  stroke="#0D8BD9" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Sueroterapia"/>
+                <Area key="area-laser"  type="monotone" dataKey="laser"  stroke="#F59E0B" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Láser"/>
               </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="bg-card rounded-2xl p-5 border border-border">
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4">Distribución por Tipo</p>
             <ResponsiveContainer width="100%" height={150}>
-              <PieChart><Pie data={CHART_TIPOS} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={3} dataKey="value">{CHART_TIPOS.map(entry => <Cell key={entry.name} fill={entry.color}/>)}</Pie><Tooltip contentStyle={{ fontSize:11, borderRadius:8 }}/></PieChart>
+              <PieChart>
+                <Pie key="pie" data={CHART_TIPOS} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={3} dataKey="value">
+                  {CHART_TIPOS.map((entry, i) => <Cell key={`pie-cell-${i}`} fill={entry.color}/>)}
+                </Pie>
+                <Tooltip key="pie-tooltip" contentStyle={{ fontSize:11, borderRadius:8 }}/>
+              </PieChart>
             </ResponsiveContainer>
-            <div className="flex justify-center gap-4 mt-1">{CHART_TIPOS.map(t => (<div key={t.name} className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{ background: t.color }}/><span className="text-[10px] text-muted-foreground">{t.name}</span></div>))}</div>
+            <div className="flex justify-center gap-4 mt-1">{CHART_TIPOS.map((t, i) => (<div key={`legend-${i}`} className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{ background: t.color }}/><span className="text-[10px] text-muted-foreground">{t.name}</span></div>))}</div>
           </div>
         </div>
       )}
@@ -2352,6 +2453,25 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
                     {r.creadoPor && <p className="text-[10px] text-muted-foreground hidden sm:block">Por: {r.creadoPor}</p>}
                     {r.aprobadoPor && <p className="text-[10px] text-emerald-700 font-semibold">✓ {r.aprobadoPor}</p>}
                     {r.motivoRechazo && <p className="text-[10px] text-red-600 truncate">✕ {r.motivoRechazo}</p>}
+                    {/* Indicadores de notificaciones enviadas */}
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {r.emailEnviado && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full font-semibold">
+                          <Mail size={9}/> Email enviado{r.emailPaciente ? ` · ${r.emailPaciente}` : ""}
+                        </span>
+                      )}
+                      {r.whatsappEnviado && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded-full font-semibold">
+                          <MessageSquare size={9}/> WA enviado
+                        </span>
+                      )}
+                      {r.pdfUrl && (
+                        <a href={r.pdfUrl} target="_blank" rel="noopener noreferrer"
+                           className="inline-flex items-center gap-0.5 text-[9px] bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-full font-semibold hover:bg-purple-100 transition-colors">
+                          <Download size={9}/> PDF nube
+                        </a>
+                      )}
+                    </div>
                     {/* Botones en fila para mobile */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                       <button onClick={() => onView(r)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0D51D9] text-white text-[10px] font-semibold hover:bg-[#1648bf] transition-colors"><Eye size={11}/> PDF</button>
@@ -2460,23 +2580,130 @@ export default function App() {
   }, []);
 
   const handleSave = (r: ConsentRecord) => {
-    setRecords(prev => {
-      const updated = [...prev, r];
-      localStorage.setItem("medfis_records", JSON.stringify(updated));
-      return updated;
-    });
+    const d        = r.datos as any;
+    const emailPac = (d?.paciente?.email    ?? "") as string;
+    const telPac   = (d?.paciente?.telefono ?? "") as string;
+
+    // 1. Guardar inmediatamente en localStorage
+    const rBase: ConsentRecord = { ...r, emailPaciente: emailPac || undefined };
+    setRecords(prev => { const u = [...prev, rBase]; localStorage.setItem("medfis_records", JSON.stringify(u)); return u; });
     nextIdRef.current += 1;
     setActiveForm(null);
     setPage("historial");
-    const baseMsg = `${r.pacienteNombre} · ${r.tipo} · Radicado: ${r.radicado}. Revise y otorgue el Visto Bueno.`;
+
+    // 2. Notificaciones internas
+    const baseMsg    = `${r.pacienteNombre} · ${r.tipo} · Radicado: ${r.radicado}. Revise y otorgue el Visto Bueno.`;
     const notifMedico: Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: "Consentimiento pendiente de Visto Bueno", mensaje: baseMsg, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "MÉDICO" };
     const notifAdmin:  Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: `Nuevo consentimiento — ${r.pacienteNombre}`, mensaje: `Registrado por: ${r.creadoPor ?? "—"} · ${r.radicado} · Pendiente aprobación médica.`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "ADMINISTRADOR" };
-    setNotificaciones(prev => {
-      const updated = [...prev, notifMedico, notifAdmin];
-      localStorage.setItem("medfis_notificaciones", JSON.stringify(updated));
-      return updated;
-    });
-    addToast("success", `Consentimiento ${r.radicado} guardado`);
+    setNotificaciones(prev => { const u = [...prev, notifMedico, notifAdmin]; localStorage.setItem("medfis_notificaciones", JSON.stringify(u)); return u; });
+
+    addToast("success", `✅ ${r.radicado} guardado — generando PDF y enviando notificaciones…`);
+
+    // 3. Pipeline asíncrono: PDF → Supabase → Email → WhatsApp
+    const textoMap: Record<string, string> = {
+      escleroterapia: makeTextoEscleroterapia(ips),
+      sueroterapia:   makeTextoSueroterapia(ips),
+      laser:          makeTextoLaser(ips),
+      paquete:        makeTextoEscleroterapia(ips) + "\n\n" + makeTextoSueroterapia(ips) + "\n\n" + makeTextoLaser(ips),
+    };
+
+    const pipeline = async () => {
+      // ── 3a. Generar PDF ──────────────────────────────────────────────────
+      let pdfUrl: string | null = null;
+      let emailEnviado = false;
+
+      try {
+        const pdfBlob = await generarPDFConsentimiento({
+          radicado:       r.radicado,
+          tipo:           r.tipo,
+          fecha:          fmtFecha(r.fecha),
+          pacienteNombre: r.pacienteNombre,
+          pacienteDoc:    r.pacienteDoc,
+          pacienteTel:    r.pacienteTel,
+          pacienteEmail:  emailPac || undefined,
+          creadoPor:      r.creadoPor,
+          textoConsent:   textoMap[r.tipo] ?? "",
+          ipsNombre:      ips.nombre,
+          ipsNit:         ips.nit,
+          ipsMedico:      ips.medico,
+          ipsRm:          ips.rm,
+          ipsCiudad:      ips.ciudad,
+        });
+
+        // ── 3b. Subir PDF a Supabase Storage ────────────────────────────────
+        pdfUrl = await subirPDF(pdfBlob, r.radicado, r.pacienteDoc);
+        if (pdfUrl) addToast("info", `☁️ PDF guardado en la nube`);
+
+        // ── 3c. Enviar email via EmailJS ─────────────────────────────────────
+        const datosEmail = {
+          emailPaciente:  emailPac,
+          nombrePaciente: r.pacienteNombre,
+          radicado:       r.radicado,
+          tipo:           r.tipo,
+          fecha:          fmtFecha(r.fecha),
+          documento:      r.pacienteDoc,
+          telefono:       r.pacienteTel,
+          creadoPor:      r.creadoPor ?? "—",
+          pdfUrl:         pdfUrl ?? undefined,
+          ipsNombre:      ips.nombre,
+          ipsMedico:      ips.medico,
+        };
+
+        const [okPac, okCli] = await Promise.allSettled([
+          emailPac ? enviarEmailPaciente(datosEmail) : Promise.resolve(false),
+          enviarEmailClinica(datosEmail),
+        ]);
+
+        emailEnviado = (okPac.status === "fulfilled" && okPac.value) ||
+                       (okCli.status === "fulfilled" && okCli.value);
+
+        if (emailEnviado && emailPac) addToast("success", `📧 Email enviado a ${emailPac}`);
+        else if (emailEnviado)        addToast("success", `📧 Copia enviada a la clínica`);
+
+      } catch (err) {
+        console.error("Pipeline PDF/email:", err);
+        addToast("warning", "PDF/email: modo sin conexión — datos guardados localmente");
+      }
+
+      // ── 3d. Actualizar flags en el registro ─────────────────────────────
+      setRecords(prev => {
+        const updated = prev.map(x => x.id === r.id
+          ? { ...x, emailEnviado, pdfUrl: pdfUrl ?? undefined }
+          : x
+        );
+        localStorage.setItem("medfis_records", JSON.stringify(updated));
+        return updated;
+      });
+
+      // ── 3e. WhatsApp (abrir Web) ─────────────────────────────────────────
+      if (telPac) {
+        const tLabel = { escleroterapia:"Escleroterapia", sueroterapia:"Sueroterapia Vit C/B", laser:"Terapia Láser", paquete:"Paquete Integral" }[r.tipo] ?? r.tipo;
+        const waMsg  = encodeURIComponent(
+          `✅ *${ips.nombre}* — Consentimiento Informado\n\n` +
+          `Estimado/a *${r.pacienteNombre}*,\n\n` +
+          `Su consentimiento informado ha sido registrado exitosamente.\n\n` +
+          `📋 *Procedimiento:* ${tLabel}\n` +
+          `🔖 *Radicado:* ${r.radicado}\n` +
+          `📅 *Fecha:* ${fmtFecha(r.fecha)}\n` +
+          `⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n` +
+          (pdfUrl ? `📄 *PDF del consentimiento:* ${pdfUrl}\n\n` : "") +
+          `Recibirá confirmación cuando el médico apruebe su cita.\n\n` +
+          `📞 *Contacto clínica:* +57 311 404 8112\n` +
+          `📧 medfissaludintensa@gmail.com\n` +
+          `_${ips.medico} · ${ips.rm}_`
+        );
+        const numLimpio = telPac.replace(/[^0-9]/g, "");
+        window.open(`https://wa.me/57${numLimpio}?text=${waMsg}`, "_blank");
+        setRecords(prev => {
+          const updated = prev.map(x => x.id === r.id ? { ...x, whatsappEnviado: true } : x);
+          localStorage.setItem("medfis_records", JSON.stringify(updated));
+          return updated;
+        });
+        addToast("info", `📱 WhatsApp enviado a ${r.pacienteNombre}`);
+      }
+    };
+
+    pipeline();
   };
 
   const handleAprobar = (id: string) => {
@@ -2620,10 +2847,10 @@ export default function App() {
         </div>
 
         {/* Formularios */}
-        {activeForm==="escleroterapia" && <FormEscleroterapia onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre}/>}
-        {activeForm==="sueroterapia"   && <FormSueroterapia   onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre}/>}
-        {activeForm==="laser"          && <FormLaser           onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre}/>}
-        {activeForm==="paquete"        && <FormPaquete         onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre}/>}
+        {activeForm==="escleroterapia" && <FormEscleroterapia onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre} records={records}/>}
+        {activeForm==="sueroterapia"   && <FormSueroterapia   onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre} records={records}/>}
+        {activeForm==="laser"          && <FormLaser           onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre} records={records}/>}
+        {activeForm==="paquete"        && <FormPaquete         onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre} records={records}/>}
 
         {viewRecord && <PDFModal record={viewRecord} onClose={() => setViewRecord(null)} addToast={addToast}/>}
         {showSettings && user.rol === "ADMINISTRADOR" && <IPSSettingsModal ips={ips} onSave={saveIPS} onClose={() => setShowSettings(false)}/>}

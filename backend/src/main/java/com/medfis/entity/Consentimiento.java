@@ -29,6 +29,9 @@ public class Consentimiento {
     @Column(name = "aprobado_por", length = 200) private String aprobadoPor;
     @Column(name = "fecha_aprobacion") private LocalDate fechaAprobacion;
     @Column(name = "creado_por", length = 200) private String creadoPor;
+    @Column(name = "email_paciente", length = 200) private String emailPaciente;
+    @Column(name = "email_enviado", nullable = false) private boolean emailEnviado = false;
+    @Column(name = "whatsapp_enviado", nullable = false) private boolean whatsappEnviado = false;
     @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb", nullable = false) private Map<String, Object> datos;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
