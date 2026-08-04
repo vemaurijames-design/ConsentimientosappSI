@@ -1992,6 +1992,12 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
             ))}
           </div>
         </div>
+        {/* Autoría y derechos reservados */}
+        <div className="mt-6 text-center space-y-0.5">
+          <p className="text-[10px] text-[#7A94C5]">Desarrollado por <span className="font-bold text-white">JM Ingeniero</span></p>
+          <p className="text-[9px] text-[#5571A0]">© {new Date().getFullYear()} Todos los derechos reservados · Uso exclusivo {ips.nombre}</p>
+          <p className="text-[9px] text-[#5571A0]">Nos reservamos el derecho de admisión</p>
+        </div>
       </div>
     </div>
   );
@@ -2048,6 +2054,10 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
             <p className="text-[10px] text-[#7A94C5]">{user.rol}</p>
           </div>
           <button onClick={onLogout} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C5D5F0] hover:bg-white/8 text-sm font-medium transition-colors"><LogOut size={15}/> Cerrar Sesión</button>
+          <div className="px-3 pt-2 border-t border-white/8 mt-1">
+            <p className="text-[9px] text-[#5571A0]">Dev: <span className="text-[#7A94C5] font-semibold">JM Ingeniero</span></p>
+            <p className="text-[9px] text-[#5571A0]">© {new Date().getFullYear()} · Derechos reservados</p>
+          </div>
         </div>
       </aside>
     </>
@@ -2241,7 +2251,12 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-xl font-bold">Historial</h1><p className="text-sm text-muted-foreground">{filtered.length} registros encontrados</p></div>
+      <div className="flex items-start justify-between gap-3">
+        <div><h1 className="text-xl font-bold">Historial de Consentimientos</h1><p className="text-sm text-muted-foreground">{filtered.length} registros encontrados</p></div>
+        {user.rol !== "ADMINISTRADOR" && (
+          <span className="flex-shrink-0 inline-flex items-center gap-1.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-xl font-semibold"><Eye size={11}/> Solo lectura</span>
+        )}
+      </div>
 
       <div className="flex flex-col sm:flex-row flex-wrap gap-2">
         <div className="relative flex-1 min-w-0">
@@ -2297,8 +2312,8 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
                       )}
                       <button onClick={() => { const d2 = r.datos as any; const p = d2.paciente; const msg = encodeURIComponent(`*${ips.nombre}* - Radicado: ${r.radicado}\nEstado: ${r.estado}`); window.open(`https://wa.me/57${(p?.telefono||"").replace(/[^0-9]/g,"")}?text=${msg}`,"_blank"); addToast("info","Abriendo WhatsApp..."); }}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#25D366] text-white text-[10px] font-semibold hover:bg-[#20ba5a] transition-colors"><MessageSquare size={11}/> WA</button>
-                      {(user.rol==="ADMINISTRADOR"||user.rol==="MÉDICO") && (
-                        <button onClick={() => { onDelete(r.id); addToast("info","Consentimiento anulado"); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"><Trash2 size={12}/></button>
+                      {user.rol === "ADMINISTRADOR" && (
+                        <button onClick={() => { onDelete(r.id); addToast("info","Consentimiento anulado"); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors" title="Anular (solo Administrador)"><Trash2 size={12}/></button>
                       )}
                     </div>
                   </div>
