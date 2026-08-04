@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, createContext, useContext, useCallback } from "react";
+import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+import medfisLogo from "@/imports/medfis_logo.png";
 import {
   FileText, LogOut, Plus, Search, Eye, Trash2, Download,
   CheckCircle, Clock, XCircle, Mail, MessageSquare,
@@ -238,9 +240,9 @@ const CHART_MENSUAL = [
   { mes: "Jul", escler: 22, suero: 13, laser: 11 },
 ];
 const CHART_TIPOS = [
-  { name: "Escleroterapia", value: 46, color: "#1A56DB" },
-  { name: "Sueroterapia",   value: 29, color: "#00B896" },
-  { name: "Láser Várices",  value: 25, color: "#F59E0B" },
+  { name: "Escleroterapia", value: 46, color: "#031CA6" },
+  { name: "Sueroterapia",   value: 29, color: "#0D51D9" },
+  { name: "Láser Várices",  value: 25, color: "#0D8BD9" },
 ];
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
@@ -271,7 +273,7 @@ function Toast({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number) =>
     <div className="fixed bottom-5 right-5 z-[400] flex flex-col gap-2 max-w-sm">
       {toasts.map(t => (
         <div key={t.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium text-white
-          ${t.type === "success" ? "bg-emerald-600" : t.type === "error" ? "bg-red-600" : t.type === "warning" ? "bg-amber-600" : "bg-[#1A56DB]"}`}>
+          ${t.type === "success" ? "bg-emerald-600" : t.type === "error" ? "bg-red-600" : t.type === "warning" ? "bg-amber-600" : "bg-[#0D51D9]"}`}>
           {t.type === "success" ? <Check size={15}/> : t.type === "error" ? <XCircle size={15}/> : t.type === "warning" ? <AlertTriangle size={15}/> : <Bell size={15}/>}
           <span className="flex-1">{t.msg}</span>
           <button onClick={() => remove(t.id)}><X size={13} className="opacity-70"/></button>
@@ -296,8 +298,8 @@ function StatusBadge({ estado }: { estado: EstadoConsent }) {
 
 function TipoBadge({ tipo }: { tipo: TipoConsent }) {
   const cfg = {
-    escleroterapia: { color: "bg-[#1A56DB]/10 text-[#1A56DB]",   icon: <Syringe size={10}/>, label: "Escleroterapia" },
-    sueroterapia:   { color: "bg-[#00B896]/10 text-[#00B896]",   icon: <Droplets size={10}/>, label: "Sueroterapia"  },
+    escleroterapia: { color: "bg-[#0D51D9]/10 text-[#0D51D9]",   icon: <Syringe size={10}/>, label: "Escleroterapia" },
+    sueroterapia:   { color: "bg-[#0D8BD9]/10 text-[#0D8BD9]",   icon: <Droplets size={10}/>, label: "Sueroterapia"  },
     laser:          { color: "bg-amber-100 text-amber-700",        icon: <Zap size={10}/>,     label: "Láser Várices" },
     paquete:        { color: "bg-purple-100 text-purple-700",      icon: <Package size={10}/>, label: "Paquete"       },
   }[tipo];
@@ -306,7 +308,7 @@ function TipoBadge({ tipo }: { tipo: TipoConsent }) {
 
 function RolBadge({ rol }: { rol: RolUsuario }) {
   const cfg: Record<RolUsuario, string> = {
-    "MÉDICO":        "bg-[#1A56DB]/10 text-[#1A56DB]",
+    "MÉDICO":        "bg-[#0D51D9]/10 text-[#0D51D9]",
     "ADMINISTRADOR": "bg-purple-100 text-purple-700",
     "AUXILIAR":      "bg-emerald-100 text-emerald-700",
     "ENFERMERA":     "bg-pink-100 text-pink-700",
@@ -331,7 +333,7 @@ function SignatureCanvas({ label, onSave, onCancel }: { label: string; onSave: (
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#0C1A35"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = "#031CA6"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
     const start = (e: MouseEvent | TouchEvent) => { e.preventDefault(); drawing.current = true; const p = getPos(e, canvas); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
     const move  = (e: MouseEvent | TouchEvent) => { e.preventDefault(); if (!drawing.current) return; const p = getPos(e, canvas); ctx.lineTo(p.x, p.y); ctx.stroke(); setHasDrawn(true); };
     const end   = () => { drawing.current = false; };
@@ -347,13 +349,13 @@ function SignatureCanvas({ label, onSave, onCancel }: { label: string; onSave: (
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg">
         <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#1A56DB]/10 flex items-center justify-center"><Pen size={15} className="text-[#1A56DB]"/></div>
+            <div className="w-8 h-8 rounded-lg bg-[#0D51D9]/10 flex items-center justify-center"><Pen size={15} className="text-[#0D51D9]"/></div>
             <div><p className="font-semibold text-sm">{label}</p><p className="text-[10px] text-muted-foreground">Firme con dedo en móvil/tablet o mouse en PC</p></div>
           </div>
           <button onClick={onCancel}><X size={18} className="text-muted-foreground"/></button>
         </div>
         <div className="p-4 sm:p-5">
-          <div className="border-2 border-dashed border-[#1A56DB]/30 rounded-xl overflow-hidden bg-[#f8faff]">
+          <div className="border-2 border-dashed border-[#0D51D9]/30 rounded-xl overflow-hidden bg-[#f8faff]">
             <canvas ref={canvasRef} width={600} height={220} className="w-full cursor-crosshair" style={{ touchAction: "none" }}/>
           </div>
           <p className="text-[11px] text-center text-muted-foreground mt-2">Dibuje su firma — funciona con dedo, lápiz táctil o mouse</p>
@@ -361,7 +363,7 @@ function SignatureCanvas({ label, onSave, onCancel }: { label: string; onSave: (
             <button onClick={clear} className="py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted">Limpiar</button>
             <button onClick={onCancel} className="py-2.5 rounded-lg border border-border text-sm font-medium">Cancelar</button>
             <button onClick={() => onSave(canvasRef.current!.toDataURL("image/png"))} disabled={!hasDrawn}
-              className="py-2.5 rounded-lg bg-[#1A56DB] text-white text-sm font-semibold disabled:opacity-40 hover:bg-[#1648bf] transition-colors">
+              className="py-2.5 rounded-lg bg-[#0D51D9] text-white text-sm font-semibold disabled:opacity-40 hover:bg-[#1648bf] transition-colors">
               Confirmar ✓
             </button>
           </div>
@@ -385,9 +387,9 @@ function FirmaField({ label, value, onChange }: { label: string; value: string; 
           </div>
         ) : (
           <button onClick={() => setOpen(true)}
-            className="w-full border-2 border-dashed border-[#1A56DB]/30 rounded-xl p-6 flex flex-col items-center gap-2 hover:bg-[#1A56DB]/5 transition-colors">
-            <Pen size={22} className="text-[#1A56DB]/40"/>
-            <p className="text-sm font-semibold text-[#1A56DB]">Toque aquí para firmar</p>
+            className="w-full border-2 border-dashed border-[#0D51D9]/30 rounded-xl p-6 flex flex-col items-center gap-2 hover:bg-[#0D51D9]/5 transition-colors">
+            <Pen size={22} className="text-[#0D51D9]/40"/>
+            <p className="text-sm font-semibold text-[#0D51D9]">Toque aquí para firmar</p>
             <p className="text-[10px] text-muted-foreground">Funciona con dedo en tablet o mouse</p>
           </button>
         )}
@@ -410,7 +412,7 @@ function Field({ label, value, onChange, type = "text", placeholder = "", requir
       <div className="relative">
         {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50">{icon}</div>}
         <input readOnly={readOnly} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-          className={`w-full border border-border rounded-lg ${icon ? "pl-9" : "px-3"} pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 focus:border-[#1A56DB] transition-colors
+          className={`w-full border border-border rounded-lg ${icon ? "pl-9" : "px-3"} pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30 focus:border-[#0D51D9] transition-colors
             ${readOnly ? "bg-muted text-muted-foreground cursor-default" : "bg-input-background"}`}/>
       </div>
     </div>
@@ -431,20 +433,20 @@ function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: 
   const s = (k: keyof DatosPaciente) => (v: string) => onChange({ ...data, [k]: v });
   return (
     <div className="space-y-5">
-      <div className="p-3 bg-[#0C1A35] rounded-xl flex items-center gap-3">
-        <Stethoscope size={18} className="text-[#1A56DB] flex-shrink-0"/>
+      <div className="p-3 bg-[#031CA6] rounded-xl flex items-center gap-3">
+        <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-9 h-9 object-contain flex-shrink-0 rounded-lg bg-white p-0.5"/>
         <div>
           <p className="text-[10px] font-bold text-white uppercase tracking-wider">{ips.nombre} · NIT {ips.nit}</p>
-          <p className="text-[10px] text-[#8899BB]">{ips.medico} · {ips.rm}</p>
+          <p className="text-[10px] text-[#7A94C5]">{ips.medico} · {ips.rm}</p>
         </div>
       </div>
       <div>
-        <p className="text-[10px] font-bold text-[#1A56DB] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Shield size={11}/> Identificación</p>
+        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Shield size={11}/> Identificación</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Tipo Doc <span className="text-red-500">*</span></label>
             <select value={data.tipoDoc} onChange={e => s("tipoDoc")(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30">
+              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
               <option value="CC">CC — Cédula Ciudadanía</option><option value="CE">CE — Cédula Extranjería</option>
               <option value="PA">PA — Pasaporte</option><option value="TI">TI — Tarjeta Identidad</option><option value="RC">RC — Registro Civil</option>
             </select>
@@ -458,7 +460,7 @@ function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: 
         </div>
       </div>
       <div>
-        <p className="text-[10px] font-bold text-[#1A56DB] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Phone size={11}/> Contacto</p>
+        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Phone size={11}/> Contacto</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Teléfono / Celular" value={data.telefono} onChange={s("telefono")} placeholder="3001234567" type="tel" icon={<Phone size={13}/>} required/>
           <Field label="Correo electrónico" value={data.email} onChange={s("email")} placeholder="correo@ejemplo.com" type="email" icon={<AtSign size={13}/>}/>
@@ -476,7 +478,7 @@ function StepDatosPaciente({ data, onChange }: { data: DatosPaciente; onChange: 
             <div>
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Parentesco <span className="text-red-500">*</span></label>
               <select value={data.contactoParentesco} onChange={e => s("contactoParentesco")(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30">
+                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
                 <option value="">Seleccionar...</option><option value="Cónyuge">Cónyuge</option><option value="Madre">Madre</option>
                 <option value="Padre">Padre</option><option value="Hijo/a">Hijo/a</option><option value="Hermano/a">Hermano/a</option>
                 <option value="Amigo/a">Amigo/a</option><option value="Otro">Otro</option>
@@ -503,7 +505,7 @@ function StepVitalesEnfermera({ data, onChange, extraContent }: {
     if (k === "peso" || k === "talla") updated.imc = calcIMC(updated.peso, updated.talla);
     onChange(updated);
   };
-  const Vital = ({ label, k, placeholder, unit, color = "border-[#1A56DB]/20" }: { label: string; k: keyof typeof VITALES_EMPTY; placeholder: string; unit: string; color?: string }) => (
+  const Vital = ({ label, k, placeholder, unit, color = "border-[#0D51D9]/20" }: { label: string; k: keyof typeof VITALES_EMPTY; placeholder: string; unit: string; color?: string }) => (
     <div className={`bg-white border-2 ${color} rounded-xl p-3 text-center`}>
       <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">{label}</p>
       <input value={data[k]} onChange={e => s(k)(e.target.value)} placeholder={placeholder}
@@ -513,10 +515,10 @@ function StepVitalesEnfermera({ data, onChange, extraContent }: {
   );
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3 p-3 bg-[#1A56DB]/8 border border-[#1A56DB]/20 rounded-xl">
-        <Activity size={16} className="text-[#1A56DB] flex-shrink-0"/>
+      <div className="flex items-center gap-3 p-3 bg-[#0D51D9]/8 border border-[#0D51D9]/20 rounded-xl">
+        <Activity size={16} className="text-[#0D51D9] flex-shrink-0"/>
         <div>
-          <p className="text-xs font-bold text-[#1A56DB]">Sección Auxiliar de Enfermería</p>
+          <p className="text-xs font-bold text-[#0D51D9]">Sección Auxiliar de Enfermería</p>
           <p className="text-[10px] text-muted-foreground">Registre los signos vitales ANTES de que el paciente lea y firme el consentimiento</p>
         </div>
       </div>
@@ -548,7 +550,7 @@ function StepVitalesEnfermera({ data, onChange, extraContent }: {
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Observaciones de Enfermería</label>
         <textarea value={data.observaciones} onChange={e => s("observaciones")(e.target.value)}
           rows={3} placeholder="Anotaciones relevantes..."
-          className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30 resize-none"/>
+          className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30 resize-none"/>
       </div>
     </div>
   );
@@ -558,18 +560,18 @@ function StepCuestionario({ data, onChange }: { data: Record<string, "Si" | "No"
   const answered = Object.values(data).filter(v => v !== "").length;
   return (
     <div className="space-y-2">
-      <div className="bg-[#EEF2F8] rounded-xl p-3 mb-3 flex items-center justify-between">
-        <div><p className="text-xs font-bold text-[#1A56DB]">Test Diagnóstico</p><p className="text-[10px] text-muted-foreground">Marque Sí o No</p></div>
-        <span className="bg-[#1A56DB] text-white text-xs font-bold px-2.5 py-1 rounded-lg">{answered}/{CUESTIONARIO_PREGUNTAS.length}</span>
+      <div className="bg-[#EFF3FB] rounded-xl p-3 mb-3 flex items-center justify-between">
+        <div><p className="text-xs font-bold text-[#0D51D9]">Test Diagnóstico</p><p className="text-[10px] text-muted-foreground">Marque Sí o No</p></div>
+        <span className="bg-[#0D51D9] text-white text-xs font-bold px-2.5 py-1 rounded-lg">{answered}/{CUESTIONARIO_PREGUNTAS.length}</span>
       </div>
       {CUESTIONARIO_PREGUNTAS.map((q, i) => (
-        <div key={i} className="flex items-start justify-between gap-3 p-3 bg-white border border-border rounded-xl hover:border-[#1A56DB]/30 transition-colors">
+        <div key={i} className="flex items-start justify-between gap-3 p-3 bg-white border border-border rounded-xl hover:border-[#0D51D9]/30 transition-colors">
           <p className="text-xs flex-1 leading-relaxed">{q}</p>
           <div className="flex gap-1.5 flex-shrink-0">
             {(["Si", "No"] as const).map(opt => (
               <button key={opt} onClick={() => onChange({ ...data, [q]: opt })}
                 className={`w-10 py-1.5 rounded-lg text-xs font-bold border transition-colors
-                  ${data[q] === opt ? opt === "Si" ? "bg-red-500 border-red-500 text-white" : "bg-emerald-500 border-emerald-500 text-white" : "border-border text-muted-foreground hover:border-[#1A56DB]/40"}`}>
+                  ${data[q] === opt ? opt === "Si" ? "bg-red-500 border-red-500 text-white" : "bg-emerald-500 border-emerald-500 text-white" : "border-border text-muted-foreground hover:border-[#0D51D9]/40"}`}>
                 {opt}
               </button>
             ))}
@@ -591,11 +593,11 @@ function StepLeerConsentimiento({ titulo, texto, leido, onLeido }: { titulo: str
         <BookOpen size={16} className="text-amber-600 flex-shrink-0 mt-0.5"/>
         <div><p className="text-xs font-bold text-amber-800">Lectura obligatoria del consentimiento</p><p className="text-[10px] text-amber-700 mt-0.5">El paciente debe leer el documento completo.</p></div>
       </div>
-      <div className="border-2 border-[#1A56DB]/20 rounded-xl overflow-hidden">
-        <div className="bg-[#0C1A35] px-4 py-3">
-          <p className="text-[10px] text-[#C8D6EF] font-bold uppercase tracking-wider">Consentimiento Informado</p>
+      <div className="border-2 border-[#0D51D9]/20 rounded-xl overflow-hidden">
+        <div className="bg-[#031CA6] px-4 py-3">
+          <p className="text-[10px] text-[#C5D5F0] font-bold uppercase tracking-wider">Consentimiento Informado</p>
           <p className="text-xs text-white font-semibold">{titulo}</p>
-          <p className="text-[10px] text-[#8899BB] mt-0.5">{ips.nombre} · NIT {ips.nit} · {ips.medico}</p>
+          <p className="text-[10px] text-[#7A94C5] mt-0.5">{ips.nombre} · NIT {ips.nit} · {ips.medico}</p>
         </div>
         <div ref={scrollRef} onScroll={handleScroll} className="h-72 overflow-y-auto p-5 bg-white text-xs leading-relaxed text-foreground whitespace-pre-line">
           {texto}
@@ -612,7 +614,7 @@ function StepLeerConsentimiento({ titulo, texto, leido, onLeido }: { titulo: str
       {scrolledToEnd && (
         <button onClick={() => onLeido(true)}
           className={`w-full flex items-center justify-center gap-3 p-4 rounded-xl border-2 font-semibold text-sm transition-all
-            ${leido ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-[#1A56DB] bg-[#1A56DB]/5 text-[#1A56DB] hover:bg-[#1A56DB]/10"}`}>
+            ${leido ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-[#0D51D9] bg-[#0D51D9]/5 text-[#0D51D9] hover:bg-[#0D51D9]/10"}`}>
           <CheckCircle size={18}/>
           {leido ? "Leído y comprendido ✓" : "Confirmar que leí y comprendí el documento"}
         </button>
@@ -627,10 +629,10 @@ function StepFirmaFinal({ consentido, onConsentido, firma, onFirma, nombrePacien
 }) {
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-3 p-4 bg-[#EEF2F8] rounded-xl border border-[#1A56DB]/15">
-        <Shield size={16} className="text-[#1A56DB] flex-shrink-0 mt-0.5"/>
+      <div className="flex items-start gap-3 p-4 bg-[#EFF3FB] rounded-xl border border-[#0D51D9]/15">
+        <Shield size={16} className="text-[#0D51D9] flex-shrink-0 mt-0.5"/>
         <div>
-          <p className="text-xs font-bold text-[#1A56DB]">Decisión y Firma del Paciente</p>
+          <p className="text-xs font-bold text-[#0D51D9]">Decisión y Firma del Paciente</p>
           <p className="text-[10px] text-muted-foreground mt-0.5">Al firmar, se notificará automáticamente al médico para su aprobación.</p>
         </div>
       </div>
@@ -678,10 +680,13 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
 
   return (
     <div className="bg-white p-7 max-w-[640px] mx-auto text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
-      <div className="flex items-start justify-between pb-4 mb-4 border-b-2 border-[#1A56DB]">
-        <div><p className="font-black text-2xl text-[#1A56DB] tracking-tight">{ips.nombre}</p><p className="text-[10px] text-muted-foreground font-mono">NIT {ips.nit}</p><p className="text-[10px] text-muted-foreground">{ips.ciudad}</p></div>
+      <div className="flex items-start justify-between pb-4 mb-4 border-b-2 border-[#0D51D9]">
+        <div className="flex items-center gap-3">
+          <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-14 h-14 object-contain"/>
+          <div><p className="font-black text-2xl text-[#031CA6] tracking-tight">{ips.nombre}</p><p className="text-[10px] text-muted-foreground font-mono">NIT {ips.nit}</p><p className="text-[10px] text-muted-foreground">{ips.ciudad}</p></div>
+        </div>
         <div className="text-right">
-          <p className="text-xs font-mono text-[#1A56DB] font-bold">{record.radicado}</p>
+          <p className="text-xs font-mono text-[#0D51D9] font-bold">{record.radicado}</p>
           <p className="text-[10px] text-muted-foreground">{fmtFecha(record.fecha)}</p>
           <div className="mt-1 flex flex-col items-end gap-1"><StatusBadge estado={record.estado}/></div>
         </div>
@@ -704,19 +709,19 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
         </div>
       )}
 
-      <p className="text-center font-black text-sm uppercase tracking-wide text-[#0C1A35] mb-1">CONSENTIMIENTO INFORMADO</p>
-      <p className="text-center text-xs font-bold text-[#1A56DB] mb-5">{TITULOS[record.tipo]}</p>
+      <p className="text-center font-black text-sm uppercase tracking-wide text-[#031CA6] mb-1">CONSENTIMIENTO INFORMADO</p>
+      <p className="text-center text-xs font-bold text-[#0D51D9] mb-5">{TITULOS[record.tipo]}</p>
 
       {record.tipo === "paquete" && (
         <div className="mb-4 flex items-center gap-2 flex-wrap justify-center">
-          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#1A56DB]/10 text-[#1A56DB] rounded-full text-[10px] font-bold"><Syringe size={10}/> Escleroterapia</span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#00B896]/10 text-[#00B896] rounded-full text-[10px] font-bold"><Droplets size={10}/> Sueroterapia</span>
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#0D51D9]/10 text-[#0D51D9] rounded-full text-[10px] font-bold"><Syringe size={10}/> Escleroterapia</span>
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#0D8BD9]/10 text-[#0D8BD9] rounded-full text-[10px] font-bold"><Droplets size={10}/> Sueroterapia</span>
           <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold"><Zap size={10}/> Láser ND:YAG</span>
         </div>
       )}
 
-      <div className="mb-4 p-3 bg-[#EEF2F8] rounded-xl">
-        <p className="text-[9px] font-bold text-[#1A56DB] uppercase tracking-wider mb-2">Datos del Paciente</p>
+      <div className="mb-4 p-3 bg-[#EFF3FB] rounded-xl">
+        <p className="text-[9px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2">Datos del Paciente</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-0.5">
             <p className="text-xs font-bold">{pac?.nombre}</p>
@@ -748,7 +753,7 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
           <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Signos Vitales — Enfermería</p>
           <div className="grid grid-cols-5 gap-1 mb-2">
             {[["SpO2", vitales.oximetria + "%"], ["T.A.", vitales.tension], ["F.C.", vitales.frecuenciaCardiaca + " lpm"], ["F.R.", vitales.frecuenciaRespiratoria + " rpm"], ["Temp.", vitales.temperatura + "°C"]].map(([l,v]) => (
-              <div key={l} className="bg-[#EEF2F8] rounded-lg p-2 text-center"><p className="text-[8px] text-muted-foreground font-bold">{l}</p><p className="text-[10px] font-bold">{v || "—"}</p></div>
+              <div key={l} className="bg-[#EFF3FB] rounded-lg p-2 text-center"><p className="text-[8px] text-muted-foreground font-bold">{l}</p><p className="text-[10px] font-bold">{v || "—"}</p></div>
             ))}
           </div>
           <div className="grid grid-cols-3 gap-1">
@@ -778,8 +783,8 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
         <div className="mb-4">
           <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1"><Droplets size={9}/> Prescripción — Sueroterapia</p>
           <div className="grid grid-cols-2 gap-2 mb-2">
-            <div className="bg-[#EEF2F8] rounded-lg p-2 text-center"><p className="text-[9px] text-muted-foreground">Vitamina C</p><p className="text-xs font-bold">{d.dosis_vitC || "—"}</p></div>
-            <div className="bg-[#EEF2F8] rounded-lg p-2 text-center"><p className="text-[9px] text-muted-foreground">Complejo B</p><p className="text-xs font-bold">{d.dosis_compB || "—"}</p></div>
+            <div className="bg-[#EFF3FB] rounded-lg p-2 text-center"><p className="text-[9px] text-muted-foreground">Vitamina C</p><p className="text-xs font-bold">{d.dosis_vitC || "—"}</p></div>
+            <div className="bg-[#EFF3FB] rounded-lg p-2 text-center"><p className="text-[9px] text-muted-foreground">Complejo B</p><p className="text-xs font-bold">{d.dosis_compB || "—"}</p></div>
           </div>
           {d.trazabilidad && (
             <div className="grid grid-cols-3 gap-1">
@@ -798,7 +803,7 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
         <div className="mb-4">
           <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1"><Zap size={9}/> Parámetros ND:YAG</p>
           <table className="w-full text-[9px] border border-border rounded-lg overflow-hidden">
-            <thead><tr className="bg-[#0C1A35] text-[#C8D6EF]">{["Fototipo","Pieza","Modo","Hz","J/cm²","mJ","cm²","Pases"].map(h => <th key={h} className="px-1.5 py-1.5 text-left font-semibold">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-[#031CA6] text-[#C5D5F0]">{["Fototipo","Pieza","Modo","Hz","J/cm²","mJ","cm²","Pases"].map(h => <th key={h} className="px-1.5 py-1.5 text-left font-semibold">{h}</th>)}</tr></thead>
             <tbody>
               {d.parametros.map((row: LaserRow, i: number) => (
                 <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-[#F8FAFF]"}>
@@ -815,7 +820,7 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
         <div className="flex justify-center mb-3">
           <div className="text-center w-56">
             {d.firmaConsentimiento ? (
-              <img src={d.firmaConsentimiento} alt="firma" className="w-full h-20 object-contain border-2 border-[#1A56DB]/20 rounded-xl bg-[#f8faff] mb-2"/>
+              <img src={d.firmaConsentimiento} alt="firma" className="w-full h-20 object-contain border-2 border-[#0D51D9]/20 rounded-xl bg-[#f8faff] mb-2"/>
             ) : (
               <div className="w-full h-20 border-2 border-dashed border-muted-foreground/30 rounded-xl mb-2 flex items-center justify-center"><p className="text-[9px] text-muted-foreground">Firma pendiente</p></div>
             )}
@@ -850,7 +855,7 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
 
       <div className="flex gap-2 mt-5">
         <button onClick={onSendWhatsApp} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20ba5a] transition-colors"><MessageSquare size={16}/> WhatsApp</button>
-        <button onClick={onSendEmail} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"><Mail size={16}/> Email</button>
+        <button onClick={onSendEmail} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"><Mail size={16}/> Email</button>
       </div>
       <div className="flex gap-2 mt-2">
         <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted"><Printer size={14}/> Imprimir</button>
@@ -874,7 +879,7 @@ function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClos
       <div className="bg-gray-50 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl h-[95vh] sm:max-h-[94vh] flex flex-col">
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-white border-b border-border rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3">
-            <FileText size={16} className="text-[#1A56DB]"/>
+            <FileText size={16} className="text-[#0D51D9]"/>
             <div><p className="font-bold text-sm">{record.radicado}</p><div className="flex items-center gap-2 flex-wrap"><StatusBadge estado={record.estado}/><TipoBadge tipo={record.tipo}/></div></div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"><X size={16} className="text-muted-foreground"/></button>
@@ -894,13 +899,13 @@ function WizardHeader({ steps, current, titulo, icon }: { steps: string[]; curre
   return (
     <div className="flex-shrink-0 px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#1A56DB]/10 flex items-center justify-center text-[#1A56DB] flex-shrink-0">{icon}</div>
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#0D51D9]/10 flex items-center justify-center text-[#0D51D9] flex-shrink-0">{icon}</div>
         <div className="min-w-0">
           <p className="font-bold text-sm truncate">{titulo}</p>
           <p className="text-[10px] text-muted-foreground">Paso {current}/{steps.length}: <span className="hidden xs:inline">{steps[current - 1]}</span></p>
         </div>
       </div>
-      <div className="flex gap-1">{steps.map((_, i) => <div key={i} className={`flex-1 h-1.5 rounded-full transition-all ${i < current ? "bg-[#1A56DB]" : "bg-border"}`}/>)}</div>
+      <div className="flex gap-1">{steps.map((_, i) => <div key={i} className={`flex-1 h-1.5 rounded-full transition-all ${i < current ? "bg-[#0D51D9]" : "bg-border"}`}/>)}</div>
     </div>
   );
 }
@@ -913,7 +918,7 @@ function NavButtons({ step, total, onBack, onNext, onFinish, canNext = true, fin
       {step > 1 && <button onClick={onBack} className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"><ChevronLeft size={15}/> <span className="hidden sm:inline">Anterior</span></button>}
       <div className="flex-1"/>
       {step < total ? (
-        <button onClick={onNext} disabled={!canNext} className="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold disabled:opacity-40 hover:bg-[#1648bf] transition-colors">Siguiente <ChevronRight size={15}/></button>
+        <button onClick={onNext} disabled={!canNext} className="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold disabled:opacity-40 hover:bg-[#1648bf] transition-colors">Siguiente <ChevronRight size={15}/></button>
       ) : (
         <button onClick={onFinish} disabled={!canNext || finishing} className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 transition-colors">
           {finishing ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/> Guardando...</> : <><CheckCircle size={15}/> <span className="hidden sm:inline">Guardar y </span>Notificar Médico</>}
@@ -1048,14 +1053,14 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName }: {
 
   const PrescripcionExtra = (
     <div className="space-y-4 mt-4 pt-4 border-t border-border">
-      <div className="flex items-center gap-2 p-2 bg-[#00B896]/10 border border-[#00B896]/30 rounded-xl"><Droplets size={14} className="text-[#00B896]"/><p className="text-xs font-bold text-[#00B896]">Prescripción Médica — Sueroterapia</p></div>
+      <div className="flex items-center gap-2 p-2 bg-[#0D8BD9]/10 border border-[#0D8BD9]/30 rounded-xl"><Droplets size={14} className="text-[#0D8BD9]"/><p className="text-xs font-bold text-[#0D8BD9]">Prescripción Médica — Sueroterapia</p></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Dosis Vitamina C (cc)" value={dosis_vitC} onChange={setDosisVitC} placeholder="Ej: 3 cc"/>
         <Field label="Dosis Complejo B (cc)" value={dosis_compB} onChange={setDosisCompB} placeholder="Ej: 4 cc"/>
       </div>
       <div>
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Vía de Administración</label>
-        <select value={viaPrescripcion} onChange={e => setViaPrescripcion(e.target.value)} className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30">
+        <select value={viaPrescripcion} onChange={e => setViaPrescripcion(e.target.value)} className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
           <option>Intravenosa</option><option>Intramuscular</option><option>Subcutánea</option>
         </select>
       </div>
@@ -1141,16 +1146,16 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName }: {
     <div className="space-y-3 mt-4 pt-4 border-t border-border">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-xl flex-1 mr-2"><Zap size={14} className="text-amber-600"/><p className="text-xs font-bold text-amber-800">Parámetros ND:YAG</p></div>
-        <button onClick={addRow} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#1A56DB] text-white text-xs font-medium hover:bg-[#1648bf]"><Plus size={12}/> Fila</button>
+        <button onClick={addRow} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#0D51D9] text-white text-xs font-medium hover:bg-[#1648bf]"><Plus size={12}/> Fila</button>
       </div>
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-[10px]">
-          <thead><tr className="bg-[#0C1A35] text-[#C8D6EF]">{["Fototipo","Pieza","Modo","Hz","J/cm²","mJ","cm²","Pases",""].map(h => <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}</tr></thead>
+          <thead><tr className="bg-[#031CA6] text-[#C5D5F0]">{["Fototipo","Pieza","Modo","Hz","J/cm²","mJ","cm²","Pases",""].map(h => <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}</tr></thead>
           <tbody>
             {params.map((row, i) => (
               <tr key={i} className={i%2===0?"bg-white":"bg-[#F8FAFF]"}>
                 {(["fototipo","pieza","modo","frecuencia","fluencia","energia","area","pases"] as (keyof LaserRow)[]).map(k => (
-                  <td key={k} className="px-1 py-1"><input value={row[k]} onChange={e => updRow(i,k,e.target.value)} className="w-full min-w-[44px] border border-transparent focus:border-[#1A56DB]/40 rounded px-1.5 py-1 bg-transparent focus:bg-white focus:outline-none text-[10px] font-mono"/></td>
+                  <td key={k} className="px-1 py-1"><input value={row[k]} onChange={e => updRow(i,k,e.target.value)} className="w-full min-w-[44px] border border-transparent focus:border-[#0D51D9]/40 rounded px-1.5 py-1 bg-transparent focus:bg-white focus:outline-none text-[10px] font-mono"/></td>
                 ))}
                 <td className="px-1 py-1">{params.length > 1 && <button onClick={() => setParams(p => p.filter((_,idx)=>idx!==i))} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={10}/></button>}</td>
               </tr>
@@ -1260,7 +1265,7 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName }: {
   const SueroLaserExtra = (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div className="flex items-center gap-2 p-2.5 bg-[#00B896]/10 border border-[#00B896]/30 rounded-xl"><Droplets size={15} className="text-[#00B896]"/><p className="text-xs font-bold text-[#00B896]">Prescripción — Sueroterapia</p></div>
+        <div className="flex items-center gap-2 p-2.5 bg-[#0D8BD9]/10 border border-[#0D8BD9]/30 rounded-xl"><Droplets size={15} className="text-[#0D8BD9]"/><p className="text-xs font-bold text-[#0D8BD9]">Prescripción — Sueroterapia</p></div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Dosis Vitamina C (cc)" value={dosis_vitC} onChange={setDosisVitC} placeholder="Ej: 3 cc"/>
           <Field label="Dosis Complejo B (cc)" value={dosis_compB} onChange={setDosisCompB} placeholder="Ej: 4 cc"/>
@@ -1271,12 +1276,12 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName }: {
       <div className="border-t border-border pt-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex-1 mr-2"><Zap size={15} className="text-amber-600"/><p className="text-xs font-bold text-amber-800">Parámetros ND:YAG</p></div>
-          <button onClick={() => setParams(p => [...p,{fototipo:"",pieza:"",modo:"",frecuencia:"",fluencia:"",energia:"",area:"",pases:""}])} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#1A56DB] text-white text-xs font-medium"><Plus size={12}/> Fila</button>
+          <button onClick={() => setParams(p => [...p,{fototipo:"",pieza:"",modo:"",frecuencia:"",fluencia:"",energia:"",area:"",pases:""}])} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-[#0D51D9] text-white text-xs font-medium"><Plus size={12}/> Fila</button>
         </div>
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-[10px]">
-            <thead><tr className="bg-[#0C1A35] text-[#C8D6EF]">{["Fototipo","Pieza","Modo","Hz","J/cm²","mJ","cm²","Pases",""].map(h => <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}</tr></thead>
-            <tbody>{params.map((row, i) => (<tr key={i} className={i%2===0?"bg-white":"bg-[#F8FAFF]"}>{(["fototipo","pieza","modo","frecuencia","fluencia","energia","area","pases"] as (keyof LaserRow)[]).map(k => (<td key={k} className="px-1 py-1"><input value={row[k]} onChange={e => updRow(i,k,e.target.value)} className="w-full min-w-[44px] border border-transparent focus:border-[#1A56DB]/40 rounded px-1.5 py-1 bg-transparent focus:bg-white focus:outline-none text-[10px] font-mono"/></td>))}<td className="px-1 py-1">{params.length > 1 && <button onClick={() => setParams(p => p.filter((_,idx)=>idx!==i))} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={10}/></button>}</td></tr>))}</tbody>
+            <thead><tr className="bg-[#031CA6] text-[#C5D5F0]">{["Fototipo","Pieza","Modo","Hz","J/cm²","mJ","cm²","Pases",""].map(h => <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}</tr></thead>
+            <tbody>{params.map((row, i) => (<tr key={i} className={i%2===0?"bg-white":"bg-[#F8FAFF]"}>{(["fototipo","pieza","modo","frecuencia","fluencia","energia","area","pases"] as (keyof LaserRow)[]).map(k => (<td key={k} className="px-1 py-1"><input value={row[k]} onChange={e => updRow(i,k,e.target.value)} className="w-full min-w-[44px] border border-transparent focus:border-[#0D51D9]/40 rounded px-1.5 py-1 bg-transparent focus:bg-white focus:outline-none text-[10px] font-mono"/></td>))}<td className="px-1 py-1">{params.length > 1 && <button onClick={() => setParams(p => p.filter((_,idx)=>idx!==i))} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={10}/></button>}</td></tr>))}</tbody>
           </table>
         </div>
       </div>
@@ -1285,16 +1290,16 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName }: {
 
   const content = () => {
     if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac}/>;
-    if (step === 2) return <div className="space-y-6"><StepVitalesEnfermera data={vitales} onChange={setVitales}/><div className="border-t border-border pt-5"><div className="flex items-center gap-2 p-2.5 bg-[#1A56DB]/8 border border-[#1A56DB]/20 rounded-xl mb-4"><Syringe size={14} className="text-[#1A56DB]"/><p className="text-xs font-bold text-[#1A56DB]">Cuestionario — Escleroterapia</p></div><StepCuestionario data={cuest} onChange={setCuest}/></div></div>;
+    if (step === 2) return <div className="space-y-6"><StepVitalesEnfermera data={vitales} onChange={setVitales}/><div className="border-t border-border pt-5"><div className="flex items-center gap-2 p-2.5 bg-[#0D51D9]/8 border border-[#0D51D9]/20 rounded-xl mb-4"><Syringe size={14} className="text-[#0D51D9]"/><p className="text-xs font-bold text-[#0D51D9]">Cuestionario — Escleroterapia</p></div><StepCuestionario data={cuest} onChange={setCuest}/></div></div>;
     if (step === 3) return SueroLaserExtra;
-    if (step === 4) return <div><div className="flex items-center gap-2 mb-3 p-2 bg-[#1A56DB]/8 rounded-lg"><Syringe size={14} className="text-[#1A56DB]"/><p className="text-xs font-bold text-[#1A56DB]">1 de 3 — Escleroterapia</p></div><StepLeerConsentimiento titulo="Escleroterapia de Várices" texto={makeTextoEscleroterapia(ips)} leido={leido1} onLeido={setLeido1}/></div>;
-    if (step === 5) return <div><div className="flex items-center gap-2 mb-3 p-2 bg-[#00B896]/10 rounded-lg"><Droplets size={14} className="text-[#00B896]"/><p className="text-xs font-bold text-[#00B896]">2 de 3 — Sueroterapia</p></div><StepLeerConsentimiento titulo="Sueroterapia Vitamina C / Complejo B" texto={makeTextoSueroterapia(ips)} leido={leido2} onLeido={setLeido2}/></div>;
+    if (step === 4) return <div><div className="flex items-center gap-2 mb-3 p-2 bg-[#0D51D9]/8 rounded-lg"><Syringe size={14} className="text-[#0D51D9]"/><p className="text-xs font-bold text-[#0D51D9]">1 de 3 — Escleroterapia</p></div><StepLeerConsentimiento titulo="Escleroterapia de Várices" texto={makeTextoEscleroterapia(ips)} leido={leido1} onLeido={setLeido1}/></div>;
+    if (step === 5) return <div><div className="flex items-center gap-2 mb-3 p-2 bg-[#0D8BD9]/10 rounded-lg"><Droplets size={14} className="text-[#0D8BD9]"/><p className="text-xs font-bold text-[#0D8BD9]">2 de 3 — Sueroterapia</p></div><StepLeerConsentimiento titulo="Sueroterapia Vitamina C / Complejo B" texto={makeTextoSueroterapia(ips)} leido={leido2} onLeido={setLeido2}/></div>;
     if (step === 6) return <div><div className="flex items-center gap-2 mb-3 p-2 bg-amber-50 rounded-lg"><Zap size={14} className="text-amber-600"/><p className="text-xs font-bold text-amber-700">3 de 3 — Láser ND:YAG</p></div><StepLeerConsentimiento titulo="Terapia Láser ND:YAG" texto={makeTextoLaser(ips)} leido={leido3} onLeido={setLeido3}/></div>;
     if (step === 7) return (
       <div className="space-y-4">
         <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl"><p className="text-xs font-bold text-purple-800 flex items-center gap-2"><Package size={14}/> Firma única — 3 consentimientos</p><p className="text-[10px] text-purple-700 mt-1">Al firmar, el médico recibirá una notificación para dar su Visto Bueno antes de proceder con la cita.</p></div>
         <div className="grid grid-cols-3 gap-2">
-          {[{c:"bg-[#1A56DB]/10 text-[#1A56DB] border-[#1A56DB]/30",icon:<Syringe size={12}/>,l:"Escler.",ok:leido1},{c:"bg-[#00B896]/10 text-[#00B896] border-[#00B896]/30",icon:<Droplets size={12}/>,l:"Suero.",ok:leido2},{c:"bg-amber-100 text-amber-700 border-amber-300",icon:<Zap size={12}/>,l:"Láser",ok:leido3}].map(({c,icon,l,ok}) => (
+          {[{c:"bg-[#0D51D9]/10 text-[#0D51D9] border-[#0D51D9]/30",icon:<Syringe size={12}/>,l:"Escler.",ok:leido1},{c:"bg-[#0D8BD9]/10 text-[#0D8BD9] border-[#0D8BD9]/30",icon:<Droplets size={12}/>,l:"Suero.",ok:leido2},{c:"bg-amber-100 text-amber-700 border-amber-300",icon:<Zap size={12}/>,l:"Láser",ok:leido3}].map(({c,icon,l,ok}) => (
             <div key={l} className={`flex items-center gap-1.5 p-2 rounded-lg border text-[10px] font-semibold ${c}`}>{icon}{l}{ok && <Check size={10} className="ml-auto"/>}</div>
           ))}
         </div>
@@ -1338,7 +1343,7 @@ function AprobacionModal({ record, medicoNombre, onAprobar, onRechazar, onClose 
 
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {/* Info del consentimiento */}
-          <div className="p-3 bg-[#EEF2F8] rounded-xl space-y-2">
+          <div className="p-3 bg-[#EFF3FB] rounded-xl space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold">{pac?.nombre}</p>
               <TipoBadge tipo={record.tipo}/>
@@ -1357,7 +1362,7 @@ function AprobacionModal({ record, medicoNombre, onAprobar, onRechazar, onClose 
           {d.firmaConsentimiento && (
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Firma del Paciente</p>
-              <img src={d.firmaConsentimiento} alt="firma" className="h-16 border-2 border-[#1A56DB]/20 rounded-xl bg-[#f8faff] p-1"/>
+              <img src={d.firmaConsentimiento} alt="firma" className="h-16 border-2 border-[#0D51D9]/20 rounded-xl bg-[#f8faff] p-1"/>
             </div>
           )}
 
@@ -1367,7 +1372,7 @@ function AprobacionModal({ record, medicoNombre, onAprobar, onRechazar, onClose 
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Signos Vitales</p>
               <div className="grid grid-cols-3 sm:grid-cols-3 gap-1.5">
                 {[["SpO2", d.vitales.oximetria + "%"], ["T.A.", d.vitales.tension], ["F.C.", d.vitales.frecuenciaCardiaca + " lpm"], ["Peso", d.vitales.peso + " kg"], ["Talla", d.vitales.talla + " cm"], ["IMC", d.vitales.imc]].map(([l,v]) => (
-                  <div key={l} className="bg-[#EEF2F8] rounded-lg p-2 text-center"><p className="text-[8px] text-muted-foreground font-bold">{l}</p><p className="text-[10px] font-bold">{v || "—"}</p></div>
+                  <div key={l} className="bg-[#EFF3FB] rounded-lg p-2 text-center"><p className="text-[8px] text-muted-foreground font-bold">{l}</p><p className="text-[10px] font-bold">{v || "—"}</p></div>
                 ))}
               </div>
             </div>
@@ -1420,15 +1425,15 @@ function NotificationPanel({ notifs, onClose, onMarkRead, onMarkAllRead, onOpenC
   return (
     <div className="fixed inset-0 z-[200]" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="absolute right-2 sm:right-4 top-14 w-[calc(100vw-16px)] sm:w-80 bg-white rounded-2xl shadow-2xl border border-border overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-[#0C1A35]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-[#031CA6]">
           <div className="flex items-center gap-2">
-            <Bell size={15} className="text-[#1A56DB]"/>
+            <Bell size={15} className="text-[#0D51D9]"/>
             <p className="text-sm font-bold text-white">Notificaciones</p>
             {noLeidas > 0 && <span className="bg-red-500 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5">{noLeidas}</span>}
           </div>
           <div className="flex items-center gap-2">
-            {noLeidas > 0 && <button onClick={onMarkAllRead} className="text-[10px] text-[#8899BB] hover:text-white transition-colors font-medium">Leer todo</button>}
-            <button onClick={onClose}><X size={15} className="text-[#8899BB]"/></button>
+            {noLeidas > 0 && <button onClick={onMarkAllRead} className="text-[10px] text-[#7A94C5] hover:text-white transition-colors font-medium">Leer todo</button>}
+            <button onClick={onClose}><X size={15} className="text-[#7A94C5]"/></button>
           </div>
         </div>
         <div className="max-h-[70vh] overflow-y-auto divide-y divide-border">
@@ -1437,18 +1442,18 @@ function NotificationPanel({ notifs, onClose, onMarkRead, onMarkAllRead, onOpenC
           ) : (
             notifs.slice().reverse().map(n => (
               <div key={n.id} onClick={() => { onMarkRead(n.id); if (n.consentId) onOpenConsent(n.consentId); }}
-                className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${!n.leida ? "bg-[#EEF2F8]" : ""}`}>
+                className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${!n.leida ? "bg-[#EFF3FB]" : ""}`}>
                 <div className="flex items-start gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
-                    ${n.tipo === "NUEVO_CONSENTIMIENTO" ? "bg-amber-100" : n.tipo === "APROBADO" ? "bg-emerald-100" : n.tipo === "RECHAZADO" ? "bg-red-100" : "bg-[#1A56DB]/10"}`}>
-                    {n.tipo === "NUEVO_CONSENTIMIENTO" ? <BellRing size={14} className="text-amber-600"/> : n.tipo === "APROBADO" ? <CheckSquare size={14} className="text-emerald-600"/> : n.tipo === "RECHAZADO" ? <XSquare size={14} className="text-red-600"/> : <Bell size={14} className="text-[#1A56DB]"/>}
+                    ${n.tipo === "NUEVO_CONSENTIMIENTO" ? "bg-amber-100" : n.tipo === "APROBADO" ? "bg-emerald-100" : n.tipo === "RECHAZADO" ? "bg-red-100" : "bg-[#0D51D9]/10"}`}>
+                    {n.tipo === "NUEVO_CONSENTIMIENTO" ? <BellRing size={14} className="text-amber-600"/> : n.tipo === "APROBADO" ? <CheckSquare size={14} className="text-emerald-600"/> : n.tipo === "RECHAZADO" ? <XSquare size={14} className="text-red-600"/> : <Bell size={14} className="text-[#0D51D9]"/>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs font-semibold ${!n.leida ? "text-foreground" : "text-muted-foreground"}`}>{n.titulo}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{n.mensaje}</p>
                     <p className="text-[9px] text-muted-foreground mt-1">{fmtHora(n.fecha)}</p>
                   </div>
-                  {!n.leida && <div className="w-2 h-2 bg-[#1A56DB] rounded-full flex-shrink-0 mt-1"/>}
+                  {!n.leida && <div className="w-2 h-2 bg-[#0D51D9] rounded-full flex-shrink-0 mt-1"/>}
                 </div>
               </div>
             ))
@@ -1545,7 +1550,7 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
           <p className="text-sm text-muted-foreground">{usuarios.length} usuarios · {usuarios.filter(u=>u.activo).length} activos</p>
         </div>
         <button onClick={() => { setShowForm(true); setEditingUser(null); setPwdUser(null); setNombre(""); setEmail(""); setPassword(""); setConfirmPwd(""); setRol("AUXILIAR"); }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
           <UserPlus size={16}/> Agregar Usuario
         </button>
       </div>
@@ -1557,9 +1562,9 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
 
       {/* Formulario nuevo usuario */}
       {showForm && (
-        <div className="bg-card border-2 border-[#1A56DB]/30 rounded-2xl p-5 space-y-4">
+        <div className="bg-card border-2 border-[#0D51D9]/30 rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="font-bold text-sm flex items-center gap-2"><UserPlus size={16} className="text-[#1A56DB]"/> Nuevo Usuario del Sistema</p>
+            <p className="font-bold text-sm flex items-center gap-2"><UserPlus size={16} className="text-[#0D51D9]"/> Nuevo Usuario del Sistema</p>
             <button onClick={() => setShowForm(false)}><X size={16} className="text-muted-foreground"/></button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1569,7 +1574,7 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
           <div>
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Rol en el Sistema <span className="text-red-500">*</span></label>
             <select value={rol} onChange={e => setRol(e.target.value as RolUsuario)}
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30">
+              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
               {ROL_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
@@ -1579,7 +1584,7 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
           </div>
           <div className="flex gap-2">
             <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
-            <button onClick={handleAdd} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
+            <button onClick={handleAdd} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
               <Save size={14}/> Crear Usuario
             </button>
           </div>
@@ -1637,14 +1642,14 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre, email o rol..."
-          className="w-full border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30"/>
+          className="w-full border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"/>
       </div>
 
       {/* Lista de usuarios */}
       <div className="space-y-2">
         {filtered.map(u => (
-          <div key={u.id} className={`bg-card rounded-2xl border border-border p-4 flex items-center gap-4 transition-all ${!u.activo ? "opacity-55" : ""} ${editingUser?.id===u.id||pwdUser?.id===u.id?"border-[#1A56DB]":""}`}>
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-black text-sm ${u.activo?"bg-[#1A56DB]":"bg-gray-400"}`}>
+          <div key={u.id} className={`bg-card rounded-2xl border border-border p-4 flex items-center gap-4 transition-all ${!u.activo ? "opacity-55" : ""} ${editingUser?.id===u.id||pwdUser?.id===u.id?"border-[#0D51D9]":""}`}>
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-black text-sm ${u.activo?"bg-[#0D51D9]":"bg-gray-400"}`}>
               {u.nombre.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
@@ -1696,8 +1701,8 @@ function AdminStatsPage({ records, usuarios }: { records: ConsentRecord[]; usuar
   const staffActivo = usuarios.filter(u => u.activo).length;
 
   const porTipo = [
-    { tipo: "Escleroterapia", count: records.filter(r=>r.tipo==="escleroterapia").length, color:"#1A56DB" },
-    { tipo: "Sueroterapia",   count: records.filter(r=>r.tipo==="sueroterapia").length,   color:"#00B896" },
+    { tipo: "Escleroterapia", count: records.filter(r=>r.tipo==="escleroterapia").length, color:"#0D51D9" },
+    { tipo: "Sueroterapia",   count: records.filter(r=>r.tipo==="sueroterapia").length,   color:"#0D8BD9" },
     { tipo: "Láser ND:YAG",   count: records.filter(r=>r.tipo==="laser").length,          color:"#F59E0B" },
     { tipo: "Paquete",        count: records.filter(r=>r.tipo==="paquete").length,         color:"#8B5CF6" },
   ];
@@ -1740,7 +1745,7 @@ function AdminStatsPage({ records, usuarios }: { records: ConsentRecord[]; usuar
 
       {/* KPIs principales */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KPI label="Consentimientos" value={total} sub={`${hoyCount} hoy`} color="#1A56DB"/>
+        <KPI label="Consentimientos" value={total} sub={`${hoyCount} hoy`} color="#0D51D9"/>
         <KPI label="Pacientes únicos" value={pacientesUnicos} sub="documentos distintos" color="#8B5CF6"/>
         <KPI label="Aprobados" value={aprobados} sub={total>0?`${Math.round(aprobados/total*100)}% del total`:"-"} color="#10b981"/>
         <KPI label="Pendientes médico" value={pendientes} sub={pendientes>0?"⚠ Requieren Visto Bueno":"Al día"} color={pendientes>0?"#f59e0b":"#10b981"}/>
@@ -1756,7 +1761,7 @@ function AdminStatsPage({ records, usuarios }: { records: ConsentRecord[]; usuar
             return (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
                 <span className="text-[9px] font-bold text-muted-foreground">{d.count > 0 ? d.count : ""}</span>
-                <div className="w-full rounded-t-md transition-all" style={{ height:`${Math.max(pct, 4)}%`, background: d.count>0?"#1A56DB":"#e5e7eb" }}/>
+                <div className="w-full rounded-t-md transition-all" style={{ height:`${Math.max(pct, 4)}%`, background: d.count>0?"#0D51D9":"#e5e7eb" }}/>
                 <span className="text-[8px] text-muted-foreground text-center leading-tight">{d.dia}</span>
               </div>
             );
@@ -1809,9 +1814,9 @@ function AdminStatsPage({ records, usuarios }: { records: ConsentRecord[]; usuar
           <div className="space-y-2">
             {creadorList.map(([nombre, count], i) => (
               <div key={nombre} className="flex items-center gap-3">
-                <span className="w-5 h-5 rounded-full bg-[#1A56DB]/10 text-[#1A56DB] text-[10px] font-black flex items-center justify-center">{i+1}</span>
+                <span className="w-5 h-5 rounded-full bg-[#0D51D9]/10 text-[#0D51D9] text-[10px] font-black flex items-center justify-center">{i+1}</span>
                 <span className="flex-1 text-xs font-medium">{nombre}</span>
-                <span className="text-xs font-bold text-[#1A56DB]">{count}</span>
+                <span className="text-xs font-bold text-[#0D51D9]">{count}</span>
               </div>
             ))}
           </div>
@@ -1822,8 +1827,8 @@ function AdminStatsPage({ records, usuarios }: { records: ConsentRecord[]; usuar
       <div className="bg-card rounded-2xl border border-border p-4">
         <p className="text-sm font-bold mb-3">Resumen del Personal</p>
         <div className="grid grid-cols-3 gap-3">
-          <div className="text-center p-3 bg-[#1A56DB]/5 rounded-xl">
-            <p className="text-2xl font-black text-[#1A56DB]">{staff}</p>
+          <div className="text-center p-3 bg-[#0D51D9]/5 rounded-xl">
+            <p className="text-2xl font-black text-[#0D51D9]">{staff}</p>
             <p className="text-[10px] text-muted-foreground">Total Staff</p>
           </div>
           <div className="text-center p-3 bg-emerald-50 rounded-xl">
@@ -1904,7 +1909,7 @@ function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c
     <div className="fixed inset-0 bg-black/70 z-[300] flex items-end sm:items-center justify-center sm:p-4">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-white z-10">
-          <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-[#1A56DB]/10 flex items-center justify-center"><Settings size={15} className="text-[#1A56DB]"/></div><div><p className="font-bold text-sm">Configuración IPS</p><p className="text-[10px] text-muted-foreground">Constantes del sistema — solo Administrador</p></div></div>
+          <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-[#0D51D9]/10 flex items-center justify-center"><Settings size={15} className="text-[#0D51D9]"/></div><div><p className="font-bold text-sm">Configuración IPS</p><p className="text-[10px] text-muted-foreground">Constantes del sistema — solo Administrador</p></div></div>
           <button onClick={onClose}><X size={18} className="text-muted-foreground"/></button>
         </div>
         <div className="p-5 space-y-4">
@@ -1914,9 +1919,9 @@ function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c
           <Field label="Médico Responsable" value={form.medico} onChange={s("medico")} placeholder="Dr. Nombre Apellido" icon={<Stethoscope size={13}/>} required/>
           <Field label="Registro Médico (RM)" value={form.rm} onChange={s("rm")} placeholder="RM 0000000"/>
           <Field label="Ciudad / Sede" value={form.ciudad} onChange={s("ciudad")} placeholder="Ciudad, País" icon={<MapPin size={13}/>}/>
-          <div className="p-3 bg-[#EEF2F8] rounded-xl text-[10px] text-muted-foreground space-y-0.5">
+          <div className="p-3 bg-[#EFF3FB] rounded-xl text-[10px] text-muted-foreground space-y-0.5">
             <p className="font-bold text-foreground text-xs mb-1">Vista previa del encabezado:</p>
-            <p className="font-bold text-[#1A56DB]">{form.nombre || "Nombre IPS"}</p>
+            <p className="font-bold text-[#0D51D9]">{form.nombre || "Nombre IPS"}</p>
             <p>NIT {form.nit || "000000000"}</p>
             <p>{form.medico || "Médico"} · {form.rm || "RM"}</p>
             <p className="text-[9px]">{form.ciudad || "Ciudad"}</p>
@@ -1924,7 +1929,7 @@ function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c
         </div>
         <div className="flex gap-2 px-5 pb-5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
-          <button onClick={() => { onSave(form); onClose(); }} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#1A56DB] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"><Save size={14}/> Guardar</button>
+          <button onClick={() => { onSave(form); onClose(); }} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"><Save size={14}/> Guardar</button>
         </div>
       </div>
     </div>
@@ -1954,13 +1959,15 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
   };
 
   return (
-    <div className="min-h-screen bg-[#0C1A35] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#031CA6] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#1A56DB] mb-4"><Stethoscope size={30} className="text-white"/></div>
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white mb-4 shadow-lg">
+            <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-16 h-16 object-contain"/>
+          </div>
           <h1 className="text-2xl font-black text-white">{ips.nombre}</h1>
-          <p className="text-[#C8D6EF] text-sm mt-1">Sistema de Consentimientos Informados</p>
-          <p className="text-[#8899BB] text-[10px] mt-0.5 font-mono">NIT {ips.nit}</p>
+          <p className="text-[#C5D5F0] text-sm mt-1">Sistema de Consentimientos Informados</p>
+          <p className="text-[#7A94C5] text-[10px] mt-0.5 font-mono">NIT {ips.nit}</p>
         </div>
         <div className="bg-white rounded-2xl p-6 shadow-2xl">
           <h2 className="text-sm font-bold mb-5">Iniciar Sesión</h2>
@@ -1968,7 +1975,7 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
             <Field label="Correo electrónico" value={email} onChange={setEmail} type="email" placeholder="usuario@medfis.com" required/>
             <Field label="Contraseña" value={password} onChange={setPassword} type="password" placeholder="••••••••" required/>
             {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-medium"><XCircle size={14}/> {error}</div>}
-            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-[#1A56DB] text-white font-semibold text-sm disabled:opacity-60 hover:bg-[#1648bf] transition-colors flex items-center justify-center gap-2">
+            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-[#0D51D9] text-white font-semibold text-sm disabled:opacity-60 hover:bg-[#1648bf] transition-colors flex items-center justify-center gap-2">
               {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Verificando...</> : "Ingresar"}
             </button>
           </form>
@@ -2007,40 +2014,40 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
   return (
     <>
       {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose}/>}
-      <aside className={`fixed top-0 left-0 h-full w-60 bg-[#0C1A35] z-50 flex flex-col transition-transform duration-300 ${mobileOpen?"translate-x-0":"-translate-x-full"} lg:translate-x-0`}>
+      <aside className={`fixed top-0 left-0 h-full w-60 bg-[#031CA6] z-50 flex flex-col transition-transform duration-300 ${mobileOpen?"translate-x-0":"-translate-x-full"} lg:translate-x-0`}>
         <div className="px-5 py-5 border-b border-white/8">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#1A56DB] flex items-center justify-center"><Stethoscope size={18} className="text-white"/></div>
-            <div><p className="font-black text-white text-sm">{ips.nombre}</p><p className="text-[10px] text-[#8899BB] font-mono">NIT {ips.nit}</p></div>
+            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center p-0.5"><ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-full h-full object-contain"/></div>
+            <div><p className="font-black text-white text-sm">{ips.nombre}</p><p className="text-[10px] text-[#7A94C5] font-mono">NIT {ips.nit}</p></div>
           </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {nav.map(item => (
             <button key={item.id} onClick={() => { onPage(item.id); onClose(); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors relative ${page===item.id?"bg-[#1A56DB] text-white":"text-[#C8D6EF] hover:bg-white/8"}`}>
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors relative ${page===item.id?"bg-[#0D51D9] text-white":"text-[#C5D5F0] hover:bg-white/8"}`}>
               {item.icon} {item.label}
               {(item.badge ?? 0) > 0 && <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">{item.badge}</span>}
             </button>
           ))}
           {user.rol === "ADMINISTRADOR" && (<>
             <button onClick={() => { onPage("admin"); onClose(); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="admin"?"bg-[#1A56DB] text-white":"text-[#C8D6EF] hover:bg-white/8"}`}>
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="admin"?"bg-[#0D51D9] text-white":"text-[#C5D5F0] hover:bg-white/8"}`}>
               <BarChart2 size={17}/> Panel Admin
             </button>
             <button onClick={() => { onPage("staff"); onClose(); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="staff"?"bg-[#1A56DB] text-white":"text-[#C8D6EF] hover:bg-white/8"}`}>
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="staff"?"bg-[#0D51D9] text-white":"text-[#C5D5F0] hover:bg-white/8"}`}>
               <UserCog size={17}/> Gestión de Staff
             </button>
           </>)}
         </nav>
         <div className="px-3 pb-5 border-t border-white/8 pt-4 space-y-1">
-          {user.rol === "ADMINISTRADOR" && <button onClick={onSettings} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C8D6EF] hover:bg-white/8 text-sm font-medium transition-colors"><Settings size={15}/> Config. IPS</button>}
-          {user.rol === "ADMINISTRADOR" && <button onClick={onChangePwd} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C8D6EF] hover:bg-white/8 text-sm font-medium transition-colors"><Lock size={15}/> Mi Contraseña</button>}
+          {user.rol === "ADMINISTRADOR" && <button onClick={onSettings} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C5D5F0] hover:bg-white/8 text-sm font-medium transition-colors"><Settings size={15}/> Config. IPS</button>}
+          {user.rol === "ADMINISTRADOR" && <button onClick={onChangePwd} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C5D5F0] hover:bg-white/8 text-sm font-medium transition-colors"><Lock size={15}/> Mi Contraseña</button>}
           <div className="px-3 py-2">
             <p className="text-[10px] text-white font-semibold truncate">{user.nombre}</p>
-            <p className="text-[10px] text-[#8899BB]">{user.rol}</p>
+            <p className="text-[10px] text-[#7A94C5]">{user.rol}</p>
           </div>
-          <button onClick={onLogout} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C8D6EF] hover:bg-white/8 text-sm font-medium transition-colors"><LogOut size={15}/> Cerrar Sesión</button>
+          <button onClick={onLogout} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C5D5F0] hover:bg-white/8 text-sm font-medium transition-colors"><LogOut size={15}/> Cerrar Sesión</button>
         </div>
       </aside>
     </>
@@ -2098,7 +2105,7 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <TipoBadge tipo={r.tipo}/>
-                    <button onClick={() => onViewRecord(r)} className="p-1.5 rounded-lg bg-[#1A56DB]/10 text-[#1A56DB] hover:bg-[#1A56DB]/20 transition-colors"><Eye size={13}/></button>
+                    <button onClick={() => onViewRecord(r)} className="p-1.5 rounded-lg bg-[#0D51D9]/10 text-[#0D51D9] hover:bg-[#0D51D9]/20 transition-colors"><Eye size={13}/></button>
                     {user.rol === "MÉDICO" && (
                       <button onClick={() => setAprobandoRecord(r)}
                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 transition-colors">
@@ -2116,7 +2123,7 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label:"Total",          value: records.length,              icon:<FileText size={18}/>,    color:"text-[#1A56DB]", bg:"bg-[#1A56DB]/10" },
+          { label:"Total",          value: records.length,              icon:<FileText size={18}/>,    color:"text-[#0D51D9]", bg:"bg-[#0D51D9]/10" },
           { label:"Firmados",       value: firmados,                    icon:<Clock size={18}/>,        color:"text-blue-600",  bg:"bg-blue-50"      },
           { label:"Aprobados",      value: aprobados,                   icon:<CheckCircle size={18}/>,  color:"text-emerald-600",bg:"bg-emerald-50"   },
           { label:"Hoy",            value: hoyCount,                    icon:<Activity size={18}/>,     color:"text-amber-600", bg:"bg-amber-50"      },
@@ -2134,8 +2141,8 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Crear Nuevo Consentimiento</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {([
-            { tipo:"escleroterapia" as TipoConsent, label:"Escleroterapia", sub:"Inyección de Várices",  icon:<Syringe size={24}/>,  color:"bg-[#1A56DB]", light:"bg-[#1A56DB]/8 hover:bg-[#1A56DB]/12 border-[#1A56DB]/20" },
-            { tipo:"sueroterapia"   as TipoConsent, label:"Sueroterapia",   sub:"Vit C / Complejo B IV", icon:<Droplets size={24}/>, color:"bg-[#00B896]", light:"bg-[#00B896]/8 hover:bg-[#00B896]/12 border-[#00B896]/20" },
+            { tipo:"escleroterapia" as TipoConsent, label:"Escleroterapia", sub:"Inyección de Várices",  icon:<Syringe size={24}/>,  color:"bg-[#0D51D9]", light:"bg-[#0D51D9]/8 hover:bg-[#0D51D9]/12 border-[#0D51D9]/20" },
+            { tipo:"sueroterapia"   as TipoConsent, label:"Sueroterapia",   sub:"Vit C / Complejo B IV", icon:<Droplets size={24}/>, color:"bg-[#0D8BD9]", light:"bg-[#0D8BD9]/8 hover:bg-[#0D8BD9]/12 border-[#0D8BD9]/20" },
             { tipo:"laser"          as TipoConsent, label:"Láser Várices",  sub:"Terapia ND:YAG",        icon:<Zap size={24}/>,      color:"bg-amber-500", light:"bg-amber-50 hover:bg-amber-100 border-amber-200"           },
             { tipo:"paquete"        as TipoConsent, label:"Paquete",        sub:"Los 3 procedimientos",  icon:<Package size={24}/>,  color:"bg-purple-600",light:"bg-purple-50 hover:bg-purple-100 border-purple-200"         },
           ]).map(item => (
@@ -2157,7 +2164,7 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
               <div key={r.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors ${i<arr.length-1?"border-b border-border":""} ${r.pendienteMedico && r.estado === "FIRMADO" ? "border-l-4 border-l-amber-400":""} ${r.estado === "APROBADO" ? "border-l-4 border-l-emerald-500" : ""}`}
                 onClick={() => onViewRecord(r)}>
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  {r.tipo==="escleroterapia"?<Syringe size={14} className="text-[#1A56DB]"/>:r.tipo==="sueroterapia"?<Droplets size={14} className="text-[#00B896]"/>:r.tipo==="laser"?<Zap size={14} className="text-amber-600"/>:<Package size={14} className="text-purple-600"/>}
+                  {r.tipo==="escleroterapia"?<Syringe size={14} className="text-[#0D51D9]"/>:r.tipo==="sueroterapia"?<Droplets size={14} className="text-[#0D8BD9]"/>:r.tipo==="laser"?<Zap size={14} className="text-amber-600"/>:<Package size={14} className="text-purple-600"/>}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold truncate">{r.pacienteNombre}</p>
@@ -2181,12 +2188,12 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4">Tendencia Mensual</p>
             <ResponsiveContainer width="100%" height={150}>
               <AreaChart data={CHART_MENSUAL}>
-                <defs><linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#1A56DB" stopOpacity={0.15}/><stop offset="95%" stopColor="#1A56DB" stopOpacity={0}/></linearGradient></defs>
+                <defs><linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0D51D9" stopOpacity={0.15}/><stop offset="95%" stopColor="#0D51D9" stopOpacity={0}/></linearGradient></defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F4"/>
                 <XAxis dataKey="mes" tick={{ fontSize:10 }}/><YAxis tick={{ fontSize:10 }}/>
                 <Tooltip contentStyle={{ fontSize:11, borderRadius:8 }}/>
-                <Area type="monotone" dataKey="escler" stroke="#1A56DB" fill="url(#gE)" strokeWidth={2} name="Escleroterapia"/>
-                <Area type="monotone" dataKey="suero"  stroke="#00B896" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Sueroterapia"/>
+                <Area type="monotone" dataKey="escler" stroke="#0D51D9" fill="url(#gE)" strokeWidth={2} name="Escleroterapia"/>
+                <Area type="monotone" dataKey="suero"  stroke="#0D8BD9" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Sueroterapia"/>
                 <Area type="monotone" dataKey="laser"  stroke="#F59E0B" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Láser"/>
               </AreaChart>
             </ResponsiveContainer>
@@ -2240,7 +2247,7 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
         <div className="relative flex-1 min-w-0">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre, radicado o cédula..."
-            className="w-full border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-[#1A56DB]/30"/>
+            className="w-full border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"/>
         </div>
         <div className="flex gap-2">
           <select value={fTipo} onChange={e => setFTipo(e.target.value as any)} className="flex-1 border border-border rounded-xl px-2.5 py-2.5 text-sm bg-card focus:outline-none">
@@ -2260,10 +2267,10 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
             const d = r.datos as any;
             const pac = d.paciente;
             return (
-              <div key={r.id} className={`bg-card rounded-2xl border border-border p-3 sm:p-4 transition-colors hover:border-[#1A56DB]/30 ${r.pendienteMedico && r.estado === "FIRMADO" ? "border-l-4 border-l-amber-400" : ""} ${r.estado === "APROBADO" ? "border-l-4 border-l-emerald-500" : ""} ${r.estado === "RECHAZADO" ? "border-l-4 border-l-red-400" : ""}`}>
+              <div key={r.id} className={`bg-card rounded-2xl border border-border p-3 sm:p-4 transition-colors hover:border-[#0D51D9]/30 ${r.pendienteMedico && r.estado === "FIRMADO" ? "border-l-4 border-l-amber-400" : ""} ${r.estado === "APROBADO" ? "border-l-4 border-l-emerald-500" : ""} ${r.estado === "RECHAZADO" ? "border-l-4 border-l-red-400" : ""}`}>
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                    {r.tipo==="escleroterapia"?<Syringe size={15} className="text-[#1A56DB]"/>:r.tipo==="sueroterapia"?<Droplets size={15} className="text-[#00B896]"/>:r.tipo==="laser"?<Zap size={15} className="text-amber-600"/>:<Package size={15} className="text-purple-600"/>}
+                    {r.tipo==="escleroterapia"?<Syringe size={15} className="text-[#0D51D9]"/>:r.tipo==="sueroterapia"?<Droplets size={15} className="text-[#0D8BD9]"/>:r.tipo==="laser"?<Zap size={15} className="text-amber-600"/>:<Package size={15} className="text-purple-600"/>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
@@ -2284,7 +2291,7 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
                     {r.motivoRechazo && <p className="text-[10px] text-red-600 truncate">✕ {r.motivoRechazo}</p>}
                     {/* Botones en fila para mobile */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                      <button onClick={() => onView(r)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#1A56DB] text-white text-[10px] font-semibold hover:bg-[#1648bf] transition-colors"><Eye size={11}/> PDF</button>
+                      <button onClick={() => onView(r)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0D51D9] text-white text-[10px] font-semibold hover:bg-[#1648bf] transition-colors"><Eye size={11}/> PDF</button>
                       {r.pendienteMedico && r.estado === "FIRMADO" && user.rol === "MÉDICO" && (
                         <button onClick={() => setAprobandoRecord(r)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 transition-colors"><CalendarCheck size={11}/> Visto Bueno</button>
                       )}
@@ -2320,8 +2327,8 @@ function TipoSelectorPage({ onSelect }: { onSelect: (t: TipoConsent) => void }) 
       <div><h1 className="text-xl font-bold">Nuevo Consentimiento</h1><p className="text-sm text-muted-foreground">Seleccione el tipo de procedimiento</p></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {([
-          { tipo:"escleroterapia" as TipoConsent, label:"Escleroterapia",  sub:"Inyección de Várices MMII",         icon:<Syringe size={28}/>,  color:"border-[#1A56DB] bg-[#1A56DB]/5", iconBg:"bg-[#1A56DB]" },
-          { tipo:"sueroterapia"   as TipoConsent, label:"Sueroterapia",    sub:"Vitamina C y/o Complejo B IV/IM",   icon:<Droplets size={28}/>, color:"border-[#00B896] bg-[#00B896]/5", iconBg:"bg-[#00B896]" },
+          { tipo:"escleroterapia" as TipoConsent, label:"Escleroterapia",  sub:"Inyección de Várices MMII",         icon:<Syringe size={28}/>,  color:"border-[#0D51D9] bg-[#0D51D9]/5", iconBg:"bg-[#0D51D9]" },
+          { tipo:"sueroterapia"   as TipoConsent, label:"Sueroterapia",    sub:"Vitamina C y/o Complejo B IV/IM",   icon:<Droplets size={28}/>, color:"border-[#0D8BD9] bg-[#0D8BD9]/5", iconBg:"bg-[#0D8BD9]" },
           { tipo:"laser"          as TipoConsent, label:"Láser Várices",   sub:"Terapia ND:YAG Control Venas",      icon:<Zap size={28}/>,      color:"border-amber-400 bg-amber-50",    iconBg:"bg-amber-500"  },
           { tipo:"paquete"        as TipoConsent, label:"Paquete Completo",sub:"Los 3 consentimientos en una sesión",icon:<Package size={28}/>,  color:"border-purple-400 bg-purple-50",  iconBg:"bg-purple-600" },
         ]).map(o => (
@@ -2514,7 +2521,7 @@ export default function App() {
                 {notifCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center animate-pulse">{notifCount}</span>}
               </button>
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#1A56DB] flex items-center justify-center text-white text-xs font-bold">{user.nombre.charAt(0)}</div>
+                <div className="w-7 h-7 rounded-full bg-[#0D51D9] flex items-center justify-center text-white text-xs font-bold">{user.nombre.charAt(0)}</div>
                 <div className="hidden sm:block text-right">
                   <p className="text-xs font-semibold leading-tight truncate max-w-[120px]">{user.nombre.split(" ")[0]}</p>
                   <p className="text-[9px] text-muted-foreground">{user.rol}</p>
