@@ -144,91 +144,139 @@ const CUESTIONARIO_PREGUNTAS = [
   "¿Uso de medias de compresión alguna Vez?",
 ];
 
-// ─── TEXTOS DINÁMICOS ─────────────────────────────────────────────────────────
+// ─── TEXTOS DINÁMICOS (transcritos fielmente del documento oficial Med&Fis) ───
 function makeTextoEscleroterapia(ips: IPSConfig) {
-  return `Yo, el (la) paciente abajo firmante, por medio del presente documento doy mi consentimiento para que se lleve a cabo el procedimiento de ESCLEROTERAPIA (INYECCIÓN) DE VÁRICES DE LOS MIEMBROS INFERIORES, en las instalaciones de la IPS ${ips.nombre} (NIT ${ips.nit}), bajo la responsabilidad del ${ips.medico} (${ips.rm}).
+  return `CONSENTIMIENTO INFORMADO PARA ESCLEROTERAPIA (INYECCIÓN) DE VÁRICES DE LOS MIEMBROS INFERIORES
+${ips.nombre} — NIT ${ips.nit}
 
-INFORMACIÓN DEL PROCEDIMIENTO:
-La escleroterapia es un procedimiento médico utilizado para el tratamiento de várices y arañas vasculares (telangiectasias) de los miembros inferiores. Consiste en la inyección de una solución esclerosante (Polidocanol) directamente en el interior del vaso afectado, lo que produce la inflamación y cierre de este.
+Política de NO REUSO: "Por razones de bioseguridad y eficacia, todos los dispositivos médicos de un solo uso serán desechados adecuadamente después de su uso y no se reutilizarán bajo ninguna circunstancia."
 
-BENEFICIOS ESPERADOS:
-• Eliminación o reducción notable de las várices y telangiectasias tratadas.
-• Mejoría estética y funcional de los miembros inferiores.
-• Alivio de síntomas como pesadez, cansancio y dolor en piernas.
+Nota aclaratoria 1: Con el fin de optimizar la atención, en el consultorio estarán dos personas durante el procedimiento: el médico tratante y un(a) auxiliar encargado(a) del diligenciamiento de la historia. Por lo tanto, al brindar mi consentimiento acepto la permanencia de estas dos personas durante el tratamiento.
 
-RIESGOS Y POSIBLES COMPLICACIONES:
-• Hiperpigmentación cutánea (manchas oscuras) temporal o permanente.
-• Neovascularización (aparición de nuevos vasos pequeños).
-• Reacción alérgica al esclerosante (rara pero posible).
-• Tromboflebitis superficial (inflamación de la vena tratada).
-• Ulceración cutánea en casos muy raros.
-• Dolor o ardor en el sitio de inyección durante y después del procedimiento.
+Yo, mayor de edad e identificado(a) con el documento relacionado, por medio del presente manifiesto que he decidido voluntaria y libremente conocer la información referente al tratamiento de mis venas várices y/o arañas varicosas por medio de la inyección de sustancias esclerosantes (escleroterapia).
 
-ALTERNATIVAS TERAPÉUTICAS:
-• Cirugía de várices (fleboextracción). • Tratamiento con láser endovenoso.
-• Uso de medias de compresión (conservador). • Abstención de tratamiento.
+DESCRIPCIÓN DEL PROCEDIMIENTO:
+Se inyecta una solución química conocida como esclerosante (Polidocanol) en forma líquida-microespuma directamente en la vena afectada. Esta solución irrita la pared interna de la vena provocando que se hinche y se cierre. Con el tiempo la vena se convierte en tejido cicatricial y se desvanece. No se requiere anestesia ya que es un procedimiento mínimamente invasivo y generalmente de recuperación rápida. El objetivo de la escleroterapia es eliminar venas varicosas y arañas vasculares provocando su cierre y eventual reabsorción por el cuerpo. Esto busca mejorar la apariencia estética de las piernas y reducir síntomas como dolor, hinchazón y sensación de pesadez, mejorando así la calidad de vida del paciente.
 
-OBLIGACIONES DEL PACIENTE POST-PROCEDIMIENTO:
-• Usar medias de compresión durante el tiempo indicado por el médico.
-• Evitar exposición solar directa en zonas tratadas por mínimo 30 días.
-• Caminar diariamente al menos 30 minutos.
-• Evitar baños calientes, saunas y ejercicio intenso por 48-72 horas.
-• Consultar inmediatamente si presenta inflamación excesiva, úlceras o reacción alérgica.
+El alcance del tratamiento es hasta venas menores de 3mm. Venas mayores a 3mm corresponden a cirugía vascular.
 
-El paciente declara que ha recibido suficiente información sobre el procedimiento, ha tenido la oportunidad de realizar preguntas que han sido respondidas satisfactoriamente. Autoriza la realización del procedimiento de manera libre, voluntaria y sin coacción alguna.`;
+El Dr. evaluará de manera aproximada el número de sesiones de escleroterapia que necesita el paciente debido a que la medicina no es una ciencia exacta y cada paciente es fisiológicamente distinto. Debido a esto y otros factores, los resultados pueden variar.
+
+REACCIONES Y COMPLICACIONES:
+Entre las reacciones, complicaciones y riesgos conocidos están el que de inmediato puede aparecer enrojecimiento e inflamación locales con amoratamiento posterior a la intervención. Adicional a esto, dolor, comezón y sensibilidad en las áreas tratadas; pueden sentirse pequeños bultos moderadamente dolorosos, formarse coágulos en las várices inyectadas los cuales deben ser evaluados por el médico en cita de revisión. En algunas personas el tratamiento deja manchas temporales o permanentes en los sitios de inyección o a lo largo de las varices que dependen de factores genéticos y/o exposición solar. Hinchazón leve en las extremidades inferiores, aparecimiento esporádico de várices muy pequeñas, ocasionalmente úlceras en sitios de inyección las cuales sanan lentamente y dejan cicatrices antiestéticas. Frecuentemente trastornos pasajeros de la visión, raramente queloides, infección cutánea, inflamación de los sistemas venosos con formación de trombos (coágulos) y la posibilidad de reacciones alérgicas o tóxicas o paro cardiaco causado por los materiales usados lo cual puede llevar excepcionalmente a la muerte. Pueden presentarse además otros riesgos no previstos. Con toda la información tengo en cuenta y acepto las secuelas de todos los riesgos.
+
+TRATAMIENTOS ALTERNATIVOS:
+Terapia con láser endovenoso, Ablación por radiofrecuencia (RFA), Flebectomía ambulatoria, Tratamiento con láser superficial, Compresión graduada, cambios en el estilo de vida.
+
+RESULTADOS ESPERADOS:
+El resultado esperado es una disminución o mejora de las condiciones fisiológicas y visibles de las venas várices, mejorando su estética al reducir su apariencia, aliviar síntomas concernientes a ellas como dolor, hinchazón, picazón y sensación de pesadez en las piernas, mejorando la calidad de vida del paciente. Se aclara que dichos resultados varían en cada paciente de acuerdo a factores genéticos, fisiológicos y el cumplimiento o no de los cuidados y recomendaciones que sugiere el médico. Teniendo en cuenta dichas variantes, NO se garantiza un resultado estético específico después del tratamiento.
+
+DECLARACIÓN DEL PACIENTE:
+Doy fe de que se me ha dado la oportunidad de informar sobre mis enfermedades (en caso de tenerlas) y medicamentos consumidos habitualmente en caso de posibles interacciones o contraindicaciones. He tenido la oportunidad de realizar todas las preguntas necesarias con el fin de resolver mis inquietudes y considero que fueron contestadas adecuada y claramente por mi médico tratante. Estoy informado(a) sobre una revisión de rutina y la posibilidad de una cita de evaluación en caso de ser necesaria para observar la evolución del tratamiento (sin costo adicional).
+
+Si durante el curso de este tratamiento surgen condiciones que requieran interrumpirlo o hacer procedimientos adicionales o diferentes a los que se planearon, autorizo y pido a mi médico tratante para que, según su criterio, haga lo que estime necesario según las circunstancias.
+
+CONSENTIMIENTO:
+Al firmar reconozco que he leído y entendido el presente documento. Teniendo en cuenta todo lo anterior, considero que tengo conocimientos adecuados para dar mi consentimiento y autorización para el procedimiento de escleroterapia, entendiendo y asumiendo los riesgos, reacciones, complicaciones y resultados insatisfactorios que pueden derivarse del mismo, independiente de las precauciones y cuidados que puedan tomarse para evitarlos. Me comprometo además a cumplir fielmente con las recomendaciones, instrucciones y controles, antes y después del tratamiento.
+
+Nota aclaratoria 2: La IPS ${ips.nombre} no realizará ningún tipo de devolución de dinero una vez iniciado el tratamiento.
+
+Al firmar este apartado, SI doy mi consentimiento libre y voluntario para proceder con el tratamiento. Autorizo para el procedimiento al ${ips.medico}. ${ips.rm}.
+
+DISENTIMIENTO:
+En caso de tener dudas sobre el procedimiento o no estar de acuerdo con su realización, el paciente puede firmar su disentimiento y NO autoriza el procedimiento.`;
 }
 
 function makeTextoSueroterapia(ips: IPSConfig) {
-  return `Yo, el (la) paciente abajo firmante, por medio del presente documento doy mi consentimiento para que se lleve a cabo el procedimiento de SUEROTERAPIA DE VITAMINA C Y/O COMPLEJO B, en las instalaciones de la IPS ${ips.nombre} (NIT ${ips.nit}), bajo la responsabilidad del ${ips.medico} (${ips.rm}).
+  return `CONSENTIMIENTO INFORMADO PARA SUEROTERAPIA DE VITAMINA C y/o COMPLEJO B
+${ips.nombre} — NIT ${ips.nit}
 
-INFORMACIÓN DEL PROCEDIMIENTO:
-La sueroterapia vitamínica consiste en la administración endovenosa o intramuscular de vitaminas (Vitamina C y/o Complejo B) diluidas en solución salina (NaCl 0.9%), con el objetivo de suplementar deficiencias nutricionales, mejorar el estado general del paciente y apoyar funciones metabólicas específicas.
+Política de NO REUSO: "Por razones de bioseguridad y eficacia, todos los dispositivos médicos de un solo uso serán desechados adecuadamente después de su uso y no se reutilizarán bajo ninguna circunstancia."
 
-VITAMINA C (Ácido Ascórbico): Antioxidante potente, favorece la síntesis de colágeno, mejora la inmunidad, apoya la cicatrización de tejidos y tiene propiedades antiinflamatorias.
+1. OBJETIVO DEL PROCEDIMIENTO:
+Mejorar el estado nutricional y de salud del paciente, proporcionando suplementos esenciales que pueden ayudar en la recuperación de diversas condiciones y mejorar el bienestar general.
 
-COMPLEJO B (B1, B6, B12): Esencial para el metabolismo energético, función neurológica, producción de glóbulos rojos y síntesis de neurotransmisores.
+2. DESCRIPCIÓN DEL PROCEDIMIENTO:
+Consiste en la administración intravenosa de la vitamina de acuerdo a las indicaciones del médico. Vitamina C y Complejo B.
 
-POSIBLES RIESGOS:
-• Dolor o inflamación en el sitio de punción. • Reacción alérgica (poco frecuente).
-• Sensación de calor o rubefacción durante la infusión. • Mareo o náuseas leves (muy raros).
-• Extravasación del suero (en caso de punción defectuosa).
+3. BENEFICIOS ESPERADOS:
+Se me ha informado que la sueroterapia de vitamina C ó complejo B puede ayudar a mejorar mi sistema inmunológico, reducir el estrés oxidativo y apoyar la salud. Aumento en los niveles de energía. Mejora la salud de la piel, el cabello y las uñas. Reducción de la fatiga y el cansancio general.
 
-CONTRAINDICACIONES RELATIVAS:
-• Cálculos renales por oxalato — dosis altas de Vitamina C.
-• Déficit de G6PD — hemólisis con dosis altas de Vitamina C.
-• Hipercoagulabilidad — evaluar individualmente.
+4. RIESGOS Y EFECTOS SECUNDARIOS:
+Se me ha explicado que, al igual que con cualquier tratamiento intravenoso, existen riesgos, incluyendo pero no limitándose a:
 
-El paciente declara que ha sido informado de manera clara sobre el procedimiento, sus beneficios, riesgos y alternativas. Autoriza la realización del procedimiento de manera libre, voluntaria y sin coacción alguna.`;
+• Dolor, enrojecimiento, hematomas o edemas en el sitio de la venopunción.
+• Reacciones alérgicas a la sustancia suministrada.
+• Infecciones en el sitio de la inyección.
+• Desbalance electrolítico.
+• En el caso de la vitamina C puede agudizar los síntomas por cálculos renales.
+• En raras ocasiones genera reacciones respiratorias por desbalance en el pH sanguíneo.
+
+5. ALTERNATIVAS AL TRATAMIENTO:
+Se me han informado otras alternativas de tratamiento, incluyendo la suplementación oral de vitamina C o complejo B. Ajustes en la dieta y estilo de vida. Otros tratamientos recomendados por el médico.
+
+6. DECLARACIÓN DEL PACIENTE:
+Me han explicado y comprendo satisfactoriamente la esencia y el propósito de este procedimiento, así como los posibles riesgos y complicaciones, y las otras alternativas de tratamiento. He tenido la oportunidad de hacer todas las preguntas que desee y he recibido respuestas satisfactorias.
+
+7. CONSENTIMIENTO:
+Al firmar este apartado, SI doy mi consentimiento libre y voluntario para proceder con el tratamiento. Autorizo para la realización del procedimiento bajo la prescripción del ${ips.medico}.
+
+Nota: La IPS ${ips.nombre} (NIT ${ips.nit}) no realizará ningún tipo de devolución de dinero una vez iniciado el tratamiento.
+
+DISENTIMIENTO:
+En caso de tener dudas sobre el procedimiento o no estar de acuerdo con su realización, el paciente puede firmar su disentimiento y NO autoriza el procedimiento.`;
 }
 
 function makeTextoLaser(ips: IPSConfig) {
-  return `Yo, el (la) paciente abajo firmante, por medio del presente documento doy mi consentimiento para que se lleve a cabo el procedimiento de TERAPIA LÁSER ND:YAG PARA EL CONTROL DE VENAS VÁRICES, en las instalaciones de la IPS ${ips.nombre} (NIT ${ips.nit}), bajo la responsabilidad del ${ips.medico} (${ips.rm}).
+  return `CONSENTIMIENTO INFORMADO EN TERAPIA LÁSER PARA EL CONTROL DE VENAS VÁRICES
+${ips.nombre} — NIT ${ips.nit}
 
-INFORMACIÓN DEL PROCEDIMIENTO:
-La terapia láser con equipo Nd:YAG (longitud de onda 1064 nm) es un tratamiento utilizado para el control de venas varicosas y telangiectasias. El láser emite energía que es absorbida selectivamente por la hemoglobina del vaso, generando calor que colapsa y cierra la vena sin dañar el tejido circundante.
+Política de NO REUSO: "Por razones de bioseguridad y eficacia, todos los dispositivos médicos de un solo uso serán desechados adecuadamente después de su uso y no se reutilizarán bajo ninguna circunstancia."
 
-FOTOTIPOS DE PIEL (Fitzpatrick):
-• Fototipo I-II: Piel muy clara — parámetros menores.
-• Fototipo III-IV: Piel morena — parámetros intermedios.
-• Fototipo V-VI: Piel oscura — mayor precaución.
+1. OBJETIVO DEL PROCEDIMIENTO:
+Cerrar y eliminar las venas afectadas de manera segura y eficaz, mejorando tanto la apariencia estética como el alivio de síntomas relacionados, como dolor, hinchazón y sensación de pesadez en las piernas.
+
+2. DESCRIPCIÓN DEL PROCEDIMIENTO:
+El procedimiento de terapia láser para el tratamiento de venas várices es mínimamente invasivo y suele realizarse de manera ambulatoria. Tras evaluación previa y estudios como una ecografía DOPPLER, se limpia y desinfecta la zona a tratar.
+
+El láser genera calor, que provoca la contracción y el cierre de la vena afectada. Este calor daña específicamente la pared de la vena, causando su colapso. Una vez cerrada, la sangre es redirigida hacia venas sanas.
 
 BENEFICIOS ESPERADOS:
-• Reducción o eliminación de venas tratadas.
-• Procedimiento sin incisiones, mínimo tiempo de recuperación.
-• Mejora estética y funcional de los miembros inferiores.
+Mejora en la circulación sanguínea. Se experimenta una reducción significativa del dolor, la hinchazón, la sensación de pesadez y cansancio en las piernas. Ofrece una apariencia más uniforme y saludable de las piernas. Permite regresar a las actividades diarias rápidamente y con menor incomodidad.
 
-RIESGOS Y POSIBLES EFECTOS SECUNDARIOS:
-• Eritema (enrojecimiento) temporal en el área tratada. • Edema (inflamación) leve post-tratamiento.
-• Cambios pigmentarios temporales. • Costras o ampollas superficiales (raras, energías altas).
-• Dolor durante el procedimiento. • Resultado incompleto que requiera sesiones adicionales.
+3. RIESGOS, COMPLICACIONES Y EFECTOS SECUNDARIOS:
+• Puede haber sensibilidad o dolor en la zona tratada, aunque suele ser temporal.
+• Algunas personas pueden experimentar oscurecimiento o aclaramiento temporal de la piel.
+• Enrojecimiento e hinchazón leve por pocos días.
+• Aunque es raro, siempre existe un pequeño riesgo de infección en el sitio de la incisión.
+• En casos poco frecuentes, pueden formarse coágulos en las venas tratadas.
+• Eventualmente y sólo en algunos casos puede ocurrir daño en los nervios.
+• Quemaduras en la piel, si el láser no se utiliza correctamente.
+• Sensación de tirantez o tensión a lo largo de la vena tratada.
+• Ocasionalmente adormecimiento o sensación de hormigueo.
+• Formación de coágulos en venas profundas.
+• Daño a nervios adyacentes que puede provocar dolor o pérdida temporal de sensibilidad.
+• En algunos casos pueden desarrollar venas várices en el futuro si no se toman medidas preventivas.
 
-INSTRUCCIONES POST-TRATAMIENTO:
-• Aplicar compresas frías si hay sensación de calor excesivo.
-• Evitar exposición solar directa por 30 días. Usar protector solar FPS 50+.
-• No aplicar calor local (saunas, baños calientes) por 72 horas.
-• Usar medias de compresión según indicación médica.
+4. PIELES NO APTAS PARA ESTE TIPO DE PROCEDIMIENTO:
+Se debe evitar la terapia láser para venas várices en pieles con infecciones activas, con heridas abiertas o úlceras, extremadamente sensibles, con dermatitis severa, psoriasis activa o eczema, pieles con pigmentación muy oscura o pieles propensas a desarrollar queloides o cicatrices hipertróficas, pieles tatuadas y especialmente con tatuajes oscuros.
 
-El paciente declara haber leído y comprendido este documento en su totalidad y autoriza voluntariamente la realización del procedimiento descrito.`;
+5. ALTERNATIVAS AL TRATAMIENTO:
+Escleroterapia, ablación por radiofrecuencia (RFA), microflebectomía, cirugía tradicional (stripping venoso), medias de compresión y cambios en el estilo de vida para el alivio de los síntomas.
+
+6. RECOMENDACIONES POST PROCEDIMIENTO:
+Se deben utilizar medias de compresión, caminar continuamente, evitar levantar objetos pesados, realizar ejercicios extenuantes o permanecer demasiado tiempo de pie. Usar protector solar en la zona tratada. Asistir a las citas de control para evaluar la evolución del tratamiento y detectar posibles complicaciones a tiempo.
+
+7. DECLARACIÓN DE LA IPS:
+Aunque la terapia láser para el control de venas várices tiene un alto porcentaje de efectividad, su eficacia depende de varios factores, entre ellos la gravedad de las várices y el cumplimiento de los cuidados posteriores al procedimiento, los cuales dependen del paciente y se encuentran fuera de nuestro control directo. Por lo tanto la IPS ${ips.nombre} no puede asumir un porcentaje de efectividad en los resultados y NO realizará ningún tipo de devolución de dinero una vez iniciado el tratamiento.
+
+8. DECLARACIÓN DEL PACIENTE:
+Me han explicado y comprendo satisfactoriamente la esencia y el propósito de este procedimiento, así como los posibles riesgos y complicaciones, y las otras alternativas de tratamiento. He tenido la oportunidad de hacer todas las preguntas que desee y he recibido respuestas satisfactorias.
+
+Al firmar este apartado, SI doy mi consentimiento libre y voluntario para proceder con el tratamiento. Autorizo al ${ips.medico} (${ips.rm}) para la realización del procedimiento.
+
+9. DISENTIMIENTO:
+Tengo dudas sobre el procedimiento o no estoy de acuerdo con su realización. En ese caso, firmo mi disentimiento y NO autorizo el tratamiento.`;
 }
 
 const CHART_MENSUAL = [
