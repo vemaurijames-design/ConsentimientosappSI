@@ -2537,6 +2537,25 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSolicitud, setShowSolicitud] = useState(false);
+  const [solNombre, setSolNombre] = useState("");
+  const [solTel, setSolTel] = useState("");
+  const [solMensaje, setSolMensaje] = useState("");
+  const [solEnviado, setSolEnviado] = useState(false);
+
+  const handleSolicitud = (e: React.FormEvent) => {
+    e.preventDefault();
+    const adminWA = (import.meta as any).env?.VITE_WA_CLINICA ?? "573114048112";
+    const msg = encodeURIComponent(
+      `🔔 *SOLICITUD DE ACCESO — ${ips.nombre}*\n\n` +
+      `👤 *Nombre:* ${solNombre}\n` +
+      `📱 *Teléfono/Email:* ${solTel}\n` +
+      (solMensaje ? `💬 *Mensaje:* ${solMensaje}\n` : "") +
+      `\n_Enviado desde el login de CliniSign_`
+    );
+    window.open(`https://wa.me/${adminWA}?text=${msg}`, "_blank");
+    setSolEnviado(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(""); setLoading(true);
@@ -2610,10 +2629,56 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
             </button>
           </form>
           <div className="mt-5 pt-4 border-t border-border">
-            <div className="flex items-start gap-2 p-3 bg-[#EFF3FB] rounded-xl">
-              <Shield size={13} className="text-[#0D51D9] mt-0.5 shrink-0"/>
-              <p className="text-[10px] text-[#0D51D9] leading-relaxed">Contacte al <strong>Administrador</strong> para obtener sus credenciales de acceso al sistema.</p>
-            </div>
+            {!showSolicitud ? (
+              <button
+                type="button"
+                onClick={() => setShowSolicitud(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#0D51D9]/30 bg-[#EFF3FB] text-[#0D51D9] text-[11px] font-semibold hover:bg-[#0D51D9]/10 transition-colors"
+              >
+                <Phone size={13}/>
+                ¿No tienes acceso? Contactar Administrador
+              </button>
+            ) : solEnviado ? (
+              <div className="flex flex-col items-center gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                <CheckCircle size={22} className="text-emerald-600"/>
+                <p className="text-xs font-bold text-emerald-800">¡Solicitud enviada!</p>
+                <p className="text-[10px] text-emerald-700">El Administrador recibirá tu mensaje por WhatsApp y te contactará pronto.</p>
+                <button type="button" onClick={() => { setSolEnviado(false); setShowSolicitud(false); setSolNombre(""); setSolTel(""); setSolMensaje(""); }} className="mt-1 text-[10px] text-emerald-600 underline">Volver al login</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-foreground">Solicitar acceso al sistema</p>
+                  <button type="button" onClick={() => setShowSolicitud(false)} className="text-muted-foreground hover:text-foreground"><XCircle size={14}/></button>
+                </div>
+                <form onSubmit={handleSolicitud} className="space-y-2">
+                  <input
+                    required value={solNombre} onChange={e => setSolNombre(e.target.value)}
+                    placeholder="Tu nombre completo"
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"
+                  />
+                  <input
+                    required value={solTel} onChange={e => setSolTel(e.target.value)}
+                    placeholder="Teléfono o email de contacto"
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"
+                  />
+                  <textarea
+                    value={solMensaje} onChange={e => setSolMensaje(e.target.value)}
+                    placeholder="Mensaje (opcional) — ej: soy médico, necesito acceso"
+                    rows={2}
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40 resize-none"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#25D366] text-white text-[11px] font-bold hover:bg-[#1fbd5a] transition-colors"
+                  >
+                    <Phone size={13}/>
+                    Enviar solicitud por WhatsApp
+                  </button>
+                </form>
+                <p className="text-[9px] text-muted-foreground text-center">Se abrirá WhatsApp con tu mensaje listo para enviar al Administrador</p>
+              </div>
+            )}
           </div>
         </div>
         {/* Autoría y derechos reservados */}
