@@ -1,3 +1,0 @@
--- Inicialización de datos manejada por DataInitializer.java (Spring Boot ApplicationRunner)
--- El usuario administrador se crea automáticamente al arrancar si no existe.
--- Email: medfissaludintensa@gmail.com / Password: admin123456

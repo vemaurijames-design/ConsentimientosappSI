@@ -57,10 +57,10 @@ public class EmailService {
     }
 
     private void send(String to, String subject, String html, String pdfBase64, String radicado)
-            throws MessagingException {
+            throws MessagingException, java.io.UnsupportedEncodingException {
         MimeMessage msg = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
-        helper.setFrom(from, fromName);
+        helper.setFrom(new jakarta.mail.internet.InternetAddress(from, fromName, "UTF-8"));
         helper.setTo(to);
         helper.setSubject(subject);
         helper.setText(html, true);
