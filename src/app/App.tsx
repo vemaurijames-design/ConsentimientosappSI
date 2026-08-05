@@ -407,6 +407,41 @@ function genRadicado(tipo: TipoConsent, n: number) {
   const prefix = { escleroterapia: "ESC", sueroterapia: "SUE", laser: "LAS", paquete: "PAQ" }[tipo];
   return `${prefix}-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
 }
+
+/**
+ * Envía WhatsApp automático via backend Twilio.
+ * Si el backend no está disponible, abre wa.me como fallback silencioso.
+ */
+async function enviarWhatsAppAuto(numero: string, mensaje: string): Promise<void> {
+  const numLimpio = numero.replace(/[^0-9]/g, "");
+  if (!numLimpio) return;
+  try {
+    const resp = await fetch(`${API_BASE}/whatsapp/enviar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ numero: numLimpio, mensaje }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) throw new Error("backend WA error " + resp.status);
+  } catch {
+    // Fallback silencioso — el backend Twilio envía el mensaje principal al crear/aprobar/rechazar
+    // Este método es solo para reenvíos manuales
+  }
+}
+
+async function enviarSolicitudAcceso(nombre: string, contacto: string, mensaje: string): Promise<boolean> {
+  try {
+    const resp = await fetch(`${API_BASE}/whatsapp/solicitud-acceso`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre, contacto, mensaje }),
+      signal: AbortSignal.timeout(5000),
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
 function hoy() { return new Date().toISOString().split("T")[0]; }
 function fmtFecha(iso: string) {
   if (!iso) return "—";
@@ -1171,10 +1206,10 @@ function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClos
   const ips = useIPS();
   const d = record.datos as any;
   const pac = d.paciente as DatosPaciente;
-  const handleWA = () => {
-    const msg = encodeURIComponent(`*${ips.nombre}* — Consentimiento Informado\n\nEstimado/a ${pac?.nombre},\n\n📋 Radicado: ${record.radicado}\n📅 Fecha: ${fmtFecha(record.fecha)}\n✅ Estado: ${record.estado}\n\n_${ips.nombre} · NIT ${ips.nit}_`);
-    window.open(`https://wa.me/57${pac?.telefono?.replace(/[^0-9]/g,"")}?text=${msg}`, "_blank");
-    addToast("info", "Abriendo WhatsApp...");
+  const handleWA = async () => {
+    const msg = `*${ips.nombre}* — Consentimiento Informado\n\nEstimado/a ${pac?.nombre},\n\n📋 Radicado: ${record.radicado}\n📅 Fecha: ${fmtFecha(record.fecha)}\n✅ Estado: ${record.estado}\n\n_${ips.nombre} · NIT ${ips.nit}_`;
+    await enviarWhatsAppAuto(pac?.telefono ?? "", msg);
+    addToast("info", "📱 WhatsApp enviado automáticamente");
   };
   return (
     <div className="fixed inset-0 bg-black/70 z-[200] flex items-end sm:items-center justify-center sm:p-3">
@@ -1318,7 +1353,7 @@ function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, reco
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
         const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
-        window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${waMsg}`, "_blank"); addToast("info", "Abriendo WhatsApp...");
+        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
       }}/>
     </PDFWrapper>
   );
@@ -1420,7 +1455,7 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, record
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
         const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
-        window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${waMsg}`, "_blank"); addToast("info", "Abriendo WhatsApp...");
+        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
       }}/>
     </PDFWrapper>
   );
@@ -1521,7 +1556,7 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName, records }: {
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
         const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
-        window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${waMsg}`, "_blank"); addToast("info", "Abriendo WhatsApp...");
+        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
       }}/>
     </PDFWrapper>
   );
@@ -1606,7 +1641,7 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName, records }: 
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
         const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
-        window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${waMsg}`, "_blank"); addToast("info", "Abriendo WhatsApp...");
+        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
       }}/>
     </PDFWrapper>
   );
@@ -2543,17 +2578,21 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
   const [solMensaje, setSolMensaje] = useState("");
   const [solEnviado, setSolEnviado] = useState(false);
 
-  const handleSolicitud = (e: React.FormEvent) => {
+  const handleSolicitud = async (e: React.FormEvent) => {
     e.preventDefault();
-    const adminWA = (import.meta as any).env?.VITE_WA_CLINICA ?? "573114048112";
-    const msg = encodeURIComponent(
-      `🔔 *SOLICITUD DE ACCESO — ${ips.nombre}*\n\n` +
-      `👤 *Nombre:* ${solNombre}\n` +
-      `📱 *Teléfono/Email:* ${solTel}\n` +
-      (solMensaje ? `💬 *Mensaje:* ${solMensaje}\n` : "") +
-      `\n_Enviado desde el login de CliniSign_`
-    );
-    window.open(`https://wa.me/${adminWA}?text=${msg}`, "_blank");
+    // Enviar via backend Twilio (automático, sin abrir WhatsApp)
+    const ok = await enviarSolicitudAcceso(solNombre, solTel, solMensaje);
+    if (!ok) {
+      // Fallback: abrir WhatsApp web si el backend no responde
+      const adminWA = (import.meta as any).env?.VITE_WA_CLINICA ?? "573114048112";
+      const msg = encodeURIComponent(
+        `🔔 *SOLICITUD DE ACCESO — ${ips.nombre}*\n\n` +
+        `👤 *Nombre:* ${solNombre}\n📱 *Contacto:* ${solTel}\n` +
+        (solMensaje ? `💬 *Mensaje:* ${solMensaje}\n` : "") +
+        `\n_Enviado desde el login de CliniSign_`
+      );
+      window.open(`https://wa.me/${adminWA}?text=${msg}`, "_blank");
+    }
     setSolEnviado(true);
   };
 
@@ -2676,7 +2715,7 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
                     Enviar solicitud por WhatsApp
                   </button>
                 </form>
-                <p className="text-[9px] text-muted-foreground text-center">Se abrirá WhatsApp con tu mensaje listo para enviar al Administrador</p>
+                <p className="text-[9px] text-muted-foreground text-center">El mensaje se enviará automáticamente al Administrador por WhatsApp</p>
               </div>
             )}
           </div>
@@ -3176,7 +3215,7 @@ function HistorialPage({ records, onView, onDelete, onAprobar, onRechazar, addTo
                       {r.pendienteMedico && r.estado === "FIRMADO" && user.rol === "MÉDICO" && (
                         <button onClick={() => setAprobandoRecord(r)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 transition-colors"><CalendarCheck size={11}/> Visto Bueno</button>
                       )}
-                      <button onClick={() => { const d2 = r.datos as any; const p = d2.paciente; const msg = encodeURIComponent(`*${ips.nombre}* - Radicado: ${r.radicado}\nEstado: ${r.estado}`); window.open(`https://wa.me/57${(p?.telefono||"").replace(/[^0-9]/g,"")}?text=${msg}`,"_blank"); addToast("info","Abriendo WhatsApp..."); }}
+                      <button onClick={() => { const d2 = r.datos as any; const p = d2.paciente; const msg = `*${ips.nombre}* - Radicado: ${r.radicado}\nEstado: ${r.estado}`; enviarWhatsAppAuto(p?.telefono||"", msg); addToast("info","📱 WhatsApp enviado automáticamente"); }}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#25D366] text-white text-[10px] font-semibold hover:bg-[#20ba5a] transition-colors"><MessageSquare size={11}/> WA</button>
                       {user.rol === "ADMINISTRADOR" && (
                         <button onClick={() => { onDelete(r.id); addToast("info","Consentimiento anulado"); }} className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors" title="Anular (solo Administrador)"><Trash2 size={12}/></button>
@@ -3451,33 +3490,14 @@ export default function App() {
 
       // ── 5. Actualizar flags localmente ───────────────────────────────
       setRecords(prev => {
-        const updated = prev.map(x => x.id === rBase.id ? { ...x, emailEnviado, pdfUrl: pdfUrl ?? undefined } : x);
+        // WhatsApp lo envía el backend automáticamente al crear el consentimiento
+        const updated = prev.map(x => x.id === rBase.id
+          ? { ...x, emailEnviado, pdfUrl: pdfUrl ?? undefined, whatsappEnviado: !!telPac }
+          : x);
         localStorage.setItem("medfis_records", JSON.stringify(updated));
         return updated;
       });
-
-      // ── 6. WhatsApp ──────────────────────────────────────────────────
-      if (telPac) {
-        const tLabel = { escleroterapia:"Escleroterapia", sueroterapia:"Sueroterapia Vit C/B", laser:"Terapia Láser", paquete:"Paquete Integral" }[rBase.tipo] ?? rBase.tipo;
-        const waMsg = encodeURIComponent(
-          `✅ *${ips.nombre}* — Consentimiento Informado\n\n` +
-          `Estimado/a *${rBase.pacienteNombre}*,\n\n` +
-          `Su consentimiento ha sido registrado exitosamente.\n\n` +
-          `📋 *Procedimiento:* ${tLabel}\n` +
-          `🔖 *Radicado:* ${rBase.radicado}\n` +
-          `📅 *Fecha:* ${fmtFecha(rBase.fecha)}\n` +
-          `⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n` +
-          (pdfUrl ? `📄 *PDF:* ${pdfUrl}\n\n` : "") +
-          `📞 *Contacto clínica:* +57 311 404 8112\n_${ips.medico} · ${ips.rm}_`
-        );
-        window.open(`https://wa.me/57${telPac.replace(/[^0-9]/g,"")}?text=${waMsg}`, "_blank");
-        setRecords(prev => {
-          const updated = prev.map(x => x.id === rBase.id ? { ...x, whatsappEnviado: true } : x);
-          localStorage.setItem("medfis_records", JSON.stringify(updated));
-          return updated;
-        });
-        addToast("info", `📱 WhatsApp abierto para ${rBase.pacienteNombre}`);
-      }
+      if (telPac) addToast("info", `📱 WhatsApp enviado automáticamente a ${rBase.pacienteNombre}`);
     };
 
     pipeline();

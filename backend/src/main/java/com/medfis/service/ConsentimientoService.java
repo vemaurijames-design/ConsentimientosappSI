@@ -1,4 +1,5 @@
 package com.medfis.service;
+
 import com.medfis.dto.ConsentimientoRequest;
 import com.medfis.entity.Consentimiento;
 import com.medfis.entity.Consentimiento.EstadoConsent;
@@ -8,36 +9,58 @@ import com.medfis.repository.ConsentimientoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-@Service @RequiredArgsConstructor
+@Service
+@RequiredArgsConstructor
 public class ConsentimientoService {
+
     private final ConsentimientoRepository repo;
     private final NotificacionService notif;
+    private final WhatsAppService whatsApp;
 
-    public List<Consentimiento> listarTodos() { return repo.findAllByOrderByCreatedAtDesc(); }
-    public List<Consentimiento> pendientesMedico() { return repo.findByPendienteMedicoTrueAndEstadoOrderByCreatedAtDesc(EstadoConsent.FIRMADO); }
-    public Consentimiento buscar(UUID id) { return repo.findById(id).orElseThrow(() -> new RuntimeException("No encontrado: "+id)); }
-    public List<Consentimiento> buscar(String q) { return q==null||q.isBlank() ? repo.findAllByOrderByCreatedAtDesc() : repo.search(q); }
+    public List<Consentimiento> listarTodos()     { return repo.findAllByOrderByCreatedAtDesc(); }
+    public List<Consentimiento> pendientesMedico(){ return repo.findByPendienteMedicoTrueAndEstadoOrderByCreatedAtDesc(EstadoConsent.FIRMADO); }
+    public Consentimiento buscar(UUID id)          { return repo.findById(id).orElseThrow(() -> new RuntimeException("No encontrado: " + id)); }
+    public List<Consentimiento> buscar(String q)   { return q == null || q.isBlank() ? repo.findAllByOrderByCreatedAtDesc() : repo.search(q); }
 
     @Transactional
     public Consentimiento crear(ConsentimientoRequest req, String creadoPor) {
         Consentimiento c = new Consentimiento();
         TipoConsent tipo = TipoConsent.valueOf(req.getTipo().toLowerCase());
-        c.setTipo(tipo); c.setRadicado(genRadicado(tipo));
-        c.setFecha(LocalDate.now()); c.setPacienteNombre(req.getPacienteNombre());
-        c.setPacienteDoc(req.getPacienteDoc()); c.setPacienteTel(req.getPacienteTel());
-        c.setEstado(EstadoConsent.FIRMADO); c.setPendienteMedico(true);
+        c.setTipo(tipo);
+        c.setRadicado(genRadicado(tipo));
+        c.setFecha(LocalDate.now());
+        c.setPacienteNombre(req.getPacienteNombre());
+        c.setPacienteDoc(req.getPacienteDoc());
+        c.setPacienteTel(req.getPacienteTel());
+        c.setEstado(EstadoConsent.FIRMADO);
+        c.setPendienteMedico(true);
         c.setCreadoPor(creadoPor);
-        if (req.getEmailPaciente() != null && !req.getEmailPaciente().isBlank()) c.setEmailPaciente(req.getEmailPaciente());
-        if (req.getPdfUrl() != null && !req.getPdfUrl().isBlank()) c.setPdfUrl(req.getPdfUrl());
+        if (req.getEmailPaciente() != null && !req.getEmailPaciente().isBlank())
+            c.setEmailPaciente(req.getEmailPaciente());
+        if (req.getPdfUrl() != null && !req.getPdfUrl().isBlank())
+            c.setPdfUrl(req.getPdfUrl());
         c.setDatos(req.getDatos());
+
         Consentimiento saved = repo.save(c);
-        String base = req.getPacienteNombre()+" · "+req.getTipo()+" · "+saved.getRadicado();
-        notif.crearYEmitir(Notificacion.TipoNotif.NUEVO_CONSENTIMIENTO, "Consentimiento pendiente de Visto Bueno", base+". Revise y apruebe.", saved.getId(), "MEDICO");
-        notif.crearYEmitir(Notificacion.TipoNotif.NUEVO_CONSENTIMIENTO, "Nuevo consentimiento — "+req.getPacienteNombre(), "Por: "+creadoPor+" · "+saved.getRadicado()+" · Pendiente aprobación médica.", saved.getId(), "ADMINISTRADOR");
+
+        // ── Notificaciones internas ──────────────────────────────────────────
+        String base = req.getPacienteNombre() + " · " + req.getTipo() + " · " + saved.getRadicado();
+        notif.crearYEmitir(Notificacion.TipoNotif.NUEVO_CONSENTIMIENTO,
+                "Consentimiento pendiente de Visto Bueno",
+                base + ". Revise y apruebe.", saved.getId(), "MEDICO");
+        notif.crearYEmitir(Notificacion.TipoNotif.NUEVO_CONSENTIMIENTO,
+                "Nuevo consentimiento — " + req.getPacienteNombre(),
+                "Por: " + creadoPor + " · " + saved.getRadicado() + " · Pendiente aprobación médica.",
+                saved.getId(), "ADMINISTRADOR");
+
+        // ── WhatsApp automático al paciente ──────────────────────────────────
+        whatsApp.notificarConsentimientoCreado(saved);
+
         return saved;
     }
 
@@ -51,27 +74,50 @@ public class ConsentimientoService {
     @Transactional
     public Consentimiento aprobar(UUID id, String medico) {
         Consentimiento c = buscar(id);
-        if (c.getEstado() != EstadoConsent.FIRMADO) throw new RuntimeException("No está en estado FIRMADO");
-        c.setEstado(EstadoConsent.APROBADO); c.setPendienteMedico(false);
-        c.setAprobadoPor(medico); c.setFechaAprobacion(LocalDate.now());
+        if (c.getEstado() != EstadoConsent.FIRMADO)
+            throw new RuntimeException("No está en estado FIRMADO");
+        c.setEstado(EstadoConsent.APROBADO);
+        c.setPendienteMedico(false);
+        c.setAprobadoPor(medico);
+        c.setFechaAprobacion(LocalDate.now());
         Consentimiento saved = repo.save(c);
-        notif.crearYEmitir(Notificacion.TipoNotif.APROBADO, "Visto Bueno — Cita habilitada", c.getPacienteNombre()+" — "+c.getRadicado()+" aprobado por "+medico, saved.getId(), "TODOS");
+
+        notif.crearYEmitir(Notificacion.TipoNotif.APROBADO,
+                "Visto Bueno — Cita habilitada",
+                c.getPacienteNombre() + " — " + c.getRadicado() + " aprobado por " + medico,
+                saved.getId(), "TODOS");
+
+        // ── WhatsApp automático al paciente ──────────────────────────────────
+        whatsApp.notificarAprobado(saved);
+
         return saved;
     }
 
     @Transactional
     public Consentimiento rechazar(UUID id, String motivo, String medico) {
         Consentimiento c = buscar(id);
-        c.setEstado(EstadoConsent.RECHAZADO); c.setPendienteMedico(false);
-        c.setMotivoRechazo(motivo); c.setAprobadoPor(medico);
+        c.setEstado(EstadoConsent.RECHAZADO);
+        c.setPendienteMedico(false);
+        c.setMotivoRechazo(motivo);
+        c.setAprobadoPor(medico);
         Consentimiento saved = repo.save(c);
-        notif.crearYEmitir(Notificacion.TipoNotif.RECHAZADO, "Consentimiento rechazado", c.getPacienteNombre()+" — "+c.getRadicado()+". Motivo: "+motivo, saved.getId(), "TODOS");
+
+        notif.crearYEmitir(Notificacion.TipoNotif.RECHAZADO,
+                "Consentimiento rechazado",
+                c.getPacienteNombre() + " — " + c.getRadicado() + ". Motivo: " + motivo,
+                saved.getId(), "TODOS");
+
+        // ── WhatsApp automático al paciente ──────────────────────────────────
+        whatsApp.notificarRechazado(saved);
+
         return saved;
     }
 
     @Transactional
     public Consentimiento anular(UUID id) {
-        Consentimiento c = buscar(id); c.setEstado(EstadoConsent.ANULADO); c.setPendienteMedico(false);
+        Consentimiento c = buscar(id);
+        c.setEstado(EstadoConsent.ANULADO);
+        c.setPendienteMedico(false);
         return repo.save(c);
     }
 
@@ -79,7 +125,8 @@ public class ConsentimientoService {
     public void marcarEmailEnviado(UUID id, String emailPaciente) {
         Consentimiento c = buscar(id);
         c.setEmailEnviado(true);
-        if (emailPaciente != null && !emailPaciente.isBlank()) c.setEmailPaciente(emailPaciente);
+        if (emailPaciente != null && !emailPaciente.isBlank())
+            c.setEmailPaciente(emailPaciente);
         repo.save(c);
     }
 
@@ -89,9 +136,14 @@ public class ConsentimientoService {
     public long countTotal()     { return repo.count(); }
 
     private String genRadicado(TipoConsent tipo) {
-        String p = switch(tipo) { case escleroterapia->"ESC"; case sueroterapia->"SUE"; case laser->"LAS"; default->"PAQ"; };
-        int year = LocalDate.now().getYear();
+        String p = switch (tipo) {
+            case escleroterapia -> "ESC";
+            case sueroterapia   -> "SUE";
+            case laser          -> "LAS";
+            default             -> "PAQ";
+        };
+        int year  = LocalDate.now().getYear();
         long count = repo.countByTipoAndYear(tipo, year) + 1;
-        return p+"-"+year+"-"+String.format("%04d", count);
+        return p + "-" + year + "-" + String.format("%04d", count);
     }
 }
