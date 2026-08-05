@@ -2773,15 +2773,32 @@ function buildPdfParamsForRecord(r: ConsentRecord, ips: IPSConfig) {
     laser:          makeTextoLaser(ips),
     paquete:        makeTextoEscleroterapia(ips) + "\n\n" + makeTextoSueroterapia(ips) + "\n\n" + makeTextoLaser(ips),
   };
-  // Resolve primary doctor firma (from doctores list or legacy field)
   const primerDoctor = ips.doctores?.find(doc => doc.activo);
   const firmaDoctor = primerDoctor?.firma ?? ips.firmaDoctor ?? undefined;
   const firmaAprobador = r.estado === "APROBADO" ? resolveAprobadorFirma(r.aprobadoPor, ips) : undefined;
+
+  // Prescripción (sueroterapia / paquete)
+  const prescripcion = (d?.dosis_vitC || d?.dosis_compB) ? {
+    dosis_vitC: d.dosis_vitC ?? "",
+    dosis_compB: d.dosis_compB ?? "",
+    via: d.viaPrescripcion ?? "Intravenosa",
+    trazabilidad: d.trazabilidad ?? {},
+  } : undefined;
+
+  // Parámetros láser
+  const parametrosLaser = (d?.parametros && Array.isArray(d.parametros) && d.parametros.length > 0)
+    ? d.parametros : undefined;
+
+  // Cuestionario (escleroterapia / paquete)
+  const cuestionario = (d?.cuestionario && Object.keys(d.cuestionario).length > 0)
+    ? d.cuestionario : undefined;
+
   return {
     radicado: r.radicado, tipo: r.tipo, fecha: fmtFecha(r.fecha),
     pacienteNombre: r.pacienteNombre, pacienteDoc: r.pacienteDoc,
     pacienteTel: r.pacienteTel, pacienteEmail: d?.paciente?.email ?? undefined,
-    creadoPor: r.creadoPor, textoConsent: textoMap[r.tipo] ?? "",
+    creadoPor: r.creadoPor,
+    textoConsent: textoMap[r.tipo] ?? "",
     ipsNombre: ips.nombre, ipsNit: ips.nit, ipsMedico: ips.medico, ipsRm: ips.rm, ipsCiudad: ips.ciudad,
     firmaConsentimiento: d?.firmaConsentimiento ?? undefined,
     firmaDoctor,
@@ -2796,7 +2813,13 @@ function buildPdfParamsForRecord(r: ConsentRecord, ips: IPSConfig) {
       contactoParentesco: d.paciente.contactoParentesco,
       contactoTelefono: d.paciente.contactoTelefono,
     } : undefined,
-    vitales: d?.vitales ?? undefined,
+    vitales: d?.vitales ? {
+      ...d.vitales,
+      frecuenciaRespiratoria: d.vitales.frecuenciaRespiratoria ?? "",
+    } : undefined,
+    cuestionario,
+    prescripcion,
+    parametrosLaser,
   };
 }
 
@@ -3376,7 +3399,14 @@ export default function App() {
             contactoParentesco: rd.paciente.contactoParentesco,
             contactoTelefono: rd.paciente.contactoTelefono,
           } : undefined,
-          vitales: rd?.vitales ?? undefined,
+          vitales: rd?.vitales ? { ...rd.vitales } : undefined,
+          cuestionario: rd?.cuestionario ?? undefined,
+          prescripcion: (rd?.dosis_vitC || rd?.dosis_compB) ? {
+            dosis_vitC: rd.dosis_vitC, dosis_compB: rd.dosis_compB,
+            via: rd.viaPrescripcion, trazabilidad: rd.trazabilidad,
+          } : undefined,
+          parametrosLaser: (rd?.parametros && Array.isArray(rd.parametros) && rd.parametros.length > 0)
+            ? rd.parametros : undefined,
         });
 
         // ── 3. Subir PDF a Supabase Storage ─────────────────────────────
