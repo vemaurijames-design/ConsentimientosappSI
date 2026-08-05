@@ -56,7 +56,11 @@ const apiService = {
 };
 
 // ─── IPS CONFIG ───────────────────────────────────────────────────────────────
-interface IPSConfig { nombre: string; nit: string; medico: string; rm: string; ciudad: string; }
+interface IPSConfig {
+  nombre: string; nit: string; medico: string; rm: string; ciudad: string;
+  /** Data URL (base64) de la firma/sello escaneado del médico */
+  firmaDoctor?: string;
+}
 
 const DEFAULT_IPS: IPSConfig = {
   nombre: "Med&Fis", nit: "901102930",
@@ -284,19 +288,47 @@ Al firmar este apartado, SI doy mi consentimiento libre y voluntario para proced
 Tengo dudas sobre el procedimiento o no estoy de acuerdo con su realización. En ese caso, firmo mi disentimiento y NO autorizo el tratamiento.`;
 }
 
-const CHART_MENSUAL = [
-  { mes: "Feb", escler: 8, suero: 5, laser: 3 },
-  { mes: "Mar", escler: 12, suero: 7, laser: 5 },
-  { mes: "Abr", escler: 10, suero: 9, laser: 4 },
-  { mes: "May", escler: 15, suero: 11, laser: 7 },
-  { mes: "Jun", escler: 18, suero: 8, laser: 9 },
-  { mes: "Jul", escler: 22, suero: 13, laser: 11 },
-];
-const CHART_TIPOS = [
-  { name: "Escleroterapia", value: 46, color: "#031CA6" },
-  { name: "Sueroterapia",   value: 29, color: "#0D51D9" },
-  { name: "Láser Várices",  value: 25, color: "#0D8BD9" },
-];
+/** Calcula datos de gráfica mensual a partir de los registros reales */
+function calcChartMensual(records: ConsentRecord[]) {
+  const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const now = new Date();
+  const result = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mes = MESES[d.getMonth()];
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const rs = records.filter(r => {
+      const rd = new Date(r.fecha);
+      return rd.getFullYear() === year && rd.getMonth() === month && r.estado !== "ANULADO";
+    });
+    result.push({
+      mes,
+      escler: rs.filter(r => r.tipo === "escleroterapia").length,
+      suero:  rs.filter(r => r.tipo === "sueroterapia").length,
+      laser:  rs.filter(r => r.tipo === "laser").length,
+      paquete:rs.filter(r => r.tipo === "paquete").length,
+    });
+  }
+  return result;
+}
+
+/** Calcula distribución por tipo para el PieChart */
+function calcChartTipos(records: ConsentRecord[]) {
+  const activos = records.filter(r => r.estado !== "ANULADO");
+  const counts = {
+    escleroterapia: activos.filter(r => r.tipo === "escleroterapia").length,
+    sueroterapia:   activos.filter(r => r.tipo === "sueroterapia").length,
+    laser:          activos.filter(r => r.tipo === "laser").length,
+    paquete:        activos.filter(r => r.tipo === "paquete").length,
+  };
+  return [
+    { name: "Escleroterapia", value: counts.escleroterapia, color: "#031CA6" },
+    { name: "Sueroterapia",   value: counts.sueroterapia,   color: "#0D51D9" },
+    { name: "Láser Várices",  value: counts.laser,          color: "#0D8BD9" },
+    { name: "Paquete",        value: counts.paquete,        color: "#4F46E5" },
+  ].filter(x => x.value > 0);
+}
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 function genRadicado(tipo: TipoConsent, n: number) {
@@ -801,10 +833,66 @@ function StepFirmaFinal({ consentido, onConsentido, firma, onFirma, nombrePacien
 // ═══════════════════════════════════════════════════════════════════════════════
 // PDF VIEWER
 // ═══════════════════════════════════════════════════════════════════════════════
-function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
+function PDFViewer({ record, onSendEmail, onSendWhatsApp, addToast = () => {} }: {
   record: ConsentRecord; onSendEmail: () => void; onSendWhatsApp: () => void;
+  addToast?: (t: "success"|"error"|"info"|"warning", m: string) => void;
 }) {
   const ips = useIPS();
+
+  const buildTexto = () => {
+    const textoMap: Record<string, string> = {
+      escleroterapia: makeTextoEscleroterapia(ips),
+      sueroterapia:   makeTextoSueroterapia(ips),
+      laser:          makeTextoLaser(ips),
+      paquete:        makeTextoEscleroterapia(ips) + "\n\n" + makeTextoSueroterapia(ips) + "\n\n" + makeTextoLaser(ips),
+    };
+    return textoMap[record.tipo] ?? "";
+  };
+
+  const buildPdfParams = () => {
+    const d = record.datos as any;
+    return {
+      radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha),
+      pacienteNombre: record.pacienteNombre, pacienteDoc: record.pacienteDoc,
+      pacienteTel: record.pacienteTel, pacienteEmail: d?.paciente?.email ?? undefined,
+      creadoPor: record.creadoPor, textoConsent: buildTexto(), ipsNombre: ips.nombre,
+      ipsNit: ips.nit, ipsMedico: ips.medico, ipsRm: ips.rm, ipsCiudad: ips.ciudad,
+      firmaConsentimiento: d?.firmaConsentimiento ?? undefined,
+      firmaDoctor: ips.firmaDoctor ?? undefined,
+      datosPaciente: d?.paciente ? {
+        direccion: d.paciente.direccion, ciudad: d.paciente.ciudad,
+        fechaNacimiento: d.paciente.fechaNacimiento,
+        contactoNombre: d.paciente.contactoNombre,
+        contactoParentesco: d.paciente.contactoParentesco,
+        contactoTelefono: d.paciente.contactoTelefono,
+      } : undefined,
+      vitales: d?.vitales ?? undefined,
+    };
+  };
+
+  const handleDownload = async () => {
+    try {
+      addToast("info", "Generando PDF…");
+      const blob = await generarPDFConsentimiento(buildPdfParams());
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `Consentimiento_${record.radicado}.pdf`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      addToast("success", "PDF descargado correctamente");
+    } catch { addToast("error", "Error generando el PDF"); }
+  };
+
+  const handlePrint = async () => {
+    try {
+      addToast("info", "Preparando impresión…");
+      const blob = await generarPDFConsentimiento(buildPdfParams());
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank");
+      if (win) { win.onload = () => { win.print(); setTimeout(() => URL.revokeObjectURL(url), 5000); }; }
+      else { addToast("warning", "Habilite ventanas emergentes para imprimir"); }
+    } catch { addToast("error", "Error preparando impresión"); }
+  };
   const d = record.datos as any;
   const pac = d.paciente as DatosPaciente;
   const vitales = d.vitales as typeof VITALES_EMPTY;
@@ -996,8 +1084,8 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp }: {
         <button onClick={onSendEmail} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"><Mail size={16}/> Email</button>
       </div>
       <div className="flex gap-2 mt-2">
-        <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted"><Printer size={14}/> Imprimir</button>
-        <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted"><Download size={14}/> Descargar PDF</button>
+        <button onClick={handlePrint} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted"><Printer size={14}/> Imprimir</button>
+        <button onClick={handleDownload} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted"><Download size={14}/> Descargar PDF</button>
       </div>
     </div>
   );
@@ -1023,7 +1111,14 @@ function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClos
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"><X size={16} className="text-muted-foreground"/></button>
         </div>
         <div className="overflow-y-auto flex-1 p-3 sm:p-4">
-          <PDFViewer record={record} onSendEmail={() => addToast("success", `Email enviado`)} onSendWhatsApp={handleWA}/>
+          <PDFViewer record={record} addToast={addToast} onSendWhatsApp={handleWA} onSendEmail={async () => {
+            addToast("info", "Enviando email…");
+            const datosEmail = { emailPaciente: pac?.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
+            const [okP, okC] = await Promise.allSettled([pac?.email ? enviarEmailPaciente(datosEmail) : Promise.resolve(false), enviarEmailClinica(datosEmail)]);
+            const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
+            if (sent) addToast("success", "Email enviado correctamente");
+            else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+          }}/>
         </div>
       </div>
     </div>
@@ -1138,7 +1233,17 @@ function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, reco
 
   if (step === 6 && record) return (
     <PDFWrapper onCancel={onCancel} titulo="Firmado — Médico notificado para Visto Bueno">
-      <PDFViewer record={record} onSendEmail={() => addToast("success", "Email enviado")} onSendWhatsApp={() => { window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${encodeURIComponent(`*${ips.nombre}* - Radicado: ${record.radicado}`)}`, "_blank"); addToast("info", "Abriendo WhatsApp..."); }}/>
+      <PDFViewer record={record} addToast={addToast} onSendEmail={async () => {
+        addToast("info", "Enviando email…");
+        const datos = { emailPaciente: pac.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
+        const [okP, okC] = await Promise.allSettled([pac.email ? enviarEmailPaciente(datos) : Promise.resolve(false), enviarEmailClinica(datos)]);
+        const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
+        if (sent) addToast("success", "Email enviado correctamente"); else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+      }} onSendWhatsApp={() => {
+        const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
+        window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${waMsg}`, "_blank"); addToast("info", "Abriendo WhatsApp...");
+      }}/>
     </PDFWrapper>
   );
 
@@ -1230,7 +1335,17 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, record
 
   if (step === 5 && record) return (
     <PDFWrapper onCancel={onCancel} titulo="Firmado — Médico notificado para Visto Bueno">
-      <PDFViewer record={record} onSendEmail={() => addToast("success","Email enviado")} onSendWhatsApp={() => { window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${encodeURIComponent(`*${ips.nombre}* - Radicado: ${record.radicado}`)}`, "_blank"); addToast("info","Abriendo WhatsApp..."); }}/>
+      <PDFViewer record={record} addToast={addToast} onSendEmail={async () => {
+        addToast("info", "Enviando email…");
+        const datos = { emailPaciente: pac.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
+        const [okP, okC] = await Promise.allSettled([pac.email ? enviarEmailPaciente(datos) : Promise.resolve(false), enviarEmailClinica(datos)]);
+        const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
+        if (sent) addToast("success", "Email enviado correctamente"); else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+      }} onSendWhatsApp={() => {
+        const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
+        window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${waMsg}`, "_blank"); addToast("info", "Abriendo WhatsApp...");
+      }}/>
     </PDFWrapper>
   );
 
@@ -1321,7 +1436,17 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName, records }: {
 
   if (step === 5 && record) return (
     <PDFWrapper onCancel={onCancel} titulo="Firmado — Médico notificado para Visto Bueno">
-      <PDFViewer record={record} onSendEmail={() => addToast("success","Email enviado")} onSendWhatsApp={() => { window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${encodeURIComponent(`*${ips.nombre}* - Radicado: ${record.radicado}`)}`, "_blank"); addToast("info","Abriendo WhatsApp..."); }}/>
+      <PDFViewer record={record} addToast={addToast} onSendEmail={async () => {
+        addToast("info", "Enviando email…");
+        const datos = { emailPaciente: pac.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
+        const [okP, okC] = await Promise.allSettled([pac.email ? enviarEmailPaciente(datos) : Promise.resolve(false), enviarEmailClinica(datos)]);
+        const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
+        if (sent) addToast("success", "Email enviado correctamente"); else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+      }} onSendWhatsApp={() => {
+        const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
+        window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${waMsg}`, "_blank"); addToast("info", "Abriendo WhatsApp...");
+      }}/>
     </PDFWrapper>
   );
 
@@ -1396,7 +1521,17 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName, records }: 
 
   if (step === 8 && record) return (
     <PDFWrapper onCancel={onCancel} titulo="Paquete Completo — Médico notificado para Visto Bueno">
-      <PDFViewer record={record} onSendEmail={() => addToast("success","Email enviado")} onSendWhatsApp={() => { window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${encodeURIComponent(`*${ips.nombre}* - Radicado: ${record.radicado}`)}`, "_blank"); addToast("info","Abriendo WhatsApp..."); }}/>
+      <PDFViewer record={record} addToast={addToast} onSendEmail={async () => {
+        addToast("info", "Enviando email…");
+        const datos = { emailPaciente: pac.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
+        const [okP, okC] = await Promise.allSettled([pac.email ? enviarEmailPaciente(datos) : Promise.resolve(false), enviarEmailClinica(datos)]);
+        const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
+        if (sent) addToast("success", "Email enviado correctamente"); else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+      }} onSendWhatsApp={() => {
+        const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
+        window.open(`https://wa.me/57${pac.telefono.replace(/\D/g,"")}?text=${waMsg}`, "_blank"); addToast("info", "Abriendo WhatsApp...");
+      }}/>
     </PDFWrapper>
   );
 
@@ -2043,6 +2178,17 @@ function AdminChangePwdModal({ user, onSave, onClose }: { user: Usuario; onSave:
 function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c: IPSConfig) => void; onClose: () => void }) {
   const [form, setForm] = useState<IPSConfig>({ ...ips });
   const s = (k: keyof IPSConfig) => (v: string) => setForm(f => ({ ...f, [k]: v }));
+  const firmaInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFirmaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { alert("La imagen debe pesar menos de 500 KB"); return; }
+    const reader = new FileReader();
+    reader.onloadend = () => setForm(f => ({ ...f, firmaDoctor: reader.result as string }));
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 z-[300] flex items-end sm:items-center justify-center sm:p-4">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
@@ -2057,6 +2203,31 @@ function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c
           <Field label="Médico Responsable" value={form.medico} onChange={s("medico")} placeholder="Dr. Nombre Apellido" icon={<Stethoscope size={13}/>} required/>
           <Field label="Registro Médico (RM)" value={form.rm} onChange={s("rm")} placeholder="RM 0000000"/>
           <Field label="Ciudad / Sede" value={form.ciudad} onChange={s("ciudad")} placeholder="Ciudad, País" icon={<MapPin size={13}/>}/>
+
+          {/* Firma / Sello del médico */}
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Firma / Sello del Médico (PDF)</p>
+            <div className="flex items-start gap-3">
+              <div className="flex-1 border-2 border-dashed border-border rounded-xl p-3 flex flex-col items-center justify-center gap-2 min-h-[80px] bg-gray-50 cursor-pointer hover:border-[#0D51D9]/50 transition-colors" onClick={() => firmaInputRef.current?.click()}>
+                {form.firmaDoctor ? (
+                  <img src={form.firmaDoctor} alt="Firma del médico" className="max-h-16 object-contain"/>
+                ) : (
+                  <>
+                    <Pen size={18} className="text-muted-foreground"/>
+                    <p className="text-[10px] text-muted-foreground text-center">Clic para subir firma escaneada o sello<br/><span className="text-[9px]">JPG/PNG · max 500 KB</span></p>
+                  </>
+                )}
+              </div>
+              {form.firmaDoctor && (
+                <button onClick={() => setForm(f => ({ ...f, firmaDoctor: undefined }))} className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors" title="Eliminar firma">
+                  <X size={14}/>
+                </button>
+              )}
+            </div>
+            <input ref={firmaInputRef} type="file" accept="image/png,image/jpeg,image/jpg" className="hidden" onChange={handleFirmaUpload}/>
+            <p className="text-[9px] text-muted-foreground mt-1.5">La imagen aparecerá en la sección de firmas de todos los PDFs generados.</p>
+          </div>
+
           <div className="p-3 bg-[#EFF3FB] rounded-xl text-[10px] text-muted-foreground space-y-0.5">
             <p className="font-bold text-foreground text-xs mb-1">Vista previa del encabezado:</p>
             <p className="font-bold text-[#0D51D9]">{form.nombre || "Nombre IPS"}</p>
@@ -2082,18 +2253,51 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(""); setLoading(true);
-    setTimeout(() => {
-      const user = usuarios.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password && u.activo);
-      if (user) onLogin(user);
-      else {
-        const exists = usuarios.find(u => u.email.toLowerCase() === email.toLowerCase());
-        if (exists && !exists.activo) setError("Este usuario está inactivo. Contacte al Administrador.");
-        else setError("Credenciales incorrectas. Verifique su email y contraseña.");
+
+    // 1. Intentar autenticación con backend Spring Boot
+    try {
+      const resp = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        signal: AbortSignal.timeout(4000),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        apiService.setToken(data.token ?? "");
+        const u: Usuario = {
+          id:        String(data.id ?? data.usuario?.id ?? "1"),
+          nombre:    data.nombre ?? data.usuario?.nombre ?? email,
+          email:     data.email ?? email,
+          rol:       (data.rol ?? data.usuario?.rol ?? "AUXILIAR") as RolUsuario,
+          password:  "",
+          activo:    true,
+          createdAt: new Date().toISOString().split("T")[0],
+        };
+        setLoading(false);
+        onLogin(u);
+        return;
       }
-      setLoading(false);
-    }, 600);
+      if (resp.status === 401 || resp.status === 403) {
+        setError("Credenciales incorrectas en el servidor. Verifique email y contraseña.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // Backend no disponible — usar autenticación local
+    }
+
+    // 2. Fallback: autenticación local (sin backend)
+    const user = usuarios.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password && u.activo);
+    if (user) { onLogin(user); }
+    else {
+      const exists = usuarios.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (exists && !exists.activo) setError("Este usuario está inactivo. Contacte al Administrador.");
+      else setError("Credenciales incorrectas. Verifique su email y contraseña.");
+    }
+    setLoading(false);
   };
 
   return (
@@ -2210,10 +2414,19 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
   addToast: (t: "success"|"error"|"info"|"warning", m: string) => void;
 }) {
   const [aprobandoRecord, setAprobandoRecord] = useState<ConsentRecord | null>(null);
+  const activos   = records.filter(r => r.estado !== "ANULADO");
   const firmados  = records.filter(r => r.estado === "FIRMADO").length;
   const aprobados = records.filter(r => r.estado === "APROBADO").length;
+  const rechazados= records.filter(r => r.estado === "RECHAZADO").length;
   const pendientesAprobacion = records.filter(r => r.pendienteMedico && r.estado === "FIRMADO");
   const hoyCount  = records.filter(r => r.fecha === hoy()).length;
+  const chartMensual = calcChartMensual(records);
+  const chartTipos   = calcChartTipos(records);
+  // Contadores por tipo
+  const cntEsc = activos.filter(r => r.tipo === "escleroterapia").length;
+  const cntSue = activos.filter(r => r.tipo === "sueroterapia").length;
+  const cntLas = activos.filter(r => r.tipo === "laser").length;
+  const cntPaq = activos.filter(r => r.tipo === "paquete").length;
 
   return (
     <div className="space-y-6">
@@ -2271,10 +2484,10 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label:"Total",          value: records.length,              icon:<FileText size={18}/>,    color:"text-[#0D51D9]", bg:"bg-[#0D51D9]/10" },
-          { label:"Firmados",       value: firmados,                    icon:<Clock size={18}/>,        color:"text-blue-600",  bg:"bg-blue-50"      },
+          { label:"Total Activos",  value: activos.length,              icon:<FileText size={18}/>,    color:"text-[#0D51D9]", bg:"bg-[#0D51D9]/10" },
+          { label:"Pendientes",     value: firmados,                    icon:<Clock size={18}/>,        color:"text-amber-600", bg:"bg-amber-50"      },
           { label:"Aprobados",      value: aprobados,                   icon:<CheckCircle size={18}/>,  color:"text-emerald-600",bg:"bg-emerald-50"   },
-          { label:"Hoy",            value: hoyCount,                    icon:<Activity size={18}/>,     color:"text-amber-600", bg:"bg-amber-50"      },
+          { label:"Hoy",            value: hoyCount,                    icon:<Activity size={18}/>,     color:"text-[#0D8BD9]", bg:"bg-[#0D8BD9]/10"  },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-2xl p-4 border border-border">
             <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center ${s.color} mb-3`}>{s.icon}</div>
@@ -2329,40 +2542,92 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
         </div>
       )}
 
-      {/* Charts */}
-      {records.length >= 2 && (
+      {/* Estadísticas por tipo */}
+      {activos.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Consentimientos por Tipo</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label:"Escleroterapia", cnt:cntEsc, color:"text-[#0D51D9]", bg:"bg-[#0D51D9]/8 border-[#0D51D9]/20", icon:<Syringe size={14}/> },
+              { label:"Sueroterapia",   cnt:cntSue, color:"text-[#0D8BD9]", bg:"bg-[#0D8BD9]/8 border-[#0D8BD9]/20", icon:<Droplets size={14}/> },
+              { label:"Láser",          cnt:cntLas, color:"text-amber-600", bg:"bg-amber-50 border-amber-200",        icon:<Zap size={14}/> },
+              { label:"Paquete",        cnt:cntPaq, color:"text-purple-600",bg:"bg-purple-50 border-purple-200",      icon:<Package size={14}/> },
+            ].map(x => (
+              <div key={x.label} className={`rounded-2xl border p-3 ${x.bg}`}>
+                <div className={`flex items-center gap-1.5 mb-1 ${x.color}`}>{x.icon}<p className="text-[10px] font-bold">{x.label}</p></div>
+                <p className={`text-2xl font-black ${x.color}`}>{x.cnt}</p>
+                <p className="text-[9px] text-muted-foreground">consentimiento{x.cnt!==1?"s":""}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Estado de consentimientos */}
+      {activos.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Estado General</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-center">
+              <p className="text-2xl font-black text-amber-600">{firmados}</p>
+              <p className="text-[10px] text-amber-700 font-semibold">Pendientes</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+              <p className="text-2xl font-black text-emerald-600">{aprobados}</p>
+              <p className="text-[10px] text-emerald-700 font-semibold">Aprobados</p>
+            </div>
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-center">
+              <p className="text-2xl font-black text-red-600">{rechazados}</p>
+              <p className="text-[10px] text-red-700 font-semibold">Rechazados</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Charts — datos reales */}
+      {activos.length >= 2 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div className="bg-card rounded-2xl p-5 border border-border">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4">Tendencia Mensual</p>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Tendencia — Últimos 6 Meses</p>
+            <p className="text-[9px] text-muted-foreground mb-3">Consentimientos realizados por procedimiento</p>
             <ResponsiveContainer width="100%" height={150}>
-              <AreaChart data={CHART_MENSUAL}>
+              <AreaChart data={chartMensual}>
                 <defs>
                   <linearGradient id="gradMedfisEscler" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#0D51D9" stopOpacity={0.15}/>
+                    <stop offset="5%"  stopColor="#0D51D9" stopOpacity={0.18}/>
                     <stop offset="95%" stopColor="#0D51D9" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid key="grid"    strokeDasharray="3 3" stroke="#E2E8F4"/>
                 <XAxis         key="xaxis"   dataKey="mes" tick={{ fontSize:10 }}/>
-                <YAxis         key="yaxis"   tick={{ fontSize:10 }}/>
+                <YAxis         key="yaxis"   tick={{ fontSize:10 }} allowDecimals={false}/>
                 <Tooltip       key="tooltip" contentStyle={{ fontSize:11, borderRadius:8 }}/>
-                <Area key="area-escler" type="monotone" dataKey="escler" stroke="#0D51D9" fill="url(#gradMedfisEscler)" strokeWidth={2} name="Escleroterapia"/>
-                <Area key="area-suero"  type="monotone" dataKey="suero"  stroke="#0D8BD9" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Sueroterapia"/>
-                <Area key="area-laser"  type="monotone" dataKey="laser"  stroke="#F59E0B" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Láser"/>
+                <Area key="area-escler"  type="monotone" dataKey="escler"  stroke="#0D51D9" fill="url(#gradMedfisEscler)" strokeWidth={2} name="Escleroterapia"/>
+                <Area key="area-suero"   type="monotone" dataKey="suero"   stroke="#0D8BD9" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Sueroterapia"/>
+                <Area key="area-laser"   type="monotone" dataKey="laser"   stroke="#F59E0B" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Láser"/>
+                <Area key="area-paquete" type="monotone" dataKey="paquete" stroke="#7C3AED" fill="none" strokeWidth={2} strokeDasharray="4 2" name="Paquete"/>
               </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="bg-card rounded-2xl p-5 border border-border">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4">Distribución por Tipo</p>
-            <ResponsiveContainer width="100%" height={150}>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Distribución por Tipo</p>
+            <p className="text-[9px] text-muted-foreground mb-3">Proporción de consentimientos activos</p>
+            <ResponsiveContainer width="100%" height={130}>
               <PieChart>
-                <Pie key="pie" data={CHART_TIPOS} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={3} dataKey="value">
-                  {CHART_TIPOS.map((entry, i) => <Cell key={`pie-cell-${i}`} fill={entry.color}/>)}
+                <Pie key="pie" data={chartTipos} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={3} dataKey="value" label={({ name, value }) => `${value}`} labelLine={false}>
+                  {chartTipos.map((entry, i) => <Cell key={`pie-cell-${i}`} fill={entry.color}/>)}
                 </Pie>
-                <Tooltip key="pie-tooltip" contentStyle={{ fontSize:11, borderRadius:8 }}/>
+                <Tooltip key="pie-tooltip" contentStyle={{ fontSize:11, borderRadius:8 }} formatter={(v, n) => [`${v} consentimiento${Number(v)!==1?"s":""}`, n]}/>
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex justify-center gap-4 mt-1">{CHART_TIPOS.map((t, i) => (<div key={`legend-${i}`} className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{ background: t.color }}/><span className="text-[10px] text-muted-foreground">{t.name}</span></div>))}</div>
+            <div className="flex flex-wrap justify-center gap-3 mt-1">
+              {chartTipos.map((t, i) => (
+                <div key={`legend-${i}`} className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: t.color }}/>
+                  <span className="text-[10px] text-muted-foreground">{t.name} <strong className="text-foreground">{t.value}</strong></span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -2563,10 +2828,24 @@ export default function App() {
   });
   const [showNotifs,    setShowNotifs]    = useState(false);
   const [showChangePwd, setShowChangePwd] = useState(false);
-  const getInitialId = (): number => {
-    try { const s = localStorage.getItem("medfis_records"); const a = s ? JSON.parse(s) : []; return a.length + 1; } catch { return 1; }
+  // Contadores consecutivos por tipo de consentimiento (persisten en localStorage)
+  const nextIdsRef = useRef(
+    ((): Record<TipoConsent, number> => {
+      const tipos: TipoConsent[] = ["escleroterapia", "sueroterapia", "laser", "paquete"];
+      const base: Record<string, number> = {};
+      for (const t of tipos) {
+        try { base[t] = parseInt(localStorage.getItem(`medfis_seq_${t}`) ?? "0", 10) + 1; } catch { base[t] = 1; }
+      }
+      return base as Record<TipoConsent, number>;
+    })()
+  );
+
+  const getNextId = (tipo: TipoConsent): number => {
+    const n = nextIdsRef.current[tipo] ?? 1;
+    nextIdsRef.current[tipo] = n + 1;
+    localStorage.setItem(`medfis_seq_${tipo}`, String(n));
+    return n;
   };
-  const nextIdRef = useRef<number>(getInitialId());
 
   const addToast = useCallback((type: "success"|"error"|"info"|"warning", msg: string) => {
     const id = Date.now();
@@ -2584,20 +2863,21 @@ export default function App() {
     const emailPac = (d?.paciente?.email    ?? "") as string;
     const telPac   = (d?.paciente?.telefono ?? "") as string;
 
-    // 1. Guardar inmediatamente en localStorage
-    const rBase: ConsentRecord = { ...r, emailPaciente: emailPac || undefined };
+    // 1. Guardar inmediatamente en localStorage — usar radicado con contador por tipo
+    const seqId = getNextId(r.tipo);
+    const radicadoFinal = genRadicado(r.tipo, seqId);
+    const rBase: ConsentRecord = { ...r, radicado: radicadoFinal, emailPaciente: emailPac || undefined };
     setRecords(prev => { const u = [...prev, rBase]; localStorage.setItem("medfis_records", JSON.stringify(u)); return u; });
-    nextIdRef.current += 1;
     setActiveForm(null);
     setPage("historial");
 
     // 2. Notificaciones internas
-    const baseMsg    = `${r.pacienteNombre} · ${r.tipo} · Radicado: ${r.radicado}. Revise y otorgue el Visto Bueno.`;
-    const notifMedico: Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: "Consentimiento pendiente de Visto Bueno", mensaje: baseMsg, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "MÉDICO" };
-    const notifAdmin:  Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: `Nuevo consentimiento — ${r.pacienteNombre}`, mensaje: `Registrado por: ${r.creadoPor ?? "—"} · ${r.radicado} · Pendiente aprobación médica.`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "ADMINISTRADOR" };
+    const baseMsg    = `${rBase.pacienteNombre} · ${rBase.tipo} · Radicado: ${rBase.radicado}. Revise y otorgue el Visto Bueno.`;
+    const notifMedico: Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: "Consentimiento pendiente de Visto Bueno", mensaje: baseMsg, consentId: rBase.id, leida: false, fecha: new Date().toISOString(), paraRol: "MÉDICO" };
+    const notifAdmin:  Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: `Nuevo consentimiento — ${rBase.pacienteNombre}`, mensaje: `Registrado por: ${rBase.creadoPor ?? "—"} · ${rBase.radicado} · Pendiente aprobación médica.`, consentId: rBase.id, leida: false, fecha: new Date().toISOString(), paraRol: "ADMINISTRADOR" };
     setNotificaciones(prev => { const u = [...prev, notifMedico, notifAdmin]; localStorage.setItem("medfis_notificaciones", JSON.stringify(u)); return u; });
 
-    addToast("success", `✅ ${r.radicado} guardado — generando PDF y enviando notificaciones…`);
+    addToast("success", `✅ ${rBase.radicado} guardado — generando PDF y enviando notificaciones…`);
 
     // 3. Pipeline asíncrono: PDF → Supabase → Email → WhatsApp
     const textoMap: Record<string, string> = {
@@ -2613,37 +2893,68 @@ export default function App() {
       let emailEnviado = false;
 
       try {
+        const rd = rBase.datos as any;
         const pdfBlob = await generarPDFConsentimiento({
-          radicado:       r.radicado,
-          tipo:           r.tipo,
-          fecha:          fmtFecha(r.fecha),
-          pacienteNombre: r.pacienteNombre,
-          pacienteDoc:    r.pacienteDoc,
-          pacienteTel:    r.pacienteTel,
+          radicado:       rBase.radicado,
+          tipo:           rBase.tipo,
+          fecha:          fmtFecha(rBase.fecha),
+          pacienteNombre: rBase.pacienteNombre,
+          pacienteDoc:    rBase.pacienteDoc,
+          pacienteTel:    rBase.pacienteTel,
           pacienteEmail:  emailPac || undefined,
-          creadoPor:      r.creadoPor,
-          textoConsent:   textoMap[r.tipo] ?? "",
+          creadoPor:      rBase.creadoPor,
+          textoConsent:   textoMap[rBase.tipo] ?? "",
           ipsNombre:      ips.nombre,
           ipsNit:         ips.nit,
           ipsMedico:      ips.medico,
           ipsRm:          ips.rm,
           ipsCiudad:      ips.ciudad,
+          firmaConsentimiento: rd?.firmaConsentimiento ?? undefined,
+          firmaDoctor:    ips.firmaDoctor ?? undefined,
+          datosPaciente:  rd?.paciente ? {
+            direccion: rd.paciente.direccion, ciudad: rd.paciente.ciudad,
+            fechaNacimiento: rd.paciente.fechaNacimiento,
+            contactoNombre: rd.paciente.contactoNombre,
+            contactoParentesco: rd.paciente.contactoParentesco,
+            contactoTelefono: rd.paciente.contactoTelefono,
+          } : undefined,
+          vitales: rd?.vitales ?? undefined,
         });
 
         // ── 3b. Subir PDF a Supabase Storage ────────────────────────────────
-        pdfUrl = await subirPDF(pdfBlob, r.radicado, r.pacienteDoc);
+        pdfUrl = await subirPDF(pdfBlob, rBase.radicado, rBase.pacienteDoc);
         if (pdfUrl) addToast("info", `☁️ PDF guardado en la nube`);
+
+        // ── 3b2. Sincronizar con backend PostgreSQL ──────────────────────────
+        try {
+          const backendResp = await apiService.post("/consentimientos", {
+            tipo:           rBase.tipo,
+            radicado:       rBase.radicado,
+            pacienteNombre: rBase.pacienteNombre,
+            pacienteDoc:    rBase.pacienteDoc,
+            pacienteTel:    rBase.pacienteTel,
+            emailPaciente:  emailPac || null,
+            fecha:          rBase.fecha,
+            pdfUrl:         pdfUrl || null,
+            creadoPor:      rBase.creadoPor ?? null,
+            datos:          JSON.stringify(rBase.datos),
+          });
+          if (backendResp.ok) addToast("success", "✅ Sincronizado con base de datos");
+          else console.warn("Backend sync status:", backendResp.status);
+        } catch (backendErr) {
+          console.warn("Backend no disponible — datos guardados localmente:", backendErr);
+        }
 
         // ── 3c. Enviar email via EmailJS ─────────────────────────────────────
         const datosEmail = {
           emailPaciente:  emailPac,
-          nombrePaciente: r.pacienteNombre,
-          radicado:       r.radicado,
-          tipo:           r.tipo,
-          fecha:          fmtFecha(r.fecha),
-          documento:      r.pacienteDoc,
-          telefono:       r.pacienteTel,
-          creadoPor:      r.creadoPor ?? "—",
+          nombrePaciente: rBase.pacienteNombre,
+          radicado:       rBase.radicado,
+          tipo:           rBase.tipo,
+          fecha:          fmtFecha(rBase.fecha),
+          documento:      rBase.pacienteDoc,
+          telefono:       rBase.pacienteTel,
+          creadoPor:      rBase.creadoPor ?? "—",
           pdfUrl:         pdfUrl ?? undefined,
           ipsNombre:      ips.nombre,
           ipsMedico:      ips.medico,
@@ -2667,7 +2978,7 @@ export default function App() {
 
       // ── 3d. Actualizar flags en el registro ─────────────────────────────
       setRecords(prev => {
-        const updated = prev.map(x => x.id === r.id
+        const updated = prev.map(x => x.id === rBase.id
           ? { ...x, emailEnviado, pdfUrl: pdfUrl ?? undefined }
           : x
         );
@@ -2677,14 +2988,14 @@ export default function App() {
 
       // ── 3e. WhatsApp (abrir Web) ─────────────────────────────────────────
       if (telPac) {
-        const tLabel = { escleroterapia:"Escleroterapia", sueroterapia:"Sueroterapia Vit C/B", laser:"Terapia Láser", paquete:"Paquete Integral" }[r.tipo] ?? r.tipo;
+        const tLabel = { escleroterapia:"Escleroterapia", sueroterapia:"Sueroterapia Vit C/B", laser:"Terapia Láser", paquete:"Paquete Integral" }[rBase.tipo] ?? rBase.tipo;
         const waMsg  = encodeURIComponent(
           `✅ *${ips.nombre}* — Consentimiento Informado\n\n` +
-          `Estimado/a *${r.pacienteNombre}*,\n\n` +
+          `Estimado/a *${rBase.pacienteNombre}*,\n\n` +
           `Su consentimiento informado ha sido registrado exitosamente.\n\n` +
           `📋 *Procedimiento:* ${tLabel}\n` +
-          `🔖 *Radicado:* ${r.radicado}\n` +
-          `📅 *Fecha:* ${fmtFecha(r.fecha)}\n` +
+          `🔖 *Radicado:* ${rBase.radicado}\n` +
+          `📅 *Fecha:* ${fmtFecha(rBase.fecha)}\n` +
           `⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n` +
           (pdfUrl ? `📄 *PDF del consentimiento:* ${pdfUrl}\n\n` : "") +
           `Recibirá confirmación cuando el médico apruebe su cita.\n\n` +
@@ -2695,11 +3006,11 @@ export default function App() {
         const numLimpio = telPac.replace(/[^0-9]/g, "");
         window.open(`https://wa.me/57${numLimpio}?text=${waMsg}`, "_blank");
         setRecords(prev => {
-          const updated = prev.map(x => x.id === r.id ? { ...x, whatsappEnviado: true } : x);
+          const updated = prev.map(x => x.id === rBase.id ? { ...x, whatsappEnviado: true } : x);
           localStorage.setItem("medfis_records", JSON.stringify(updated));
           return updated;
         });
-        addToast("info", `📱 WhatsApp enviado a ${r.pacienteNombre}`);
+        addToast("info", `📱 WhatsApp enviado a ${rBase.pacienteNombre}`);
       }
     };
 
@@ -2717,6 +3028,8 @@ export default function App() {
       const notif: Notificacion = { id: genId(), tipo: "APROBADO", titulo: "Visto Bueno otorgado", mensaje: `${r.pacienteNombre} — ${r.radicado} aprobado. La cita puede proceder.`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "TODOS" };
       setNotificaciones(prev => { const updated = [...prev, notif]; localStorage.setItem("medfis_notificaciones", JSON.stringify(updated)); return updated; });
     }
+    // Sync con backend (fire-and-forget)
+    apiService.post(`/consentimientos/${id}/aprobar`, {}).catch(() => {});
   };
 
   const handleRechazar = (id: string, motivo: string) => {
@@ -2730,6 +3043,8 @@ export default function App() {
       const notif: Notificacion = { id: genId(), tipo: "RECHAZADO", titulo: "Consentimiento rechazado", mensaje: `${r.pacienteNombre} — ${r.radicado}. Motivo: ${motivo}`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "TODOS" };
       setNotificaciones(prev => { const updated = [...prev, notif]; localStorage.setItem("medfis_notificaciones", JSON.stringify(updated)); return updated; });
     }
+    // Sync con backend (fire-and-forget)
+    apiService.post(`/consentimientos/${id}/rechazar`, { motivo }).catch(() => {});
   };
 
   const handleDelete = (id: string) => {
@@ -2847,10 +3162,10 @@ export default function App() {
         </div>
 
         {/* Formularios */}
-        {activeForm==="escleroterapia" && <FormEscleroterapia onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre} records={records}/>}
-        {activeForm==="sueroterapia"   && <FormSueroterapia   onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre} records={records}/>}
-        {activeForm==="laser"          && <FormLaser           onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre} records={records}/>}
-        {activeForm==="paquete"        && <FormPaquete         onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdRef.current} userName={user.nombre} records={records}/>}
+        {activeForm==="escleroterapia" && <FormEscleroterapia onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdsRef.current.escleroterapia} userName={user.nombre} records={records}/>}
+        {activeForm==="sueroterapia"   && <FormSueroterapia   onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdsRef.current.sueroterapia}   userName={user.nombre} records={records}/>}
+        {activeForm==="laser"          && <FormLaser           onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdsRef.current.laser}          userName={user.nombre} records={records}/>}
+        {activeForm==="paquete"        && <FormPaquete         onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdsRef.current.paquete}        userName={user.nombre} records={records}/>}
 
         {viewRecord && <PDFModal record={viewRecord} onClose={() => setViewRecord(null)} addToast={addToast}/>}
         {showSettings && user.rol === "ADMINISTRADOR" && <IPSSettingsModal ips={ips} onSave={saveIPS} onClose={() => setShowSettings(false)}/>}

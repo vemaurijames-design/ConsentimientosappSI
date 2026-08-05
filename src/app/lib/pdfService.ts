@@ -1,20 +1,35 @@
 import jsPDF from "jspdf";
 
 interface DatosConsentimiento {
-  radicado:       string;
-  tipo:           string;
-  fecha:          string;
-  pacienteNombre: string;
-  pacienteDoc:    string;
-  pacienteTel:    string;
-  pacienteEmail?: string;
-  creadoPor?:     string;
-  textoConsent:   string;
-  ipsNombre:      string;
-  ipsNit:         string;
-  ipsMedico:      string;
-  ipsRm:          string;
-  ipsCiudad:      string;
+  radicado:              string;
+  tipo:                  string;
+  fecha:                 string;
+  pacienteNombre:        string;
+  pacienteDoc:           string;
+  pacienteTel:           string;
+  pacienteEmail?:        string;
+  creadoPor?:            string;
+  textoConsent:          string;
+  ipsNombre:             string;
+  ipsNit:                string;
+  ipsMedico:             string;
+  ipsRm:                 string;
+  ipsCiudad:             string;
+  /** Data URL de la firma del paciente (canvas base64) */
+  firmaConsentimiento?:  string;
+  /** Data URL de la firma/sello del médico (imagen JPG/PNG) */
+  firmaDoctor?:          string;
+  /** Datos adicionales del paciente para la sección clínica */
+  datosPaciente?: {
+    direccion?: string; ciudad?: string; fechaNacimiento?: string;
+    contactoNombre?: string; contactoParentesco?: string; contactoTelefono?: string;
+  };
+  /** Vitales registrados por enfermería */
+  vitales?: {
+    oximetria?: string; tension?: string; frecuenciaCardiaca?: string;
+    temperatura?: string; peso?: string; talla?: string; imc?: string; glucemia?: string;
+    observaciones?: string;
+  };
 }
 
 const AZUL_OSCURO: [number, number, number] = [3, 28, 166];    // #031CA6
@@ -162,38 +177,109 @@ export async function generarPDFConsentimiento(
   checkPage(40);
 
   // ══════════════════════════════════════════════════════════════════════
+  // DATOS CLÍNICOS ADICIONALES (si existen)
+  // ══════════════════════════════════════════════════════════════════════
+  const dp = datos.datosPaciente;
+  const vit = datos.vitales;
+
+  if (dp && (dp.direccion || dp.ciudad || dp.fechaNacimiento || dp.contactoNombre)) {
+    checkPage(30);
+    doc.setFillColor(239, 243, 251);
+    doc.roundedRect(M, y, ANCHO, 28, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...AZUL_OSCURO);
+    doc.text("DATOS ADICIONALES DEL PACIENTE", M + 4, y + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...GRIS_TEXTO);
+    let dy = y + 12;
+    if (dp.direccion)   { doc.text(`Dirección: ${dp.direccion}${dp.ciudad ? ` — ${dp.ciudad}` : ""}`, M + 4, dy); dy += 5; }
+    if (dp.fechaNacimiento) { doc.text(`Fecha de nacimiento: ${dp.fechaNacimiento}`, M + 4, dy); dy += 5; }
+    if (dp.contactoNombre) {
+      doc.text(`Contacto de emergencia: ${dp.contactoNombre} (${dp.contactoParentesco ?? "—"}) · Tel: ${dp.contactoTelefono ?? "—"}`, M + 4, dy);
+    }
+    y += 34;
+  }
+
+  if (vit && (vit.oximetria || vit.tension || vit.peso)) {
+    checkPage(22);
+    doc.setFillColor(239, 243, 251);
+    doc.roundedRect(M, y, ANCHO, 20, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...AZUL_OSCURO);
+    doc.text("SIGNOS VITALES — ENFERMERÍA", M + 4, y + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...GRIS_TEXTO);
+    const vitStr = [
+      vit.oximetria ? `SpO₂: ${vit.oximetria}%` : null,
+      vit.tension   ? `TA: ${vit.tension}` : null,
+      vit.frecuenciaCardiaca ? `FC: ${vit.frecuenciaCardiaca} lpm` : null,
+      vit.temperatura ? `T°: ${vit.temperatura}°C` : null,
+      vit.peso  ? `Peso: ${vit.peso} kg` : null,
+      vit.talla ? `Talla: ${vit.talla} cm` : null,
+      vit.imc   ? `IMC: ${vit.imc}` : null,
+      vit.glucemia ? `Glucemia: ${vit.glucemia}` : null,
+    ].filter(Boolean).join("  ·  ");
+    doc.text(vitStr, M + 4, y + 13, { maxWidth: ANCHO - 8 });
+    y += 26;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
   // SECCIÓN DE FIRMAS
   // ══════════════════════════════════════════════════════════════════════
+  checkPage(60);
+  const FIRMA_H = 46;
   doc.setFillColor(239, 243, 251);
-  doc.roundedRect(M, y, ANCHO, 42, 2, 2, "F");
+  doc.roundedRect(M, y, ANCHO, FIRMA_H, 2, 2, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...AZUL_OSCURO);
   doc.text("CONSENTIMIENTO — FIRMAS", M + 4, y + 7);
 
-  const firmaY = y + 30;
+  const firmaImgH = 16; // alto reservado para imagen de firma
+  const firmaImgY = y + 10;
+  const firmaLineY = firmaImgY + firmaImgH + 2;
   const firmaW = ANCHO / 2 - 8;
 
-  // Firma paciente
+  // ── Imagen firma paciente ────────────────────────────────────────────
+  if (datos.firmaConsentimiento) {
+    try {
+      const fmt = datos.firmaConsentimiento.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
+      doc.addImage(datos.firmaConsentimiento, fmt, M + 4, firmaImgY, firmaW, firmaImgH);
+    } catch { /* firma inválida — solo mostrar línea */ }
+  }
+
+  // ── Imagen firma/sello médico ────────────────────────────────────────
+  const x2 = M + ANCHO / 2 + 4;
+  if (datos.firmaDoctor) {
+    try {
+      const fmt = datos.firmaDoctor.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
+      doc.addImage(datos.firmaDoctor, fmt, x2, firmaImgY, firmaW, firmaImgH);
+    } catch { /* imagen inválida */ }
+  }
+
+  // ── Líneas y texto bajo las imágenes ────────────────────────────────
   doc.setDrawColor(...GRIS_CLARO);
   doc.setLineWidth(0.5);
-  doc.line(M + 4, firmaY, M + 4 + firmaW, firmaY);
+  doc.line(M + 4, firmaLineY, M + 4 + firmaW, firmaLineY);
+  doc.line(x2, firmaLineY, x2 + firmaW, firmaLineY);
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...GRIS_CLARO);
-  doc.text("Firma del Paciente", M + 4, firmaY + 4);
-  doc.text(datos.pacienteNombre, M + 4, firmaY + 8);
-  doc.text(`C.C. ${datos.pacienteDoc}`, M + 4, firmaY + 12);
+  doc.text("Firma del Paciente", M + 4, firmaLineY + 4);
+  doc.text(datos.pacienteNombre, M + 4, firmaLineY + 8);
+  doc.text(`C.C. ${datos.pacienteDoc}`, M + 4, firmaLineY + 12);
 
-  // Firma médico
-  const x2 = M + ANCHO / 2 + 4;
-  doc.line(x2, firmaY, x2 + firmaW, firmaY);
-  doc.text("Firma del Médico / Responsable", x2, firmaY + 4);
-  doc.text(datos.ipsMedico, x2, firmaY + 8);
-  doc.text(datos.ipsRm, x2, firmaY + 12);
+  doc.text("Firma del Médico / Responsable", x2, firmaLineY + 4);
+  doc.text(datos.ipsMedico, x2, firmaLineY + 8);
+  doc.text(datos.ipsRm, x2, firmaLineY + 12);
 
-  y += 48;
+  y += FIRMA_H + 6;
   checkPage(14);
 
   // ══════════════════════════════════════════════════════════════════════
