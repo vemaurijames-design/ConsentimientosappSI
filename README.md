@@ -12,6 +12,7 @@
 
 ## Tabla de Contenidos
 
+0. [Arquitectura: Admin distribuidor vs Clientes](#0-arquitectura-admin-distribuidor-vs-clientes)
 1. [Stack tecnológico](#1-stack-tecnológico)
 2. [Clonar y ejecutar localmente](#2-clonar-y-ejecutar-localmente)
 3. [Variables de entorno](#3-variables-de-entorno)
@@ -24,6 +25,128 @@
 10. [Pasar a producción](#10-pasar-a-producción)
 11. [Modelo de negocio — CliniSign](#11-modelo-de-negocio)
 12. [Seguridad de datos y backup](#12-seguridad-de-datos-y-estrategia-de-backup)
+
+---
+
+## 0. Arquitectura: Admin Distribuidor vs Clientes
+
+### Concepto de distribución
+
+```
+MAURICIO SALAZAR (Propietario / Distribuidor)
+        │
+        │  Vende acceso a CliniSign
+        ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│  Cliente A       │  │  Cliente B       │  │  Cliente C       │
+│  IPS Salud+      │  │  Estética Bella  │  │  FisioVida       │
+│  ─────────────── │  │  ─────────────── │  │  ─────────────── │
+│  BD propia       │  │  BD propia       │  │  BD propia       │
+│  PostgreSQL      │  │  PostgreSQL      │  │  PostgreSQL      │
+│  (cloud cliente) │  │  (cloud cliente) │  │  (cloud cliente) │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
+```
+
+**Principio legal clave:** Cada cliente tiene su **propia base de datos**. Los datos de salud de sus pacientes NUNCA se mezclan con otros clientes ni pasan por el servidor del distribuidor. Esto cumple con la Ley 1581 de 2012 (Colombia) y la normativa de datos sensibles de salud.
+
+### Roles del sistema
+
+| Rol | Permisos |
+|-----|----------|
+| **ADMINISTRADOR** | Control total: CRUD usuarios, configuración IPS, médicos, permisos, ver todas las estadísticas, ver/descargar todos los PDFs |
+| **MÉDICO** | Ver y aprobar/rechazar consentimientos, Visto Bueno médico |
+| **ENFERMERA** | Crear consentimientos, registrar signos vitales |
+| **AUXILIAR** | Crear y registrar consentimientos |
+| **TÉCNICO** | Crear consentimientos de láser |
+
+### Lo que controla el Administrador
+
+El **ADMINISTRADOR** de cada instalación tiene control total:
+
+```
+Configuración IPS (menú ⚙️ → Configuración IPS)
+├── Tab "General": Nombre, NIT, Ciudad, Médico principal
+├── Tab "Logo & Marca": Logo de la clínica, firma general fallback
+└── Tab "Médicos": Lista de médicos con foto, RM, especialidad, firma digital
+
+Gestión de Personal (menú 👥 → Personal)
+├── Crear/editar/desactivar usuarios
+├── Asignar roles y permisos
+├── Cambiar contraseñas
+├── Fotos de perfil del personal
+└── Datos adicionales de médicos (RM, especialidad)
+
+Control de registros
+├── Ver y descargar PDF de cualquier consentimiento
+├── Anular consentimientos
+└── Acceso completo al historial
+
+Estadísticas
+└── Acceso completo a la pantalla Admin con métricas detalladas
+```
+
+### Cómo desplegar para un nuevo cliente (Mauricio como distribuidor)
+
+```bash
+# 1. Clonar el repositorio base (la plantilla)
+git clone https://github.com/mauricio-salazar/clinisign.git cliente-a
+cd cliente-a
+
+# 2. Crear .env.local para ese cliente (cada cliente tiene sus propias keys)
+cp .env.example .env.local
+# Editar con los datos del cliente A:
+# - Su URL de PostgreSQL (en Railway/Render/Supabase)
+# - Su bucket de Supabase Storage
+# - Su configuración de EmailJS
+# - Su WhatsApp
+
+# 3. Cambiar las constantes del cliente en el código
+# Editar src/app/App.tsx línea 66-70:
+const DEFAULT_IPS: IPSConfig = {
+  nombre: "IPS Cliente A",  // ← nombre de la clínica
+  nit: "900123456",          // ← NIT del cliente
+  medico: "Dr. Juan Pérez",  // ← médico responsable
+  rm: "RM 1234567",
+  ciudad: "Bogotá, Colombia",
+  doctores: [],
+};
+
+# 4. Crear el usuario administrador del cliente
+# Editar src/app/App.tsx — buscar USUARIOS_INICIALES o similar
+# y poner el email/contraseña inicial del administrador del cliente.
+
+# 5. Build de producción
+pnpm build
+# → genera /dist con todos los archivos estáticos
+
+# 6. Subir a Vercel (o el hosting elegido)
+npx vercel deploy --prod
+# → URL pública del cliente: https://clinisign-clientea.vercel.app
+
+# 7. Entregar al cliente:
+#   - URL del sistema
+#   - Email y contraseña de administrador
+#   - Manual de usuario (PDF)
+```
+
+### Gestión de la base de datos del cliente
+
+**Cada cliente usa su propio PostgreSQL en la nube.** El distribuidor NO accede a los datos de salud del cliente. Solo el equipo del cliente accede a su propia base.
+
+```
+Opción recomendada: Railway.app (PostgreSQL)
+├── Plan Hobby: $5 USD/mes (500 MB, más que suficiente)
+├── El cliente paga directamente a Railway
+├── URL de conexión: postgresql://user:pass@host:5432/dbname
+└── El cliente tiene acceso total a su propia base
+
+Opción alternativa: Render.com
+├── Plan gratuito: 90 días (luego $7 USD/mes)
+└── Ideal para clientes que quieren probar primero
+
+Opción enterprise: Servidor propio del cliente
+└── El cliente instala PostgreSQL en su propio servidor
+```
 
 ---
 
@@ -52,22 +175,50 @@
 - PostgreSQL 15+ corriendo localmente
 - Git
 
-### Paso 1 — Clonar el repositorio
+### Paso 0 — Subir el código a GitHub (solo la primera vez, como propietario)
 
 ```bash
-git clone https://github.com/mauricio-salazar/medfis-consentimientos.git
-cd medfis-consentimientos
+# Desde la carpeta del proyecto
+git init
+git add .
+git commit -m "feat: CliniSign v1.0 — Sistema de consentimientos informados"
+git branch -M main
+# Crear el repositorio en github.com/new (privado recomendado)
+git remote add origin https://github.com/mauricio-salazar/clinisign.git
+git push -u origin main
 ```
 
-> Si aún no tienes el repositorio en GitHub, crea uno en [github.com](https://github.com/new) y sube el código:
-> ```bash
-> git init
-> git add .
-> git commit -m "feat: sistema de consentimientos Med&Fis v1.0"
-> git branch -M main
-> git remote add origin https://github.com/mauricio-salazar/medfis-consentimientos.git
-> git push -u origin main
-> ```
+> **Repositorio privado** es obligatorio — contiene la configuración de clientes y credenciales base.  
+> Solo Mauricio Salazar tiene acceso. Cada cliente NO tiene acceso al código fuente.
+
+### Paso 1 — Clonar el repositorio (en el servidor o máquina local)
+
+```bash
+# Con HTTPS (recomendado, no requiere clave SSH)
+git clone https://github.com/mauricio-salazar/clinisign.git
+cd clinisign
+
+# Con SSH (si tienes clave SSH configurada en GitHub)
+git clone git@github.com:mauricio-salazar/clinisign.git
+cd clinisign
+
+# Verificar que clonó bien
+ls -la
+# Deber ver: src/, backend/, package.json, vite.config.ts, etc.
+```
+
+### Cómo actualizar cuando hay cambios
+
+```bash
+# Descargar los últimos cambios del repositorio
+git pull origin main
+
+# Si hay cambios en dependencias
+pnpm install
+
+# Reiniciar servidor de desarrollo
+pnpm dev
+```
 
 ### Paso 2 — Frontend
 
@@ -107,6 +258,30 @@ Email:    medfissaludintensa@gmail.com
 Password: admin123456
 Rol:      ADMINISTRADOR
 ```
+
+> **IMPORTANTE — Seguridad:** Cambia la contraseña del administrador inmediatamente después del primer acceso.  
+> El Administrador es el único que puede ver y gestionar las credenciales del personal.  
+> Las credenciales **NUNCA** se muestran en la pantalla de login.
+
+### Pasos iniciales para cada nueva instalación de cliente
+
+Una vez que el sistema esté corriendo, el Administrador debe:
+
+1. **Configurar la IPS** → menú ⚙️ → Configuración IPS  
+   - Tab "General": Nombre de la clínica, NIT, ciudad, médico principal
+   - Tab "Logo & Marca": Subir el logo (PNG, fondo transparente, max 300 KB)
+   - Tab "Médicos": Agregar cada médico con foto, RM, especialidad y firma escaneada
+
+2. **Crear el personal** → menú 👥 → Personal  
+   - Agregar a cada empleado con su correo, rol y contraseña inicial
+   - Para MÉDICO: ingresar su RM y especialidad
+   - Subir foto de perfil (opcional pero recomendado)
+
+3. **Informar credenciales** → el Administrador entrega por canal seguro (mensaje privado, no email)  
+   el correo y contraseña inicial a cada empleado
+
+4. **Hacer el primer consentimiento de prueba** → verificar que el PDF se genera correctamente,  
+   que el email llega y que WhatsApp funciona
 
 ---
 
@@ -467,71 +642,150 @@ Importar `MedFis_API.postman_collection.json` en Postman. La colección incluye:
 
 ## 10. Pasar a producción
 
-### Servicios necesarios y costos
+### Servicios necesarios por cliente y costos
 
-| Servicio | Uso | Costo |
+| Servicio | Uso | Costo mensual |
 |---------|-----|-------|
-| **Dominio** (ej: medfis.com.co) | Identidad online | ~$50.000 COP/año |
-| **Vercel** (frontend) | Hosting React | **Gratis** |
-| **Railway** (backend + PostgreSQL) | Spring Boot + DB | ~$5 USD/mes |
-| **Supabase** (PDFs) | Storage 1 GB | **Gratis** |
-| **EmailJS** (emails) | 200 emails/mes | **Gratis** |
+| **Dominio** (ej: clinisign-clientea.com) | Identidad online | ~$4.000 COP/mes |
+| **Vercel** (frontend React) | Hosting estático | **Gratis** (Hobby plan) |
+| **Railway** (Spring Boot + PostgreSQL) | Backend + BD | ~$20.000 COP/mes |
+| **Supabase** (almacenamiento PDFs) | 1 GB storage | **Gratis** |
+| **EmailJS** (emails navegador) | 200 emails/mes | **Gratis** |
 | **SSL/HTTPS** | Incluido en Vercel | **Gratis** |
 
-**Total mínimo: ~$50.000 COP/año** (solo el dominio)
+**Total aprox. por cliente: $24.000 COP/mes** (costo de infraestructura)  
+**Precio que puedes cobrar: $149.900 – $299.900 COP/mes** según el plan  
+**Margen bruto: ~92%**
 
-### Deploy Frontend → Vercel
+### Deploy completo paso a paso para un cliente
 
-```bash
-# 1. Hacer push del código a GitHub
-
-# 2. En vercel.com → Import Git Repository → seleccionar el repo
-
-# 3. Configurar variables de entorno en Vercel Dashboard:
-#    VITE_API_URL = https://tu-backend.railway.app/api
-#    VITE_SUPABASE_URL = ...
-#    VITE_SUPABASE_ANON_KEY = ...
-#    VITE_EMAILJS_SERVICE_ID = ...
-#    (etc.)
-
-# 4. Build command: pnpm build
-# 5. Output directory: dist
-```
-
-### Deploy Backend → Railway
+#### A. Crear la base de datos PostgreSQL en Railway
 
 ```bash
-# 1. Instalar Railway CLI
-npm install -g @railway/cli
+# 1. Ir a railway.app → New Project → Provision PostgreSQL
+# 2. En el panel de Railway, ir a la BD → Connect → copiar la connection string:
+#    postgresql://postgres:password@host:5432/railway
 
-# 2. En el directorio backend/
-railway init
-railway up
-
-# 3. Configurar variables en Railway Dashboard:
-#    MEDFIS_MAIL_PASSWORD = abcd efgh ijkl mnop
-#    spring.datasource.url = (Railway auto-configura si usa su PostgreSQL)
+# 3. Guardar esa URL, la necesitarás en los siguientes pasos
 ```
 
-### Configurar CORS para producción
+#### B. Preparar el código para el cliente
 
-En `backend/src/main/resources/application.properties`:
-```properties
-cors.allowed-origins=https://medfis.vercel.app,https://medfis.tudominio.com.co
+```bash
+# Clonar la plantilla base
+git clone https://github.com/mauricio-salazar/clinisign.git clinisign-clientea
+cd clinisign-clientea
+
+# Editar src/app/App.tsx — línea ~67 (DEFAULT_IPS):
+# Cambiar los datos iniciales de la clínica:
+const DEFAULT_IPS: IPSConfig = {
+  nombre: "IPS del Cliente A",     # ← nombre real
+  nit: "900111222",                 # ← NIT real
+  medico: "Dr. Carlos Torres",      # ← médico principal
+  rm: "RM 4567890",
+  ciudad: "Bogotá, Colombia",
+  doctores: [],
+};
+# (El Administrador puede cambiar todo esto desde la interfaz sin tocar el código)
+
+# Crear las variables de entorno del cliente
+cat > .env.local << EOF
+VITE_API_URL=https://clinisign-clientea-backend.railway.app/api
+VITE_SUPABASE_URL=https://XXXX.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_SUPABASE_BUCKET=consentimientos
+VITE_EMAILJS_SERVICE_ID=service_xxx
+VITE_EMAILJS_TEMPLATE_ID=template_xxx
+VITE_EMAILJS_PUBLIC_KEY=xxx
+VITE_EMAIL_CLINICA=admin@clientea.com
+VITE_WA_CLINICA=573001234567
+EOF
 ```
 
-### Lista de verificación pre-lanzamiento
+#### C. Deploy del backend (Spring Boot) en Railway
 
-- [ ] Dominio configurado y apuntando a Vercel
-- [ ] HTTPS activado (SSL automático en Vercel)
-- [ ] Variables de entorno correctas en producción
-- [ ] App Password Gmail configurado en Railway
-- [ ] Supabase bucket `consentimientos` público
-- [ ] EmailJS funcionando (enviar email de prueba)
-- [ ] Contraseña admin cambiada (`admin123456` → contraseña segura)
-- [ ] CORS actualizado con el dominio real
-- [ ] Backup automático PostgreSQL configurado en Railway
-- [ ] Probar flujo completo: crear → firmar → aprobar → descargar PDF → email → WhatsApp
+```bash
+# 1. En el directorio backend/
+cd backend
+
+# 2. Configurar application.properties para producción:
+# Crear backend/src/main/resources/application-prod.properties
+spring.datasource.url=${DATABASE_URL}
+spring.datasource.username=${PGUSER}
+spring.datasource.password=${PGPASSWORD}
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.connection.useSSL=true
+jwt.secret=${JWT_SECRET}
+cors.allowed-origins=${CORS_ORIGINS}
+
+# 3. En Railway Dashboard → Add Service → GitHub Repo → seleccionar backend/
+# 4. Configurar variables de entorno en Railway:
+JWT_SECRET=GenerarClave64CaracteresAleatorios
+CORS_ORIGINS=https://clinisign-clientea.vercel.app
+MEDFIS_MAIL_PASSWORD=app-password-gmail
+
+# 5. Railway buildea automáticamente con Maven y despliega
+# → URL: https://clinisign-clientea-backend.railway.app
+```
+
+#### D. Deploy del frontend (React) en Vercel
+
+```bash
+# Opción 1: Vercel CLI (recomendada)
+npm install -g vercel
+vercel login
+vercel --prod
+# → Responder las preguntas: nombre del proyecto, directorio raíz, etc.
+# → URL: https://clinisign-clientea.vercel.app
+
+# Opción 2: Conectar GitHub a Vercel
+# 1. Vercel.com → New Project → Import Git Repository
+# 2. Seleccionar el repositorio del cliente
+# 3. Configurar variables de entorno (copiar del .env.local)
+# 4. Build Command: pnpm build
+# 5. Output Directory: dist
+# 6. Deploy!
+```
+
+#### E. Conectar dominio personalizado (opcional)
+
+```bash
+# En Vercel Dashboard → Project Settings → Domains
+# Agregar: clinisign.clientea.com.co
+
+# En el proveedor del dominio (GoDaddy, Namecheap, etc.)
+# Agregar CNAME: clinisign → cname.vercel-dns.com
+# SSL automático en 5 minutos
+```
+
+#### F. Verificar que todo funciona
+
+```bash
+# Checklist de lanzamiento por cliente:
+✅ Frontend carga en https://clinisign-clientea.vercel.app
+✅ Nombre y NIT de la clínica correctos en el login
+✅ Login con admin funciona (medfissaludintensa@gmail.com / admin123456)
+✅ Cambiar contraseña admin inmediatamente
+✅ Configurar IPS: logo, médicos, firmas
+✅ Agregar usuarios del personal con sus roles
+✅ Crear consentimiento de prueba → firmar → verificar PDF descarga
+✅ Verificar que email llega al paciente
+✅ Verificar que WhatsApp abre con el mensaje correcto
+✅ Aprobar consentimiento → verificar PDF con firma del médico aprobador
+✅ Backup automático de BD configurado (Railway hace backups automáticos)
+```
+
+### Responsive: web, móvil y tablet
+
+El sistema es **100% responsive**:
+
+| Pantalla | Comportamiento |
+|---------|----------------|
+| **Desktop** (1024px+) | Sidebar fijo a la izquierda, contenido en el centro |
+| **Tablet** (768-1023px) | Sidebar colapsable con overlay |
+| **Móvil** (< 768px) | Menú hamburguesa, formularios apilados, firma táctil |
+
+**La firma del paciente es completamente táctil** — funciona con el dedo en móvil y tablet, y con el ratón en desktop. No requiere componentes externos.
 
 ---
 

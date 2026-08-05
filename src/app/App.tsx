@@ -14,7 +14,8 @@ import {
   Activity, MapPin, AtSign, UserCheck, AlertTriangle,
   Info, Users, Heart, Settings, Save, UserPlus,
   CheckSquare, XSquare, Lock, Unlock, BellRing,
-  CalendarCheck, UserCog, RefreshCw, BarChart2, Edit3, KeyRound
+  CalendarCheck, UserCog, RefreshCw, BarChart2, Edit3, KeyRound,
+  Camera, Building2, Star, User, ChevronDown, Globe, CreditCard
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -56,15 +57,29 @@ const apiService = {
 };
 
 // ─── IPS CONFIG ───────────────────────────────────────────────────────────────
+interface Doctor {
+  id: string;
+  nombre: string;
+  rm: string;
+  especialidad: string;
+  email?: string;
+  telefono?: string;
+  foto?: string;   // base64 foto de perfil
+  firma?: string;  // base64 firma/sello escaneado
+  activo: boolean;
+}
+
 interface IPSConfig {
   nombre: string; nit: string; medico: string; rm: string; ciudad: string;
-  /** Data URL (base64) de la firma/sello escaneado del médico */
-  firmaDoctor?: string;
+  logo?: string;         // base64 logo de la IPS
+  firmaDoctor?: string;  // firma médico principal (legacy/fallback)
+  doctores?: Doctor[];   // lista de médicos registrados
 }
 
 const DEFAULT_IPS: IPSConfig = {
   nombre: "Med&Fis", nit: "901102930",
   medico: "Dr. Rafael Eduardo Marrero Padilla", rm: "RM 3880525", ciudad: "Medellín, Colombia",
+  doctores: [],
 };
 
 const IPSContext = createContext<IPSConfig>(DEFAULT_IPS);
@@ -79,6 +94,9 @@ type RolUsuario = "MÉDICO" | "ADMINISTRADOR" | "AUXILIAR" | "ENFERMERA" | "TÉC
 interface Usuario {
   id: string; nombre: string; email: string; rol: RolUsuario;
   password: string; activo: boolean; createdAt: string;
+  foto?: string;         // base64 foto de perfil
+  rm?: string;           // registro médico (solo MÉDICO)
+  especialidad?: string; // especialidad clínica (solo MÉDICO)
 }
 
 interface Notificacion {
@@ -858,10 +876,10 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp, addToast = () => {} }:
       creadoPor: record.creadoPor, textoConsent: buildTexto(), ipsNombre: ips.nombre,
       ipsNit: ips.nit, ipsMedico: ips.medico, ipsRm: ips.rm, ipsCiudad: ips.ciudad,
       firmaConsentimiento: d?.firmaConsentimiento ?? undefined,
-      firmaDoctor: ips.firmaDoctor ?? undefined,
+      firmaDoctor: (ips.doctores?.find(doc => doc.activo)?.firma) ?? ips.firmaDoctor ?? undefined,
       aprobadoPor:    record.aprobadoPor ?? undefined,
       fechaAprobacion: record.fechaAprobacion ? fmtFecha(record.fechaAprobacion) : undefined,
-      firmaAprobador: record.estado === "APROBADO" ? (ips.firmaDoctor ?? undefined) : undefined,
+      firmaAprobador: record.estado === "APROBADO" ? resolveAprobadorFirma(record.aprobadoPor, ips) : undefined,
       estadoPDF:      record.estado === "APROBADO" ? "APROBADO" : record.estado === "RECHAZADO" ? "RECHAZADO" : record.estado === "FIRMADO" ? "FIRMADO" : "PENDIENTE",
       datosPaciente: d?.paciente ? {
         direccion: d.paciente.direccion, ciudad: d.paciente.ciudad,
@@ -1763,6 +1781,10 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
   const [newPwd, setNewPwd] = useState("");
   const [confirmNewPwd, setConfirmNewPwd] = useState("");
   const [q, setQ] = useState("");
+  const [staffFoto, setStaffFoto] = useState<string|undefined>();
+  const [staffRm, setStaffRm] = useState("");
+  const [staffEsp, setStaffEsp] = useState("");
+  const staffFotoRef = useRef<HTMLInputElement>(null);
 
   const filtered = usuarios.filter(u =>
     q === "" ||
@@ -1779,15 +1801,17 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
     { value: "ADMINISTRADOR", label: "ADMINISTRADOR — Control total del sistema" },
   ];
 
+  const resetStaffForm = () => { setNombre(""); setEmail(""); setRol("AUXILIAR"); setPassword(""); setConfirmPwd(""); setStaffFoto(undefined); setStaffRm(""); setStaffEsp(""); };
+
   const handleAdd = () => {
     if (!nombre.trim() || !email.trim() || !password.trim()) { addToast("error", "Completar todos los campos requeridos"); return; }
     if (password !== confirmPwd) { addToast("error", "Las contraseñas no coinciden"); return; }
     if (password.length < 6) { addToast("error", "La contraseña debe tener al menos 6 caracteres"); return; }
     if (usuarios.find(u => u.email.toLowerCase() === email.toLowerCase())) { addToast("error", "Ya existe un usuario con ese correo"); return; }
-    const nuevo: Usuario = { id: genId(), nombre: nombre.trim(), email: email.trim().toLowerCase(), rol, password, activo: true, createdAt: hoy() };
+    const nuevo: Usuario = { id: genId(), nombre: nombre.trim(), email: email.trim().toLowerCase(), rol, password, activo: true, createdAt: hoy(), foto: staffFoto, rm: staffRm.trim()||undefined, especialidad: staffEsp.trim()||undefined };
     onAddUser(nuevo);
     addToast("success", `Usuario ${nombre} creado correctamente`);
-    setNombre(""); setEmail(""); setPassword(""); setConfirmPwd(""); setRol("AUXILIAR"); setShowForm(false);
+    resetStaffForm(); setShowForm(false);
   };
 
   const handleEdit = () => {
@@ -1796,13 +1820,14 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
     if (usuarios.find(u => u.email.toLowerCase() === email.toLowerCase() && u.id !== editingUser.id)) {
       addToast("error", "Ese correo ya está en uso"); return;
     }
-    onEditUser({ ...editingUser, nombre: nombre.trim(), email: email.trim().toLowerCase(), rol });
+    onEditUser({ ...editingUser, nombre: nombre.trim(), email: email.trim().toLowerCase(), rol, foto: staffFoto, rm: staffRm.trim()||undefined, especialidad: staffEsp.trim()||undefined });
     addToast("success", `Usuario ${nombre.trim()} actualizado`);
-    setEditingUser(null); setNombre(""); setEmail(""); setRol("AUXILIAR");
+    setEditingUser(null); resetStaffForm();
   };
 
   const openEdit = (u: Usuario) => {
     setEditingUser(u); setNombre(u.nombre); setEmail(u.email); setRol(u.rol);
+    setStaffFoto(u.foto); setStaffRm(u.rm??""); setStaffEsp(u.especialidad??"");
     setShowForm(false); setPwdUser(null);
   };
 
@@ -1837,12 +1862,26 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
         <p className="text-[11px] text-purple-800 font-semibold">Solo el <strong>Administrador</strong> puede agregar, editar, cambiar contraseñas y activar/desactivar personal del sistema.</p>
       </div>
 
+      {/* Hidden file input for staff foto */}
+      <input ref={staffFotoRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 300*1024) { addToast("error","Foto max 300 KB"); return; } const r = new FileReader(); r.onloadend = () => setStaffFoto(r.result as string); r.readAsDataURL(f); }}/>
+
       {/* Formulario nuevo usuario */}
       {showForm && (
         <div className="bg-card border-2 border-[#0D51D9]/30 rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <p className="font-bold text-sm flex items-center gap-2"><UserPlus size={16} className="text-[#0D51D9]"/> Nuevo Usuario del Sistema</p>
-            <button onClick={() => setShowForm(false)}><X size={16} className="text-muted-foreground"/></button>
+            <button onClick={() => { setShowForm(false); resetStaffForm(); }}><X size={16} className="text-muted-foreground"/></button>
+          </div>
+          {/* Foto de perfil */}
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-border bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#0D51D9]/40 transition-colors shrink-0" onClick={() => staffFotoRef.current?.click()}>
+              {staffFoto ? <img src={staffFoto} alt="Foto" className="w-full h-full object-cover"/> : <Camera size={20} className="text-muted-foreground"/>}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold mb-0.5">Foto de perfil</p>
+              <p className="text-[10px] text-muted-foreground">Opcional · PNG/JPG · max 300 KB</p>
+              {staffFoto && <button onClick={() => setStaffFoto(undefined)} className="text-[10px] text-red-500 mt-0.5">Quitar foto</button>}
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nombre completo" value={nombre} onChange={setNombre} placeholder="Dr. Nombre Apellido" required icon={<UserCheck size={13}/>}/>
@@ -1855,12 +1894,18 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
               {ROL_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+          {rol === "MÉDICO" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Registro Médico (RM)" value={staffRm} onChange={setStaffRm} placeholder="RM 0000000" icon={<Stethoscope size={13}/>}/>
+              <Field label="Especialidad" value={staffEsp} onChange={setStaffEsp} placeholder="Medicina Estética"/>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Contraseña" value={password} onChange={setPassword} type="password" placeholder="Min. 6 caracteres" required icon={<Lock size={13}/>}/>
             <Field label="Confirmar contraseña" value={confirmPwd} onChange={setConfirmPwd} type="password" placeholder="Repetir contraseña" required icon={<Lock size={13}/>}/>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
+            <button onClick={() => { setShowForm(false); resetStaffForm(); }} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
             <button onClick={handleAdd} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
               <Save size={14}/> Crear Usuario
             </button>
@@ -1873,7 +1918,17 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
         <div className="bg-card border-2 border-amber-300 rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <p className="font-bold text-sm flex items-center gap-2"><Edit3 size={16} className="text-amber-600"/> Editar: {editingUser.nombre}</p>
-            <button onClick={() => setEditingUser(null)}><X size={16} className="text-muted-foreground"/></button>
+            <button onClick={() => { setEditingUser(null); resetStaffForm(); }}><X size={16} className="text-muted-foreground"/></button>
+          </div>
+          {/* Foto de perfil */}
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 flex items-center justify-center overflow-hidden cursor-pointer hover:border-amber-400 transition-colors shrink-0" onClick={() => staffFotoRef.current?.click()}>
+              {staffFoto ? <img src={staffFoto} alt="Foto" className="w-full h-full object-cover"/> : <Camera size={20} className="text-amber-400"/>}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold mb-0.5">Foto de perfil</p>
+              {staffFoto && <button onClick={() => setStaffFoto(undefined)} className="text-[10px] text-red-500">Quitar foto</button>}
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nombre completo" value={nombre} onChange={setNombre} placeholder="Nombre completo" required icon={<UserCheck size={13}/>}/>
@@ -1886,6 +1941,12 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
               {ROL_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+          {rol === "MÉDICO" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Registro Médico (RM)" value={staffRm} onChange={setStaffRm} placeholder="RM 0000000" icon={<Stethoscope size={13}/>}/>
+              <Field label="Especialidad" value={staffEsp} onChange={setStaffEsp} placeholder="Medicina Estética"/>
+            </div>
+          )}
           <div className="flex gap-2">
             <button onClick={() => setEditingUser(null)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
             <button onClick={handleEdit} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors">
@@ -1926,9 +1987,10 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
       <div className="space-y-2">
         {filtered.map(u => (
           <div key={u.id} className={`bg-card rounded-2xl border border-border p-4 flex items-center gap-4 transition-all ${!u.activo ? "opacity-55" : ""} ${editingUser?.id===u.id||pwdUser?.id===u.id?"border-[#0D51D9]":""}`}>
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-black text-sm ${u.activo?"bg-[#0D51D9]":"bg-gray-400"}`}>
-              {u.nombre.charAt(0)}
-            </div>
+            {u.foto
+              ? <img src={u.foto} alt={u.nombre} className={`w-11 h-11 rounded-xl object-cover flex-shrink-0 ${!u.activo?"grayscale opacity-60":""}`}/>
+              : <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-black text-sm ${u.activo?"bg-[#0D51D9]":"bg-gray-400"}`}>{u.nombre.charAt(0)}</div>
+            }
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-semibold text-sm">{u.nombre}</p>
@@ -1936,6 +1998,7 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
                 {!u.activo && <span className="text-[9px] bg-gray-200 text-gray-600 font-bold px-1.5 py-0.5 rounded-full">INACTIVO</span>}
               </div>
               <p className="text-[10px] text-muted-foreground mt-0.5">{u.email}</p>
+              {(u.rm || u.especialidad) && <p className="text-[10px] text-[#0D51D9] font-medium">{[u.rm, u.especialidad].filter(Boolean).join(" · ")}</p>}
               <p className="text-[9px] text-muted-foreground">Desde: {fmtFecha(u.createdAt)}</p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
@@ -2180,69 +2243,233 @@ function AdminChangePwdModal({ user, onSave, onClose }: { user: Usuario; onSave:
 // IPS SETTINGS MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
 function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c: IPSConfig) => void; onClose: () => void }) {
-  const [form, setForm] = useState<IPSConfig>({ ...ips });
+  const [form, setForm] = useState<IPSConfig>({ ...ips, doctores: ips.doctores ? [...ips.doctores] : [] });
+  const [tab, setTab] = useState<"general"|"logo"|"medicos">("general");
   const s = (k: keyof IPSConfig) => (v: string) => setForm(f => ({ ...f, [k]: v }));
-  const firmaInputRef = useRef<HTMLInputElement>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
+  // Doctor inline form state
+  const [docForm, setDocForm] = useState(false);
+  const [docEdit, setDocEdit] = useState<Doctor | null>(null);
+  const [docNombre, setDocNombre] = useState("");
+  const [docRm, setDocRm] = useState("");
+  const [docEsp, setDocEsp] = useState("");
+  const [docEmail, setDocEmail] = useState("");
+  const [docTel, setDocTel] = useState("");
+  const [docFoto, setDocFoto] = useState<string|undefined>();
+  const [docFirma, setDocFirma] = useState<string|undefined>();
+  const docFotoRef = useRef<HTMLInputElement>(null);
+  const docFirmaRef = useRef<HTMLInputElement>(null);
 
-  const handleFirmaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 500 * 1024) { alert("La imagen debe pesar menos de 500 KB"); return; }
-    const reader = new FileReader();
-    reader.onloadend = () => setForm(f => ({ ...f, firmaDoctor: reader.result as string }));
-    reader.readAsDataURL(file);
+  const readImg = (file: File, maxKB: number, cb: (url: string) => void) => {
+    if (file.size > maxKB * 1024) { alert(`La imagen debe pesar menos de ${maxKB} KB`); return; }
+    const r = new FileReader();
+    r.onloadend = () => cb(r.result as string);
+    r.readAsDataURL(file);
   };
+
+  const resetDocForm = () => { setDocForm(false); setDocEdit(null); setDocNombre(""); setDocRm(""); setDocEsp(""); setDocEmail(""); setDocTel(""); setDocFoto(undefined); setDocFirma(undefined); };
+  const openDocAdd = () => { resetDocForm(); setDocForm(true); };
+  const openDocEdit = (d: Doctor) => { setDocEdit(d); setDocNombre(d.nombre); setDocRm(d.rm); setDocEsp(d.especialidad); setDocEmail(d.email??""); setDocTel(d.telefono??""); setDocFoto(d.foto); setDocFirma(d.firma); setDocForm(false); };
+
+  const saveDoc = () => {
+    if (!docNombre.trim() || !docRm.trim()) { alert("Nombre y Registro Médico son requeridos"); return; }
+    const doctores = form.doctores ?? [];
+    if (docEdit) {
+      setForm(f => ({ ...f, doctores: (f.doctores??[]).map(d => d.id===docEdit.id ? { ...d, nombre: docNombre.trim(), rm: docRm.trim(), especialidad: docEsp.trim(), email: docEmail.trim()||undefined, telefono: docTel.trim()||undefined, foto: docFoto, firma: docFirma } : d) }));
+    } else {
+      if (doctores.find(d => d.nombre.toLowerCase()===docNombre.toLowerCase())) { alert("Ya existe un médico con ese nombre"); return; }
+      const nuevo: Doctor = { id: Math.random().toString(36).slice(2), nombre: docNombre.trim(), rm: docRm.trim(), especialidad: docEsp.trim(), email: docEmail.trim()||undefined, telefono: docTel.trim()||undefined, foto: docFoto, firma: docFirma, activo: true };
+      setForm(f => ({ ...f, doctores: [...(f.doctores??[]), nuevo] }));
+    }
+    resetDocForm();
+  };
+
+  const deleteDoc = (id: string) => setForm(f => ({ ...f, doctores: (f.doctores??[]).filter(d => d.id!==id) }));
+  const toggleDocActivo = (id: string) => setForm(f => ({ ...f, doctores: (f.doctores??[]).map(d => d.id===id ? {...d, activo: !d.activo} : d) }));
+
+  const TABS = [
+    { key: "general" as const, label: "General", icon: <Building2 size={13}/> },
+    { key: "logo" as const, label: "Logo & Marca", icon: <Star size={13}/> },
+    { key: "medicos" as const, label: `Médicos (${(form.doctores??[]).length})`, icon: <Stethoscope size={13}/> },
+  ];
 
   return (
     <div className="fixed inset-0 bg-black/70 z-[300] flex items-end sm:items-center justify-center sm:p-4">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-white z-10">
-          <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-[#0D51D9]/10 flex items-center justify-center"><Settings size={15} className="text-[#0D51D9]"/></div><div><p className="font-bold text-sm">Configuración IPS</p><p className="text-[10px] text-muted-foreground">Constantes del sistema — solo Administrador</p></div></div>
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[96vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            {form.logo ? <img src={form.logo} alt="Logo" className="w-8 h-8 rounded-lg object-contain bg-gray-50 border border-border"/> : <div className="w-8 h-8 rounded-lg bg-[#0D51D9]/10 flex items-center justify-center"><Settings size={15} className="text-[#0D51D9]"/></div>}
+            <div><p className="font-bold text-sm">Configuración IPS — CliniSign</p><p className="text-[10px] text-muted-foreground">Panel de Administración · Control Total</p></div>
+          </div>
           <button onClick={onClose}><X size={18} className="text-muted-foreground"/></button>
         </div>
-        <div className="p-5 space-y-4">
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl"><p className="text-[10px] text-amber-800 font-semibold flex items-center gap-1.5"><AlertTriangle size={11}/> Estos valores aparecen en todos los consentimientos y PDFs</p></div>
-          <Field label="Nombre de la IPS" value={form.nombre} onChange={s("nombre")} placeholder="Nombre de la clínica" required/>
-          <Field label="NIT" value={form.nit} onChange={s("nit")} placeholder="000000000" icon={<FileText size={13}/>} required/>
-          <Field label="Médico Responsable" value={form.medico} onChange={s("medico")} placeholder="Dr. Nombre Apellido" icon={<Stethoscope size={13}/>} required/>
-          <Field label="Registro Médico (RM)" value={form.rm} onChange={s("rm")} placeholder="RM 0000000"/>
-          <Field label="Ciudad / Sede" value={form.ciudad} onChange={s("ciudad")} placeholder="Ciudad, País" icon={<MapPin size={13}/>}/>
-
-          {/* Firma / Sello del médico */}
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Firma / Sello del Médico (PDF)</p>
-            <div className="flex items-start gap-3">
-              <div className="flex-1 border-2 border-dashed border-border rounded-xl p-3 flex flex-col items-center justify-center gap-2 min-h-[80px] bg-gray-50 cursor-pointer hover:border-[#0D51D9]/50 transition-colors" onClick={() => firmaInputRef.current?.click()}>
-                {form.firmaDoctor ? (
-                  <img src={form.firmaDoctor} alt="Firma del médico" className="max-h-16 object-contain"/>
-                ) : (
-                  <>
-                    <Pen size={18} className="text-muted-foreground"/>
-                    <p className="text-[10px] text-muted-foreground text-center">Clic para subir firma escaneada o sello<br/><span className="text-[9px]">JPG/PNG · max 500 KB</span></p>
-                  </>
-                )}
-              </div>
-              {form.firmaDoctor && (
-                <button onClick={() => setForm(f => ({ ...f, firmaDoctor: undefined }))} className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors" title="Eliminar firma">
-                  <X size={14}/>
-                </button>
-              )}
-            </div>
-            <input ref={firmaInputRef} type="file" accept="image/png,image/jpeg,image/jpg" className="hidden" onChange={handleFirmaUpload}/>
-            <p className="text-[9px] text-muted-foreground mt-1.5">La imagen aparecerá en la sección de firmas de todos los PDFs generados.</p>
-          </div>
-
-          <div className="p-3 bg-[#EFF3FB] rounded-xl text-[10px] text-muted-foreground space-y-0.5">
-            <p className="font-bold text-foreground text-xs mb-1">Vista previa del encabezado:</p>
-            <p className="font-bold text-[#0D51D9]">{form.nombre || "Nombre IPS"}</p>
-            <p>NIT {form.nit || "000000000"}</p>
-            <p>{form.medico || "Médico"} · {form.rm || "RM"}</p>
-            <p className="text-[9px]">{form.ciudad || "Ciudad"}</p>
-          </div>
+        {/* Tabs */}
+        <div className="flex border-b border-border shrink-0 px-2">
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-[11px] font-semibold border-b-2 transition-colors ${tab===t.key ? "border-[#0D51D9] text-[#0D51D9]" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+              {t.icon}{t.label}
+            </button>
+          ))}
         </div>
-        <div className="flex gap-2 px-5 pb-5">
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* TAB GENERAL */}
+          {tab === "general" && (
+            <>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <p className="text-[10px] text-amber-800 font-semibold flex items-center gap-1.5"><AlertTriangle size={11}/> Estos valores aparecen en todos los consentimientos y PDFs</p>
+              </div>
+              <Field label="Nombre de la IPS / Clínica" value={form.nombre} onChange={s("nombre")} placeholder="Ej. Med&Fis IPS" required icon={<Building2 size={13}/>}/>
+              <Field label="NIT" value={form.nit} onChange={s("nit")} placeholder="000000000-0" icon={<CreditCard size={13}/>} required/>
+              <Field label="Médico Responsable Principal" value={form.medico} onChange={s("medico")} placeholder="Dr. Nombre Apellido" icon={<Stethoscope size={13}/>} required/>
+              <Field label="Registro Médico (RM)" value={form.rm} onChange={s("rm")} placeholder="RM 0000000"/>
+              <Field label="Ciudad / Sede" value={form.ciudad} onChange={s("ciudad")} placeholder="Ciudad, País" icon={<MapPin size={13}/>}/>
+              <div className="p-3 bg-[#EFF3FB] rounded-xl text-[10px] text-muted-foreground space-y-0.5">
+                <p className="font-bold text-foreground text-xs mb-1 flex items-center gap-1"><Globe size={11}/> Vista previa encabezado PDF:</p>
+                <p className="font-bold text-[#0D51D9]">{form.nombre || "Nombre IPS"}</p>
+                <p>NIT {form.nit || "000000000"}</p>
+                <p>{form.medico || "Médico"} · {form.rm || "RM"}</p>
+                <p className="text-[9px]">{form.ciudad || "Ciudad"}</p>
+              </div>
+            </>
+          )}
+
+          {/* TAB LOGO & MARCA */}
+          {tab === "logo" && (
+            <>
+              <div className="p-3 bg-[#EFF3FB] rounded-xl text-[10px] text-[#0D51D9] flex items-start gap-2">
+                <Info size={12} className="mt-0.5 shrink-0"/>
+                <p>El logo aparece en la barra de navegación. La firma del médico principal se configura en la pestaña <strong>Médicos</strong>.</p>
+              </div>
+              {/* Logo */}
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Logo de la IPS (Navegación)</p>
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 min-h-[100px] bg-gray-50 cursor-pointer hover:border-[#0D51D9]/50 transition-colors" onClick={() => logoRef.current?.click()}>
+                    {form.logo ? (
+                      <img src={form.logo} alt="Logo IPS" className="max-h-20 max-w-full object-contain"/>
+                    ) : (
+                      <>
+                        <Building2 size={22} className="text-muted-foreground"/>
+                        <p className="text-[10px] text-muted-foreground text-center">Clic para subir logo<br/><span className="text-[9px]">PNG/JPG · max 300 KB · fondo transparente ideal</span></p>
+                      </>
+                    )}
+                  </div>
+                  {form.logo && <button onClick={() => setForm(f => ({ ...f, logo: undefined }))} className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors"><X size={14}/></button>}
+                </div>
+                <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) readImg(f, 300, url => setForm(fm => ({ ...fm, logo: url }))); }}/>
+              </div>
+              {/* Firma legacy (fallback) */}
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Firma General (Fallback PDF)</p>
+                <p className="text-[9px] text-muted-foreground mb-2">Se usa cuando ningún médico del listado tiene firma configurada.</p>
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 border-2 border-dashed border-border rounded-xl p-3 flex flex-col items-center justify-center gap-2 min-h-[70px] bg-gray-50 cursor-pointer hover:border-[#0D51D9]/50 transition-colors" onClick={() => { const inp = document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.onchange = (ev: any) => { const f = ev.target.files?.[0]; if (f) readImg(f, 500, url => setForm(fm => ({ ...fm, firmaDoctor: url }))); }; inp.click(); }}>
+                    {form.firmaDoctor ? <img src={form.firmaDoctor} alt="Firma" className="max-h-14 object-contain"/> : <><Pen size={16} className="text-muted-foreground"/><p className="text-[10px] text-muted-foreground text-center">Subir firma general<br/><span className="text-[9px]">JPG/PNG · max 500 KB</span></p></>}
+                  </div>
+                  {form.firmaDoctor && <button onClick={() => setForm(f => ({ ...f, firmaDoctor: undefined }))} className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors"><X size={14}/></button>}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB MÉDICOS */}
+          {tab === "medicos" && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-sm">Médicos Registrados</p>
+                  <p className="text-[10px] text-muted-foreground">Sus datos y firmas aparecen en los PDFs al aprobar</p>
+                </div>
+                <button onClick={openDocAdd} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#0D51D9] text-white text-[11px] font-semibold hover:bg-[#1648bf] transition-colors">
+                  <Plus size={13}/> Agregar
+                </button>
+              </div>
+
+              {/* Form agregar/editar médico */}
+              {(docForm || docEdit) && (
+                <div className={`border-2 rounded-2xl p-4 space-y-3 ${docEdit ? "border-amber-300 bg-amber-50/30" : "border-[#0D51D9]/30 bg-[#EFF3FB]/30"}`}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-sm">{docEdit ? "Editar Médico" : "Nuevo Médico"}</p>
+                    <button onClick={resetDocForm}><X size={15} className="text-muted-foreground"/></button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Field label="Nombre completo *" value={docNombre} onChange={setDocNombre} placeholder="Dr. Nombre Apellido" icon={<Stethoscope size={13}/>}/>
+                    <Field label="Registro Médico *" value={docRm} onChange={setDocRm} placeholder="RM 0000000"/>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Field label="Especialidad" value={docEsp} onChange={setDocEsp} placeholder="Medicina Estética"/>
+                    <Field label="Correo" value={docEmail} onChange={setDocEmail} placeholder="medico@clinica.com" type="email" icon={<AtSign size={13}/>}/>
+                  </div>
+                  <Field label="Teléfono" value={docTel} onChange={setDocTel} placeholder="+57 300 000 0000" icon={<Phone size={13}/>}/>
+
+                  {/* Foto del médico */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Foto de Perfil</p>
+                      <div className="border-2 border-dashed border-border rounded-xl p-2 flex flex-col items-center justify-center gap-1 min-h-[70px] bg-gray-50 cursor-pointer hover:border-[#0D51D9]/40 transition-colors" onClick={() => docFotoRef.current?.click()}>
+                        {docFoto ? <img src={docFoto} alt="Foto" className="w-12 h-12 rounded-lg object-cover"/> : <><Camera size={16} className="text-muted-foreground"/><p className="text-[9px] text-muted-foreground text-center">Subir foto</p></>}
+                      </div>
+                      {docFoto && <button onClick={() => setDocFoto(undefined)} className="text-[9px] text-red-500 mt-1">Quitar foto</button>}
+                      <input ref={docFotoRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) readImg(f, 300, setDocFoto); }}/>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Firma / Sello</p>
+                      <div className="border-2 border-dashed border-border rounded-xl p-2 flex flex-col items-center justify-center gap-1 min-h-[70px] bg-gray-50 cursor-pointer hover:border-[#0D51D9]/40 transition-colors" onClick={() => docFirmaRef.current?.click()}>
+                        {docFirma ? <img src={docFirma} alt="Firma" className="max-h-14 object-contain"/> : <><Pen size={16} className="text-muted-foreground"/><p className="text-[9px] text-muted-foreground text-center">Subir firma</p></>}
+                      </div>
+                      {docFirma && <button onClick={() => setDocFirma(undefined)} className="text-[9px] text-red-500 mt-1">Quitar firma</button>}
+                      <input ref={docFirmaRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) readImg(f, 500, setDocFirma); }}/>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={resetDocForm} className="flex-1 py-2 rounded-xl border border-border text-[11px] font-medium hover:bg-muted">Cancelar</button>
+                    <button onClick={saveDoc} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#0D51D9] text-white text-[11px] font-semibold hover:bg-[#1648bf] transition-colors"><Save size={12}/> {docEdit ? "Actualizar" : "Agregar"}</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de médicos */}
+              <div className="space-y-2">
+                {(form.doctores??[]).length === 0 && !docForm && !docEdit && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Stethoscope size={28} className="mx-auto mb-2 opacity-30"/>
+                    <p className="text-[11px]">Sin médicos registrados. Agrega el primer médico.</p>
+                  </div>
+                )}
+                {(form.doctores??[]).map(d => (
+                  <div key={d.id} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${d.activo ? "bg-card border-border" : "bg-muted/30 border-border opacity-60"}`}>
+                    {d.foto
+                      ? <img src={d.foto} alt={d.nombre} className="w-10 h-10 rounded-xl object-cover shrink-0"/>
+                      : <div className="w-10 h-10 rounded-xl bg-[#0D51D9]/10 flex items-center justify-center shrink-0 text-[#0D51D9] font-black text-sm">{d.nombre.charAt(0)}</div>
+                    }
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-xs font-semibold">{d.nombre}</p>
+                        {d.firma && <span className="text-[8px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Pen size={8}/> Firma</span>}
+                        {!d.activo && <span className="text-[8px] bg-gray-200 text-gray-600 font-bold px-1.5 py-0.5 rounded-full">INACTIVO</span>}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{d.rm} {d.especialidad ? `· ${d.especialidad}` : ""}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => openDocEdit(d)} className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"><Edit3 size={11}/></button>
+                      <button onClick={() => toggleDocActivo(d.id)} className={`p-1.5 rounded-lg transition-colors ${d.activo ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}>{d.activo ? <Lock size={11}/> : <Unlock size={11}/>}</button>
+                      <button onClick={() => { if (confirm(`¿Eliminar al médico ${d.nombre}?`)) deleteDoc(d.id); }} className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"><Trash2 size={11}/></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2 px-5 py-4 border-t border-border shrink-0">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted">Cancelar</button>
-          <button onClick={() => { onSave(form); onClose(); }} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"><Save size={14}/> Guardar</button>
+          <button onClick={() => { onSave(form); onClose(); }} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"><Save size={14}/> Guardar Todo</button>
         </div>
       </div>
     </div>
@@ -2308,8 +2535,11 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
     <div className="min-h-screen bg-[#031CA6] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white mb-4 shadow-lg">
-            <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-16 h-16 object-contain"/>
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white mb-4 shadow-lg overflow-hidden">
+            {ips.logo
+              ? <img src={ips.logo} alt="Logo IPS" className="w-16 h-16 object-contain"/>
+              : <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-16 h-16 object-contain"/>
+            }
           </div>
           <h1 className="text-2xl font-black text-white">{ips.nombre}</h1>
           <p className="text-[#C5D5F0] text-sm mt-1">Sistema de Consentimientos Informados</p>
@@ -2363,8 +2593,13 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
       <aside className={`fixed top-0 left-0 h-full w-60 bg-[#031CA6] z-50 flex flex-col transition-transform duration-300 ${mobileOpen?"translate-x-0":"-translate-x-full"} lg:translate-x-0`}>
         <div className="px-5 py-5 border-b border-white/8">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center p-0.5"><ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-full h-full object-contain"/></div>
-            <div><p className="font-black text-white text-sm">{ips.nombre}</p><p className="text-[10px] text-[#7A94C5] font-mono">NIT {ips.nit}</p></div>
+            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center p-0.5 overflow-hidden">
+              {ips.logo
+                ? <img src={ips.logo} alt="Logo IPS" className="w-full h-full object-contain"/>
+                : <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-full h-full object-contain"/>
+              }
+            </div>
+            <div><p className="font-black text-white text-sm leading-tight">{ips.nombre}</p><p className="text-[10px] text-[#7A94C5] font-mono">NIT {ips.nit}</p></div>
           </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -2405,6 +2640,12 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
 }
 
 // ─── PDF PARAMS HELPER (reusable outside PDFViewer) ──────────────────────────
+function resolveAprobadorFirma(aprobadoPor: string | undefined, ips: IPSConfig): string | undefined {
+  if (!aprobadoPor) return undefined;
+  const doctor = ips.doctores?.find(d => d.nombre === aprobadoPor && d.activo);
+  return doctor?.firma ?? ips.firmaDoctor ?? undefined;
+}
+
 function buildPdfParamsForRecord(r: ConsentRecord, ips: IPSConfig) {
   const d = r.datos as any;
   const textoMap: Record<string, string> = {
@@ -2413,6 +2654,10 @@ function buildPdfParamsForRecord(r: ConsentRecord, ips: IPSConfig) {
     laser:          makeTextoLaser(ips),
     paquete:        makeTextoEscleroterapia(ips) + "\n\n" + makeTextoSueroterapia(ips) + "\n\n" + makeTextoLaser(ips),
   };
+  // Resolve primary doctor firma (from doctores list or legacy field)
+  const primerDoctor = ips.doctores?.find(doc => doc.activo);
+  const firmaDoctor = primerDoctor?.firma ?? ips.firmaDoctor ?? undefined;
+  const firmaAprobador = r.estado === "APROBADO" ? resolveAprobadorFirma(r.aprobadoPor, ips) : undefined;
   return {
     radicado: r.radicado, tipo: r.tipo, fecha: fmtFecha(r.fecha),
     pacienteNombre: r.pacienteNombre, pacienteDoc: r.pacienteDoc,
@@ -2420,10 +2665,10 @@ function buildPdfParamsForRecord(r: ConsentRecord, ips: IPSConfig) {
     creadoPor: r.creadoPor, textoConsent: textoMap[r.tipo] ?? "",
     ipsNombre: ips.nombre, ipsNit: ips.nit, ipsMedico: ips.medico, ipsRm: ips.rm, ipsCiudad: ips.ciudad,
     firmaConsentimiento: d?.firmaConsentimiento ?? undefined,
-    firmaDoctor: ips.firmaDoctor ?? undefined,
+    firmaDoctor,
     aprobadoPor: r.aprobadoPor ?? undefined,
     fechaAprobacion: r.fechaAprobacion ? fmtFecha(r.fechaAprobacion) : undefined,
-    firmaAprobador: r.estado === "APROBADO" ? (ips.firmaDoctor ?? undefined) : undefined,
+    firmaAprobador,
     estadoPDF: (r.estado === "APROBADO" ? "APROBADO" : r.estado === "RECHAZADO" ? "RECHAZADO" : r.estado === "FIRMADO" ? "FIRMADO" : "PENDIENTE") as "APROBADO"|"RECHAZADO"|"FIRMADO"|"PENDIENTE",
     datosPaciente: d?.paciente ? {
       direccion: d.paciente.direccion, ciudad: d.paciente.ciudad,
