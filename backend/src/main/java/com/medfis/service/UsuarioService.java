@@ -39,4 +39,12 @@ public class UsuarioService {
         if (u.getRol() == Usuario.RolUsuario.ADMINISTRADOR) throw new RuntimeException("No se puede desactivar al Administrador");
         u.setActivo(!u.isActivo()); return repo.save(u);
     }
+
+    @Transactional
+    public void cambiarPassword(UUID id, String newPassword) {
+        if (newPassword == null || newPassword.length() < 6) throw new RuntimeException("Contraseña debe tener al menos 6 caracteres");
+        Usuario u = repo.findById(id).orElseThrow(() -> new RuntimeException("No encontrado"));
+        u.setPassword(enc.encode(newPassword));
+        repo.save(u);
+    }
 }

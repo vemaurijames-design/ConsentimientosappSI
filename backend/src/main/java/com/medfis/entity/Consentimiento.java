@@ -30,6 +30,7 @@ public class Consentimiento {
     @Column(name = "fecha_aprobacion") private LocalDate fechaAprobacion;
     @Column(name = "creado_por", length = 200) private String creadoPor;
     @Column(name = "email_paciente", length = 200) private String emailPaciente;
+    @Column(name = "pdf_url", length = 1000) private String pdfUrl;
     @Column(name = "email_enviado", nullable = false) private boolean emailEnviado = false;
     @Column(name = "whatsapp_enviado", nullable = false) private boolean whatsappEnviado = false;
     @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb", nullable = false) private Map<String, Object> datos;

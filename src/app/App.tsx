@@ -29,32 +29,86 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════════
 const API_BASE = (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) || "http://localhost:8080/api";
 
-/* Mapa de endpoints Spring Boot:
- * POST   /api/auth/login                      → login
- * POST   /api/auth/logout                     → logout
- * GET    /api/usuarios                        → listar staff (admin)
- * POST   /api/usuarios                        → crear usuario (admin)
- * PUT    /api/usuarios/{id}                   → editar usuario (admin)
- * PATCH  /api/usuarios/{id}/toggle            → activar/desactivar (admin)
- * GET    /api/consentimientos                  → listar (filtrado por rol)
- * POST   /api/consentimientos                  → crear consentimiento
- * GET    /api/consentimientos/{id}             → detalle
- * POST   /api/consentimientos/{id}/aprobar     → médico aprueba
- * POST   /api/consentimientos/{id}/rechazar    → médico rechaza (requiere motivo)
- * GET    /api/notificaciones                   → notificaciones del usuario
- * PATCH  /api/notificaciones/{id}/leer         → marcar leída
- * DELETE /api/notificaciones/{id}              → eliminar
- * WS     /ws/notificaciones                    → WebSocket (Spring STOMP)
+/* API endpoints Spring Boot:
+ * Auth:  POST /api/auth/login|logout  GET /api/auth/me
+ * Consentimientos: GET|POST /api/consentimientos  POST /{id}/aprobar|rechazar  PATCH /{id}/anular|pdfurl
+ * Usuarios: GET /api/usuarios  POST /api/usuarios  PUT /{id}  PATCH /{id}/toggle|password
+ * Notificaciones: GET /api/notificaciones  PATCH /{id}/leer  DELETE /{id}
+ * WS: /ws/notificaciones (Spring STOMP)
  */
 const apiService = {
   _token: "",
   setToken(t: string) { this._token = t; },
   headers() { return { "Content-Type": "application/json", Authorization: `Bearer ${this._token}` }; },
-  async get(path: string) { return fetch(`${API_BASE}${path}`, { headers: this.headers() }); },
-  async post(path: string, body: unknown) { return fetch(`${API_BASE}${path}`, { method: "POST", headers: this.headers(), body: JSON.stringify(body) }); },
-  async put(path: string, body: unknown) { return fetch(`${API_BASE}${path}`, { method: "PUT", headers: this.headers(), body: JSON.stringify(body) }); },
-  async patch(path: string, body?: unknown) { return fetch(`${API_BASE}${path}`, { method: "PATCH", headers: this.headers(), body: body ? JSON.stringify(body) : undefined }); },
+  async get(path: string) { return fetch(`${API_BASE}${path}`, { headers: this.headers(), signal: AbortSignal.timeout(8000) }); },
+  async post(path: string, body: unknown) { return fetch(`${API_BASE}${path}`, { method: "POST", headers: this.headers(), body: JSON.stringify(body), signal: AbortSignal.timeout(8000) }); },
+  async put(path: string, body: unknown) { return fetch(`${API_BASE}${path}`, { method: "PUT", headers: this.headers(), body: JSON.stringify(body), signal: AbortSignal.timeout(8000) }); },
+  async patch(path: string, body?: unknown) { return fetch(`${API_BASE}${path}`, { method: "PATCH", headers: this.headers(), body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(8000) }); },
+  async delete(path: string) { return fetch(`${API_BASE}${path}`, { method: "DELETE", headers: this.headers(), signal: AbortSignal.timeout(8000) }); },
 };
+
+// ─── ROL MAPPERS (backend sin tildes ↔ frontend con tildes) ──────────────────
+function toBackendRol(rol: string): string {
+  return rol.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+function fromBackendRol(rol: string): RolUsuario {
+  const map: Record<string, RolUsuario> = {
+    MEDICO: "MÉDICO", TECNICO: "TÉCNICO",
+    ADMINISTRADOR: "ADMINISTRADOR", AUXILIAR: "AUXILIAR", ENFERMERA: "ENFERMERA",
+  };
+  return map[rol] ?? (rol as RolUsuario);
+}
+
+// ─── BACKEND → FRONTEND MAPPERS ───────────────────────────────────────────────
+function fromBackendConsent(b: Record<string, unknown>): ConsentRecord {
+  const datos = typeof b.datos === "string" ? JSON.parse(b.datos as string) : (b.datos ?? {});
+  // fecha puede venir como "2025-01-15" o [2025,1,15] según Jackson config
+  const fechaRaw = b.fecha as string | number[];
+  const fecha = Array.isArray(fechaRaw)
+    ? `${fechaRaw[0]}-${String(fechaRaw[1]).padStart(2,"0")}-${String(fechaRaw[2]).padStart(2,"0")}`
+    : (fechaRaw ?? hoy());
+  const fechaApRaw = b.fechaAprobacion as string | number[] | undefined;
+  const fechaAprobacion = fechaApRaw
+    ? (Array.isArray(fechaApRaw)
+        ? `${fechaApRaw[0]}-${String(fechaApRaw[1]).padStart(2,"0")}-${String(fechaApRaw[2]).padStart(2,"0")}`
+        : fechaApRaw)
+    : undefined;
+  return {
+    id:              String(b.id ?? ""),
+    tipo:            String(b.tipo ?? "escleroterapia").toLowerCase() as TipoConsent,
+    radicado:        String(b.radicado ?? ""),
+    fecha,
+    pacienteNombre:  String(b.pacienteNombre ?? ""),
+    pacienteDoc:     String(b.pacienteDoc ?? ""),
+    pacienteTel:     String(b.pacienteTel ?? ""),
+    estado:          (b.estado as EstadoConsent) ?? "FIRMADO",
+    pendienteMedico: Boolean(b.pendienteMedico ?? false),
+    motivoRechazo:   b.motivoRechazo as string | undefined,
+    aprobadoPor:     b.aprobadoPor as string | undefined,
+    fechaAprobacion,
+    creadoPor:       b.creadoPor as string | undefined,
+    emailEnviado:    Boolean(b.emailEnviado ?? false),
+    emailPaciente:   b.emailPaciente as string | undefined,
+    whatsappEnviado: Boolean(b.whatsappEnviado ?? false),
+    pdfUrl:          b.pdfUrl as string | undefined,
+    datos,
+  };
+}
+
+function fromBackendUser(b: Record<string, unknown>, cache?: Usuario): Usuario {
+  return {
+    id:          String(b.id ?? ""),
+    nombre:      String(b.nombre ?? ""),
+    email:       String(b.email ?? ""),
+    rol:         fromBackendRol(String(b.rol ?? "AUXILIAR")),
+    password:    cache?.password ?? "••••••••",
+    activo:      Boolean(b.activo ?? true),
+    createdAt:   String(b.createdAt ?? hoy()).slice(0, 10),
+    foto:        cache?.foto,
+    rm:          cache?.rm,
+    especialidad: cache?.especialidad,
+  };
+}
 
 // ─── IPS CONFIG ───────────────────────────────────────────────────────────────
 interface Doctor {
@@ -3119,7 +3173,9 @@ export default function App() {
   });
   const [showNotifs,    setShowNotifs]    = useState(false);
   const [showChangePwd, setShowChangePwd] = useState(false);
-  // Contadores consecutivos por tipo de consentimiento (persisten en localStorage)
+  const [backendOnline, setBackendOnline] = useState(false);
+
+  // Contadores locales (fallback cuando backend no está disponible)
   const nextIdsRef = useRef(
     ((): Record<TipoConsent, number> => {
       const tipos: TipoConsent[] = ["escleroterapia", "sueroterapia", "laser", "paquete"];
@@ -3131,11 +3187,27 @@ export default function App() {
     })()
   );
 
-  const getNextId = (tipo: TipoConsent): number => {
+  const getNextIdLocal = (tipo: TipoConsent): number => {
     const n = nextIdsRef.current[tipo] ?? 1;
     nextIdsRef.current[tipo] = n + 1;
     localStorage.setItem(`medfis_seq_${tipo}`, String(n));
     return n;
+  };
+
+  // Sincronizar localStorage de usuarios (extra fields: foto, rm, especialidad)
+  const syncUsuariosCache = (lista: Usuario[]) => {
+    localStorage.setItem("medfis_usuarios", JSON.stringify(lista));
+  };
+
+  // Merge usuarios del backend con cache local (para mantener foto/rm/especialidad)
+  const mergeWithLocalUsers = (backendUsers: Record<string, unknown>[]): Usuario[] => {
+    const localCache = (() => {
+      try { return JSON.parse(localStorage.getItem("medfis_usuarios") ?? "[]") as Usuario[]; } catch { return [] as Usuario[]; }
+    })();
+    return backendUsers.map(b => {
+      const cached = localCache.find(u => u.id === String(b.id) || u.email === String(b.email));
+      return fromBackendUser(b, cached);
+    });
   };
 
   const addToast = useCallback((type: "success"|"error"|"info"|"warning", msg: string) => {
@@ -3154,23 +3226,9 @@ export default function App() {
     const emailPac = (d?.paciente?.email    ?? "") as string;
     const telPac   = (d?.paciente?.telefono ?? "") as string;
 
-    // 1. Guardar inmediatamente en localStorage — usar radicado con contador por tipo
-    const seqId = getNextId(r.tipo);
-    const radicadoFinal = genRadicado(r.tipo, seqId);
-    const rBase: ConsentRecord = { ...r, radicado: radicadoFinal, emailPaciente: emailPac || undefined };
-    setRecords(prev => { const u = [...prev, rBase]; localStorage.setItem("medfis_records", JSON.stringify(u)); return u; });
     setActiveForm(null);
     setPage("historial");
 
-    // 2. Notificaciones internas
-    const baseMsg    = `${rBase.pacienteNombre} · ${rBase.tipo} · Radicado: ${rBase.radicado}. Revise y otorgue el Visto Bueno.`;
-    const notifMedico: Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: "Consentimiento pendiente de Visto Bueno", mensaje: baseMsg, consentId: rBase.id, leida: false, fecha: new Date().toISOString(), paraRol: "MÉDICO" };
-    const notifAdmin:  Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: `Nuevo consentimiento — ${rBase.pacienteNombre}`, mensaje: `Registrado por: ${rBase.creadoPor ?? "—"} · ${rBase.radicado} · Pendiente aprobación médica.`, consentId: rBase.id, leida: false, fecha: new Date().toISOString(), paraRol: "ADMINISTRADOR" };
-    setNotificaciones(prev => { const u = [...prev, notifMedico, notifAdmin]; localStorage.setItem("medfis_notificaciones", JSON.stringify(u)); return u; });
-
-    addToast("success", `✅ ${rBase.radicado} guardado — generando PDF y enviando notificaciones…`);
-
-    // 3. Pipeline asíncrono: PDF → Supabase → Email → WhatsApp
     const textoMap: Record<string, string> = {
       escleroterapia: makeTextoEscleroterapia(ips),
       sueroterapia:   makeTextoSueroterapia(ips),
@@ -3179,12 +3237,55 @@ export default function App() {
     };
 
     const pipeline = async () => {
-      // ── 3a. Generar PDF ──────────────────────────────────────────────────
+      // ── 1. POST al backend (fuente de verdad) — obtiene ID y radicado del servidor
+      let rBase: ConsentRecord = { ...r, emailPaciente: emailPac || undefined };
+      let backendId: string | null = null;
+
+      try {
+        const backendResp = await apiService.post("/consentimientos", {
+          tipo:           r.tipo,
+          pacienteNombre: r.pacienteNombre,
+          pacienteDoc:    r.pacienteDoc,
+          pacienteTel:    r.pacienteTel,
+          emailPaciente:  emailPac || null,
+          datos:          r.datos,
+        });
+        if (backendResp.ok) {
+          const created: Record<string, unknown> = await backendResp.json();
+          backendId = String(created.id);
+          rBase = { ...rBase, id: backendId, radicado: String(created.radicado) };
+          setBackendOnline(true);
+          addToast("success", `✅ ${rBase.radicado} guardado en base de datos`);
+        } else {
+          console.warn("Backend respondió:", backendResp.status);
+          // Fallback: usar radicado local
+          const seqId = getNextIdLocal(r.tipo);
+          rBase = { ...rBase, radicado: genRadicado(r.tipo, seqId) };
+          addToast("warning", `⚠️ ${rBase.radicado} — solo guardado localmente (backend no disponible)`);
+        }
+      } catch (err) {
+        // Backend offline — usar radicado local
+        const seqId = getNextIdLocal(r.tipo);
+        rBase = { ...rBase, radicado: genRadicado(r.tipo, seqId) };
+        addToast("warning", `⚠️ ${rBase.radicado} — modo offline, datos guardados localmente`);
+      }
+
+      // Guardar en estado + localStorage inmediatamente con el radicado final
+      setRecords(prev => { const u = [...prev, rBase]; localStorage.setItem("medfis_records", JSON.stringify(u)); return u; });
+
+      // Notificaciones locales
+      const baseMsg = `${rBase.pacienteNombre} · ${rBase.tipo} · Radicado: ${rBase.radicado}. Revise y otorgue el Visto Bueno.`;
+      const notifMedico: Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: "Consentimiento pendiente de Visto Bueno", mensaje: baseMsg, consentId: rBase.id, leida: false, fecha: new Date().toISOString(), paraRol: "MÉDICO" };
+      const notifAdmin:  Notificacion = { id: genId(), tipo: "NUEVO_CONSENTIMIENTO", titulo: `Nuevo consentimiento — ${rBase.pacienteNombre}`, mensaje: `Por: ${rBase.creadoPor ?? "—"} · ${rBase.radicado} · Pendiente aprobación médica.`, consentId: rBase.id, leida: false, fecha: new Date().toISOString(), paraRol: "ADMINISTRADOR" };
+      setNotificaciones(prev => { const u = [...prev, notifMedico, notifAdmin]; localStorage.setItem("medfis_notificaciones", JSON.stringify(u)); return u; });
+
+      // ── 2. Generar PDF ──────────────────────────────────────────────────
       let pdfUrl: string | null = null;
       let emailEnviado = false;
 
       try {
         const rd = rBase.datos as any;
+        const firmaDoctor = (ips.doctores?.find(doc => doc.activo)?.firma) ?? ips.firmaDoctor ?? undefined;
         const pdfBlob = await generarPDFConsentimiento({
           radicado:       rBase.radicado,
           tipo:           rBase.tipo,
@@ -3201,7 +3302,7 @@ export default function App() {
           ipsRm:          ips.rm,
           ipsCiudad:      ips.ciudad,
           firmaConsentimiento: rd?.firmaConsentimiento ?? undefined,
-          firmaDoctor:    ips.firmaDoctor ?? undefined,
+          firmaDoctor,
           estadoPDF:      "FIRMADO",
           datosPaciente:  rd?.paciente ? {
             direccion: rd.paciente.direccion, ciudad: rd.paciente.ciudad,
@@ -3213,31 +3314,17 @@ export default function App() {
           vitales: rd?.vitales ?? undefined,
         });
 
-        // ── 3b. Subir PDF a Supabase Storage ────────────────────────────────
+        // ── 3. Subir PDF a Supabase Storage ─────────────────────────────
         pdfUrl = await subirPDF(pdfBlob, rBase.radicado, rBase.pacienteDoc);
-        if (pdfUrl) addToast("info", `☁️ PDF guardado en la nube`);
-
-        // ── 3b2. Sincronizar con backend PostgreSQL ──────────────────────────
-        try {
-          const backendResp = await apiService.post("/consentimientos", {
-            tipo:           rBase.tipo,
-            radicado:       rBase.radicado,
-            pacienteNombre: rBase.pacienteNombre,
-            pacienteDoc:    rBase.pacienteDoc,
-            pacienteTel:    rBase.pacienteTel,
-            emailPaciente:  emailPac || null,
-            fecha:          rBase.fecha,
-            pdfUrl:         pdfUrl || null,
-            creadoPor:      rBase.creadoPor ?? null,
-            datos:          JSON.stringify(rBase.datos),
-          });
-          if (backendResp.ok) addToast("success", "✅ Sincronizado con base de datos");
-          else console.warn("Backend sync status:", backendResp.status);
-        } catch (backendErr) {
-          console.warn("Backend no disponible — datos guardados localmente:", backendErr);
+        if (pdfUrl) {
+          addToast("info", `☁️ PDF guardado en la nube`);
+          // Actualizar pdfUrl en backend
+          if (backendId) {
+            apiService.patch(`/consentimientos/${backendId}/pdfurl`, { pdfUrl }).catch(() => {});
+          }
         }
 
-        // ── 3c. Enviar email via EmailJS ─────────────────────────────────────
+        // ── 4. Enviar email via EmailJS ──────────────────────────────────
         const datosEmail = {
           emailPaciente:  emailPac,
           nombrePaciente: rBase.pacienteNombre,
@@ -3256,75 +3343,76 @@ export default function App() {
           emailPac ? enviarEmailPaciente(datosEmail) : Promise.resolve(false),
           enviarEmailClinica(datosEmail),
         ]);
-
-        emailEnviado = (okPac.status === "fulfilled" && okPac.value) ||
-                       (okCli.status === "fulfilled" && okCli.value);
+        emailEnviado = (okPac.status === "fulfilled" && !!okPac.value) ||
+                       (okCli.status === "fulfilled" && !!okCli.value);
 
         if (emailEnviado && emailPac) addToast("success", `📧 Email enviado a ${emailPac}`);
         else if (emailEnviado)        addToast("success", `📧 Copia enviada a la clínica`);
 
       } catch (err) {
         console.error("Pipeline PDF/email:", err);
-        addToast("warning", "PDF/email: modo sin conexión — datos guardados localmente");
+        addToast("warning", "PDF: error generando — verifique la conexión");
       }
 
-      // ── 3d. Actualizar flags en el registro ─────────────────────────────
+      // ── 5. Actualizar flags localmente ───────────────────────────────
       setRecords(prev => {
-        const updated = prev.map(x => x.id === rBase.id
-          ? { ...x, emailEnviado, pdfUrl: pdfUrl ?? undefined }
-          : x
-        );
+        const updated = prev.map(x => x.id === rBase.id ? { ...x, emailEnviado, pdfUrl: pdfUrl ?? undefined } : x);
         localStorage.setItem("medfis_records", JSON.stringify(updated));
         return updated;
       });
 
-      // ── 3e. WhatsApp (abrir Web) ─────────────────────────────────────────
+      // ── 6. WhatsApp ──────────────────────────────────────────────────
       if (telPac) {
         const tLabel = { escleroterapia:"Escleroterapia", sueroterapia:"Sueroterapia Vit C/B", laser:"Terapia Láser", paquete:"Paquete Integral" }[rBase.tipo] ?? rBase.tipo;
-        const waMsg  = encodeURIComponent(
+        const waMsg = encodeURIComponent(
           `✅ *${ips.nombre}* — Consentimiento Informado\n\n` +
           `Estimado/a *${rBase.pacienteNombre}*,\n\n` +
-          `Su consentimiento informado ha sido registrado exitosamente.\n\n` +
+          `Su consentimiento ha sido registrado exitosamente.\n\n` +
           `📋 *Procedimiento:* ${tLabel}\n` +
           `🔖 *Radicado:* ${rBase.radicado}\n` +
           `📅 *Fecha:* ${fmtFecha(rBase.fecha)}\n` +
           `⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n` +
-          (pdfUrl ? `📄 *PDF del consentimiento:* ${pdfUrl}\n\n` : "") +
-          `Recibirá confirmación cuando el médico apruebe su cita.\n\n` +
-          `📞 *Contacto clínica:* +57 311 404 8112\n` +
-          `📧 medfissaludintensa@gmail.com\n` +
-          `_${ips.medico} · ${ips.rm}_`
+          (pdfUrl ? `📄 *PDF:* ${pdfUrl}\n\n` : "") +
+          `📞 *Contacto clínica:* +57 311 404 8112\n_${ips.medico} · ${ips.rm}_`
         );
-        const numLimpio = telPac.replace(/[^0-9]/g, "");
-        window.open(`https://wa.me/57${numLimpio}?text=${waMsg}`, "_blank");
+        window.open(`https://wa.me/57${telPac.replace(/[^0-9]/g,"")}?text=${waMsg}`, "_blank");
         setRecords(prev => {
           const updated = prev.map(x => x.id === rBase.id ? { ...x, whatsappEnviado: true } : x);
           localStorage.setItem("medfis_records", JSON.stringify(updated));
           return updated;
         });
-        addToast("info", `📱 WhatsApp enviado a ${rBase.pacienteNombre}`);
+        addToast("info", `📱 WhatsApp abierto para ${rBase.pacienteNombre}`);
       }
     };
 
     pipeline();
   };
 
-  const handleAprobar = (id: string) => {
+  const handleAprobar = async (id: string) => {
+    // Actualizar optimistamente en local
+    const aprobadoPor = user?.nombre ?? "—";
     setRecords(prev => {
-      const updated = prev.map(r => r.id === id ? { ...r, estado: "APROBADO" as EstadoConsent, pendienteMedico: false, aprobadoPor: user?.nombre, fechaAprobacion: hoy() } : r);
+      const updated = prev.map(r => r.id === id ? { ...r, estado: "APROBADO" as EstadoConsent, pendienteMedico: false, aprobadoPor, fechaAprobacion: hoy() } : r);
       localStorage.setItem("medfis_records", JSON.stringify(updated));
       return updated;
     });
     const r = records.find(x => x.id === id);
     if (r) {
-      const notif: Notificacion = { id: genId(), tipo: "APROBADO", titulo: "Visto Bueno otorgado", mensaje: `${r.pacienteNombre} — ${r.radicado} aprobado. La cita puede proceder.`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "TODOS" };
-      setNotificaciones(prev => { const updated = [...prev, notif]; localStorage.setItem("medfis_notificaciones", JSON.stringify(updated)); return updated; });
+      const notif: Notificacion = { id: genId(), tipo: "APROBADO", titulo: "Visto Bueno otorgado", mensaje: `${r.pacienteNombre} — ${r.radicado} aprobado por ${aprobadoPor}. La cita puede proceder.`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "TODOS" };
+      setNotificaciones(prev => { const u = [...prev, notif]; localStorage.setItem("medfis_notificaciones", JSON.stringify(u)); return u; });
     }
-    // Sync con backend (fire-and-forget)
-    apiService.post(`/consentimientos/${id}/aprobar`, {}).catch(() => {});
+    // Sync backend
+    try {
+      const resp = await apiService.post(`/consentimientos/${id}/aprobar`, {});
+      if (resp.ok) {
+        const updated: Record<string, unknown> = await resp.json();
+        setRecords(prev => prev.map(x => x.id === id ? { ...x, aprobadoPor: String(updated.aprobadoPor ?? aprobadoPor), fechaAprobacion: hoy() } : x));
+        addToast("success", "✅ Aprobado y sincronizado con la base de datos");
+      }
+    } catch { addToast("info", "Aprobado localmente — se sincronizará cuando el backend esté disponible"); }
   };
 
-  const handleRechazar = (id: string, motivo: string) => {
+  const handleRechazar = async (id: string, motivo: string) => {
     setRecords(prev => {
       const updated = prev.map(r => r.id === id ? { ...r, estado: "RECHAZADO" as EstadoConsent, pendienteMedico: false, motivoRechazo: motivo } : r);
       localStorage.setItem("medfis_records", JSON.stringify(updated));
@@ -3333,62 +3421,135 @@ export default function App() {
     const r = records.find(x => x.id === id);
     if (r) {
       const notif: Notificacion = { id: genId(), tipo: "RECHAZADO", titulo: "Consentimiento rechazado", mensaje: `${r.pacienteNombre} — ${r.radicado}. Motivo: ${motivo}`, consentId: r.id, leida: false, fecha: new Date().toISOString(), paraRol: "TODOS" };
-      setNotificaciones(prev => { const updated = [...prev, notif]; localStorage.setItem("medfis_notificaciones", JSON.stringify(updated)); return updated; });
+      setNotificaciones(prev => { const u = [...prev, notif]; localStorage.setItem("medfis_notificaciones", JSON.stringify(u)); return u; });
     }
-    // Sync con backend (fire-and-forget)
-    apiService.post(`/consentimientos/${id}/rechazar`, { motivo }).catch(() => {});
+    try {
+      await apiService.post(`/consentimientos/${id}/rechazar`, { motivo });
+      addToast("success", "Rechazado y sincronizado");
+    } catch { addToast("info", "Rechazado localmente"); }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     setRecords(prev => {
-      const updated = prev.map(r => r.id===id ? {...r, estado:"ANULADO" as EstadoConsent, pendienteMedico:false} : r);
+      const updated = prev.map(r => r.id === id ? { ...r, estado: "ANULADO" as EstadoConsent, pendienteMedico: false } : r);
       localStorage.setItem("medfis_records", JSON.stringify(updated));
       return updated;
     });
-    addToast("info","Consentimiento anulado");
+    try { await apiService.patch(`/consentimientos/${id}/anular`); } catch {}
+    addToast("info", "Consentimiento anulado");
   };
 
-  const handleAddUser = (u: Usuario) => {
-    const updated = [...usuarios, u];
-    setUsuarios(updated);
-    localStorage.setItem("medfis_usuarios", JSON.stringify(updated));
+  const handleAddUser = async (u: Usuario) => {
+    // Guardar en local primero (para respuesta inmediata de UI)
+    const localList = [...usuarios, u];
+    setUsuarios(localList);
+    syncUsuariosCache(localList);
+    // Sync backend
+    try {
+      const resp = await apiService.post("/usuarios", {
+        nombre: u.nombre, email: u.email, password: u.password,
+        rol: toBackendRol(u.rol),
+      });
+      if (resp.ok) {
+        const created: Record<string, unknown> = await resp.json();
+        // Actualizar con el ID real del servidor
+        const merged = fromBackendUser(created, u);
+        setUsuarios(prev => prev.map(x => x.email === u.email ? merged : x));
+        syncUsuariosCache(usuarios.map(x => x.email === u.email ? merged : x));
+        addToast("success", `Usuario ${u.nombre} creado en la base de datos`);
+      }
+    } catch { addToast("warning", "Usuario guardado localmente — sincronizará con backend al conectar"); }
   };
 
-  const handleEditUser = (updatedUser: Usuario) => {
+  const handleEditUser = async (updatedUser: Usuario) => {
     const list = usuarios.map(u => u.id === updatedUser.id ? updatedUser : u);
     setUsuarios(list);
-    localStorage.setItem("medfis_usuarios", JSON.stringify(list));
+    syncUsuariosCache(list);
     if (user?.id === updatedUser.id) setUser(updatedUser);
+    // Sync backend
+    try {
+      await apiService.put(`/usuarios/${updatedUser.id}`, {
+        nombre: updatedUser.nombre, email: updatedUser.email,
+        rol: toBackendRol(updatedUser.rol),
+      });
+      addToast("success", `Usuario ${updatedUser.nombre} actualizado`);
+    } catch { addToast("warning", "Cambios guardados localmente"); }
   };
 
-  const handleChangeUserPassword = (userId: string, newPassword: string) => {
+  const handleChangeUserPassword = async (userId: string, newPassword: string) => {
     const list = usuarios.map(u => u.id === userId ? { ...u, password: newPassword } : u);
     setUsuarios(list);
-    localStorage.setItem("medfis_usuarios", JSON.stringify(list));
-    addToast("success", "Contraseña actualizada correctamente");
+    syncUsuariosCache(list);
+    // Sync backend
+    try {
+      await apiService.patch(`/usuarios/${userId}/password`, { password: newPassword });
+      addToast("success", "Contraseña actualizada en la base de datos");
+    } catch { addToast("success", "Contraseña actualizada localmente"); }
   };
 
-  const handleToggleActivo = (id: string) => {
+  const handleToggleActivo = async (id: string) => {
     const target = usuarios.find(u => u.id === id);
     if (target?.rol === "ADMINISTRADOR") { addToast("error", "No se puede desactivar al Administrador"); return; }
     const updated = usuarios.map(u => u.id === id ? { ...u, activo: !u.activo } : u);
     setUsuarios(updated);
-    localStorage.setItem("medfis_usuarios", JSON.stringify(updated));
+    syncUsuariosCache(updated);
+    // Sync backend
+    try { await apiService.patch(`/usuarios/${id}/toggle`); } catch {}
   };
 
   const notifCount    = notificaciones.filter(n => !n.leida && (n.paraRol === "TODOS" || n.paraRol === user?.rol)).length;
   const myNotifs      = notificaciones.filter(n => n.paraRol === "TODOS" || n.paraRol === user?.rol);
 
-  // Simulación polling backend (Spring Boot WebSocket)
+  // ── Cargar datos desde PostgreSQL al iniciar sesión ─────────────────────────
   useEffect(() => {
     if (!user) return;
+    let alive = true;
+
+    const cargarDesdeBackend = async () => {
+      // 1. Cargar consentimientos
+      try {
+        const r = await apiService.get("/consentimientos");
+        if (!alive) return;
+        if (r.ok) {
+          const data: Record<string, unknown>[] = await r.json();
+          const mapped = data.map(fromBackendConsent);
+          setRecords(mapped);
+          localStorage.setItem("medfis_records", JSON.stringify(mapped));
+          setBackendOnline(true);
+        }
+      } catch { /* backend offline — usar localStorage */ }
+
+      // 2. Cargar usuarios (solo admin y médico)
+      if (user.rol === "ADMINISTRADOR" || user.rol === "MÉDICO") {
+        try {
+          const r = await apiService.get("/usuarios");
+          if (!alive) return;
+          if (r.ok) {
+            const data: Record<string, unknown>[] = await r.json();
+            const merged = mergeWithLocalUsers(data);
+            setUsuarios(merged);
+            syncUsuariosCache(merged);
+          }
+        } catch { /* usar localStorage */ }
+      }
+
+      // 3. Polling periódico de consentimientos (cada 60s para ver cambios de otros usuarios)
+    };
+
+    cargarDesdeBackend();
     const interval = setInterval(() => {
-      /* En producción: conectar a WS STOMP → ws://localhost:8080/ws/notificaciones
-       * client.subscribe('/user/queue/notificaciones', msg => { addNotificacion(JSON.parse(msg.body)); });
-       */
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
+      apiService.get("/consentimientos").then(async r => {
+        if (r.ok && alive) {
+          const data: Record<string, unknown>[] = await r.json();
+          const mapped = data.map(fromBackendConsent);
+          setRecords(mapped);
+          localStorage.setItem("medfis_records", JSON.stringify(mapped));
+        }
+      }).catch(() => {});
+    }, 60000);
+
+    return () => { alive = false; clearInterval(interval); };
+  }, [user?.id]);
 
   if (!user) return (
     <IPSContext.Provider value={ips}>

@@ -25,16 +25,27 @@ public class ConsentimientoService {
     @Transactional
     public Consentimiento crear(ConsentimientoRequest req, String creadoPor) {
         Consentimiento c = new Consentimiento();
-        c.setTipo(TipoConsent.valueOf(req.getTipo())); c.setRadicado(genRadicado(req.getTipo()));
+        TipoConsent tipo = TipoConsent.valueOf(req.getTipo().toLowerCase());
+        c.setTipo(tipo); c.setRadicado(genRadicado(tipo));
         c.setFecha(LocalDate.now()); c.setPacienteNombre(req.getPacienteNombre());
         c.setPacienteDoc(req.getPacienteDoc()); c.setPacienteTel(req.getPacienteTel());
         c.setEstado(EstadoConsent.FIRMADO); c.setPendienteMedico(true);
-        c.setCreadoPor(creadoPor); c.setDatos(req.getDatos());
+        c.setCreadoPor(creadoPor);
+        if (req.getEmailPaciente() != null && !req.getEmailPaciente().isBlank()) c.setEmailPaciente(req.getEmailPaciente());
+        if (req.getPdfUrl() != null && !req.getPdfUrl().isBlank()) c.setPdfUrl(req.getPdfUrl());
+        c.setDatos(req.getDatos());
         Consentimiento saved = repo.save(c);
         String base = req.getPacienteNombre()+" · "+req.getTipo()+" · "+saved.getRadicado();
         notif.crearYEmitir(Notificacion.TipoNotif.NUEVO_CONSENTIMIENTO, "Consentimiento pendiente de Visto Bueno", base+". Revise y apruebe.", saved.getId(), "MEDICO");
         notif.crearYEmitir(Notificacion.TipoNotif.NUEVO_CONSENTIMIENTO, "Nuevo consentimiento — "+req.getPacienteNombre(), "Por: "+creadoPor+" · "+saved.getRadicado()+" · Pendiente aprobación médica.", saved.getId(), "ADMINISTRADOR");
         return saved;
+    }
+
+    @Transactional
+    public void actualizarPdfUrl(UUID id, String pdfUrl) {
+        Consentimiento c = buscar(id);
+        if (pdfUrl != null && !pdfUrl.isBlank()) c.setPdfUrl(pdfUrl);
+        repo.save(c);
     }
 
     @Transactional
@@ -77,8 +88,10 @@ public class ConsentimientoService {
     public long countFirmados()  { return repo.countByEstado(EstadoConsent.FIRMADO); }
     public long countTotal()     { return repo.count(); }
 
-    private String genRadicado(String tipo) {
-        String p = switch(tipo) { case "escleroterapia"->"ESC"; case "sueroterapia"->"SUE"; case "laser"->"LAS"; default->"PAQ"; };
-        return p+"-"+LocalDate.now().getYear()+"-"+String.format("%04d", repo.count()+1);
+    private String genRadicado(TipoConsent tipo) {
+        String p = switch(tipo) { case escleroterapia->"ESC"; case sueroterapia->"SUE"; case laser->"LAS"; default->"PAQ"; };
+        int year = LocalDate.now().getYear();
+        long count = repo.countByTipoAndYear(tipo, year) + 1;
+        return p+"-"+year+"-"+String.format("%04d", count);
     }
 }

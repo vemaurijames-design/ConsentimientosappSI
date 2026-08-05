@@ -24,9 +24,10 @@ public class ConsentimientoController {
     @GetMapping("/pendientes") @PreAuthorize("hasAnyRole('MEDICO','ADMINISTRADOR')") public ResponseEntity<List<Consentimiento>> pendientes() { return ResponseEntity.ok(svc.pendientesMedico()); }
     @GetMapping("/{id}") public ResponseEntity<Consentimiento> buscar(@PathVariable UUID id) { return ResponseEntity.ok(svc.buscar(id)); }
     @PostMapping public ResponseEntity<Consentimiento> crear(@Valid @RequestBody ConsentimientoRequest req, Authentication auth) { return ResponseEntity.status(HttpStatus.CREATED).body(svc.crear(req, auth.getName())); }
-    @PostMapping("/{id}/aprobar") @PreAuthorize("hasRole('MEDICO')") public ResponseEntity<Consentimiento> aprobar(@PathVariable UUID id, Authentication auth) { return ResponseEntity.ok(svc.aprobar(id, auth.getName())); }
-    @PostMapping("/{id}/rechazar") @PreAuthorize("hasRole('MEDICO')") public ResponseEntity<Consentimiento> rechazar(@PathVariable UUID id, @RequestBody Map<String,String> b, Authentication auth) { return ResponseEntity.ok(svc.rechazar(id, b.getOrDefault("motivo","Sin motivo"), auth.getName())); }
+    @PostMapping("/{id}/aprobar") @PreAuthorize("hasAnyRole('MEDICO','ADMINISTRADOR')") public ResponseEntity<Consentimiento> aprobar(@PathVariable UUID id, Authentication auth) { return ResponseEntity.ok(svc.aprobar(id, auth.getName())); }
+    @PostMapping("/{id}/rechazar") @PreAuthorize("hasAnyRole('MEDICO','ADMINISTRADOR')") public ResponseEntity<Consentimiento> rechazar(@PathVariable UUID id, @RequestBody Map<String,String> b, Authentication auth) { return ResponseEntity.ok(svc.rechazar(id, b.getOrDefault("motivo","Sin motivo"), auth.getName())); }
     @PatchMapping("/{id}/anular") @PreAuthorize("hasAnyRole('MEDICO','ADMINISTRADOR')") public ResponseEntity<Consentimiento> anular(@PathVariable UUID id) { return ResponseEntity.ok(svc.anular(id)); }
+    @PatchMapping("/{id}/pdfurl") public ResponseEntity<Void> pdfUrl(@PathVariable UUID id, @RequestBody Map<String,String> body) { svc.actualizarPdfUrl(id, body.get("pdfUrl")); return ResponseEntity.ok().build(); }
     @GetMapping("/estadisticas") public ResponseEntity<Map<String,Long>> stats() { return ResponseEntity.ok(Map.of("total",svc.countTotal(),"firmados",svc.countFirmados(),"aprobados",svc.countAprobados(),"hoy",svc.countHoy())); }
 
     /** Envía email con PDF adjunto al paciente y copia a la clínica. */

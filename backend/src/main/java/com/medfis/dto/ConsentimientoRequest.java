@@ -8,5 +8,7 @@ import java.util.Map;
     @NotBlank private String pacienteNombre;
     @NotBlank private String pacienteDoc;
     private String pacienteTel;
+    private String emailPaciente;
+    private String pdfUrl;
     @NotNull private Map<String, Object> datos;
 }

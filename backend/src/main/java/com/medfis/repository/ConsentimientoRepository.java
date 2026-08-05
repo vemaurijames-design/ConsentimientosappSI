@@ -16,4 +16,6 @@ public interface ConsentimientoRepository extends JpaRepository<Consentimiento, 
     List<Consentimiento> search(String q);
     long countByFecha(LocalDate fecha);
     long countByEstado(EstadoConsent estado);
+    @Query("SELECT COUNT(c) FROM Consentimiento c WHERE c.tipo = :tipo AND YEAR(c.fecha) = :year")
+    long countByTipoAndYear(Consentimiento.TipoConsent tipo, int year);
 }
