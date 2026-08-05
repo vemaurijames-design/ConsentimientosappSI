@@ -19,6 +19,14 @@ interface DatosConsentimiento {
   firmaConsentimiento?:  string;
   /** Data URL de la firma/sello del médico (imagen JPG/PNG) */
   firmaDoctor?:          string;
+  /** Médico que aprobó el consentimiento */
+  aprobadoPor?:          string;
+  /** Fecha de aprobación (formateada) */
+  fechaAprobacion?:      string;
+  /** Data URL de la firma del médico aprobador (puede ser igual a firmaDoctor) */
+  firmaAprobador?:       string;
+  /** Estado del consentimiento para mostrar sello en el PDF */
+  estadoPDF?:            "APROBADO" | "RECHAZADO" | "FIRMADO" | "PENDIENTE";
   /** Datos adicionales del paciente para la sección clínica */
   datosPaciente?: {
     direccion?: string; ciudad?: string; fechaNacimiento?: string;
@@ -280,6 +288,88 @@ export async function generarPDFConsentimiento(
   doc.text(datos.ipsRm, x2, firmaLineY + 12);
 
   y += FIRMA_H + 6;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // SECCIÓN DE APROBACIÓN MÉDICA (solo si el consentimiento fue aprobado)
+  // ══════════════════════════════════════════════════════════════════════
+  if (datos.estadoPDF === "APROBADO" && datos.aprobadoPor) {
+    checkPage(55);
+
+    // Banner verde de aprobación
+    doc.setFillColor(5, 150, 105);
+    doc.roundedRect(M, y, ANCHO, 10, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text("✓ VISTO BUENO MÉDICO — CONSENTIMIENTO APROBADO", M + 4, y + 6.5);
+    y += 14;
+
+    checkPage(45);
+    doc.setFillColor(240, 253, 244);
+    doc.roundedRect(M, y, ANCHO, 44, 2, 2, "F");
+    doc.setDrawColor(167, 243, 208);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(M, y, ANCHO, 44, 2, 2, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(6, 78, 59);
+    doc.text("DATOS DE APROBACIÓN", M + 4, y + 8);
+
+    const aprobFields = [
+      ["Aprobado por", datos.aprobadoPor],
+      ["Fecha de aprobación", datos.fechaAprobacion ?? "—"],
+      ["Documento aprobador", datos.ipsNombre],
+    ];
+    let ay = y + 15;
+    for (const [label, valor] of aprobFields) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(107, 114, 128);
+      doc.text(String(label), M + 4, ay);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(17, 24, 39);
+      doc.text(String(valor), M + 4, ay + 4);
+      ay += 10;
+    }
+
+    // Firma del médico aprobador
+    const firmaAprobX = M + ANCHO / 2 + 4;
+    if (datos.firmaAprobador) {
+      try {
+        const fmt = datos.firmaAprobador.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
+        doc.addImage(datos.firmaAprobador, fmt, firmaAprobX, y + 10, firmaW, 16);
+      } catch { /* imagen inválida */ }
+    }
+    doc.setDrawColor(134, 239, 172);
+    doc.setLineWidth(0.5);
+    doc.line(firmaAprobX, y + 28, firmaAprobX + firmaW, y + 28);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(107, 114, 128);
+    doc.text("Firma del médico aprobador", firmaAprobX, y + 32);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(6, 78, 59);
+    doc.text(datos.aprobadoPor, firmaAprobX, y + 36);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(107, 114, 128);
+    doc.text(datos.ipsRm, firmaAprobX, y + 40);
+
+    y += 50;
+  } else if (datos.estadoPDF === "RECHAZADO") {
+    checkPage(22);
+    doc.setFillColor(254, 226, 226);
+    doc.roundedRect(M, y, ANCHO, 16, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(185, 28, 28);
+    doc.text("✕ CONSENTIMIENTO RECHAZADO POR EL MÉDICO", M + 4, y + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.text("El paciente debe ser informado del motivo de rechazo.", M + 4, y + 11);
+    y += 22;
+  }
+
   checkPage(14);
 
   // ══════════════════════════════════════════════════════════════════════

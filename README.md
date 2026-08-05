@@ -1,11 +1,12 @@
-# Med&Fis — Sistema de Consentimientos Informados
+# CliniSign — Consentimientos Médicos Digitales
 
+> **Nombre comercial:** CliniSign · *"Consentimientos médicos digitales. Seguros. Rápidos. Legales."*  
 > **Autor principal / Propietario del repositorio:** Mauricio Salazar  
 > **Desarrollado por:** JM Ingeniero  
 > **Cliente:** Med&Fis IPS · NIT 901102930 · Medellín, Colombia  
 > **Médico responsable:** Dr. Rafael Eduardo Marrero Padilla · RM 3880525
 
-Sistema digital de consentimientos informados para clínicas de estética y fisioterapia. Permite registrar, firmar, aprobar y enviar consentimientos informados con PDF, email y WhatsApp.
+**CliniSign** es un sistema digital de consentimientos informados para clínicas de estética y fisioterapia. Permite registrar, firmar con firma digital, aprobar con aval médico y enviar consentimientos informados en PDF por email y WhatsApp — todo desde el navegador, sin instalar nada.
 
 ---
 
@@ -21,7 +22,8 @@ Sistema digital de consentimientos informados para clínicas de estética y fisi
 8. [Personalizar el PDF](#8-personalizar-el-pdf)
 9. [Backend Spring Boot](#9-backend-spring-boot)
 10. [Pasar a producción](#10-pasar-a-producción)
-11. [Modelo de negocio](#11-modelo-de-negocio)
+11. [Modelo de negocio — CliniSign](#11-modelo-de-negocio)
+12. [Seguridad de datos y backup](#12-seguridad-de-datos-y-estrategia-de-backup)
 
 ---
 
@@ -600,11 +602,168 @@ Las clínicas de estética en Colombia están **obligadas** por ley (Resolución
 
 ---
 
+## 12. Seguridad de datos y estrategia de backup
+
+Los consentimientos informados contienen **datos de salud sensibles** (datos personales, firmas, procedimientos). La siguiente estrategia protege la información en todos los niveles.
+
+### 12.1 Variables de entorno — nunca en código
+
+Nunca pongas contraseñas, API keys ni URLs privadas directamente en el código. Usa siempre `.env.local`:
+
+```bash
+# Clonar el repo y crear el archivo de entorno
+cp .env.example .env.local
+# Llenar .env.local con los valores reales — este archivo NUNCA va al repositorio
+```
+
+El `.gitignore` ya excluye `.env.local`. Confirma que está ahí:
+
+```
+.env.local
+*.env
+```
+
+### 12.2 Seguridad en PostgreSQL (backend Spring Boot)
+
+```sql
+-- 1. Crear usuario de base de datos sin privilegios de superusuario
+CREATE USER medfis_app WITH PASSWORD 'ClaveSegura2025!';
+GRANT CONNECT ON DATABASE medfis TO medfis_app;
+GRANT USAGE ON SCHEMA public TO medfis_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO medfis_app;
+
+-- 2. Habilitar cifrado en reposo (Railway/Render lo activan automáticamente)
+-- En producción: usar siempre conexión SSL
+-- spring.datasource.url=jdbc:postgresql://host:5432/medfis?sslmode=require
+
+-- 3. Cifrar columnas sensibles (opcional pero recomendado)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Ejemplo: guardar firmaConsentimiento cifrada
+UPDATE consent_records 
+SET datos = datos || jsonb_build_object('firmaCifrada', encode(encrypt(datos->>'firma', 'clave', 'aes'), 'base64'));
+```
+
+**En `application.properties` (producción):**
+
+```properties
+spring.datasource.url=${DATABASE_URL}
+spring.datasource.username=${DB_USER}
+spring.datasource.password=${DB_PASS}
+spring.jpa.properties.hibernate.connection.useSSL=true
+spring.jpa.properties.hibernate.connection.requireSSL=true
+```
+
+### 12.3 Supabase Storage — seguridad de PDFs en la nube
+
+Los PDFs de consentimientos se suben automáticamente a Supabase Storage. Configura las políticas de acceso (RLS):
+
+```sql
+-- En Supabase SQL Editor:
+
+-- Solo usuarios autenticados pueden ver los PDFs
+CREATE POLICY "Autenticados pueden leer PDFs"
+ON storage.objects FOR SELECT
+USING (auth.role() = 'authenticated');
+
+-- Solo el backend puede insertar/eliminar
+CREATE POLICY "Solo backend puede subir"
+ON storage.objects FOR INSERT
+WITH CHECK (auth.role() = 'service_role');
+
+-- Los buckets deben ser PRIVADOS (no públicos)
+-- En Supabase Dashboard → Storage → consentimientos → Editar → desmarcar "Public bucket"
+```
+
+### 12.4 Backup automático de PostgreSQL
+
+**Backup diario con pg_dump (script para servidor Linux/Railway):**
+
+```bash
+#!/bin/bash
+# /scripts/backup_medfis.sh
+DATE=$(date +%Y%m%d_%H%M)
+BACKUP_DIR="/backups/medfis"
+mkdir -p $BACKUP_DIR
+
+# Crear backup comprimido
+PGPASSWORD=$DB_PASS pg_dump \
+  -h $DB_HOST -p 5432 -U $DB_USER -d medfis \
+  --no-password -Fc \
+  -f "$BACKUP_DIR/medfis_$DATE.dump"
+
+# Mantener solo los últimos 30 backups
+ls -t $BACKUP_DIR/*.dump | tail -n +31 | xargs rm -f
+
+echo "Backup completado: medfis_$DATE.dump"
+```
+
+**Programar con cron (diario a las 2 AM):**
+
+```bash
+crontab -e
+# Agregar esta línea:
+0 2 * * * /scripts/backup_medfis.sh >> /var/log/medfis_backup.log 2>&1
+```
+
+**Restaurar un backup:**
+
+```bash
+PGPASSWORD=$DB_PASS pg_restore \
+  -h $DB_HOST -p 5432 -U $DB_USER -d medfis_restore \
+  --no-password -Fc medfis_20250115_020000.dump
+```
+
+### 12.5 Backup de Supabase Storage
+
+Los PDFs en Supabase se pueden respaldar con el CLI de Supabase:
+
+```bash
+# Instalar Supabase CLI
+npm install -g supabase
+
+# Descargar todos los PDFs del bucket
+supabase storage cp --recursive ss:///consentimientos ./backup_pdfs/
+
+# Automatizar con cron semanal
+0 3 * * 0 supabase storage cp --recursive ss:///consentimientos /backups/pdfs/$(date +%Y%m%d)/
+```
+
+### 12.6 Checklist de seguridad antes de ir a producción
+
+```
+✅ .env.local no está en el repositorio (.gitignore correcto)
+✅ VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY configurados
+✅ PostgreSQL con usuario de mínimos privilegios (no 'postgres')
+✅ Conexión a BD con SSL habilitado (sslmode=require)
+✅ Supabase bucket configurado como PRIVADO
+✅ RLS activado en Supabase Storage
+✅ Backup automático diario configurado en servidor
+✅ Contraseñas de usuarios con al menos 12 caracteres
+✅ JWT secret de Spring Boot con clave aleatoria larga (64+ chars)
+✅ CORS restringido al dominio de la clínica en Spring Boot
+✅ Logs de acceso activados en el servidor de producción
+```
+
+### 12.7 JWT y CORS en Spring Boot (producción)
+
+```properties
+# application-prod.properties
+jwt.secret=${JWT_SECRET}  # Variable de entorno, mínimo 64 caracteres
+jwt.expiration=86400000   # 24 horas
+
+# CORS restringido
+spring.web.cors.allowed-origins=https://medfis.tudominio.com
+spring.web.cors.allowed-methods=GET,POST,PUT,DELETE
+spring.web.cors.allow-credentials=true
+```
+
+---
+
 ## Licencia y propiedad intelectual
 
 **© 2024–2025 Mauricio Salazar — Todos los derechos reservados.**
 
-Software de gestión de consentimientos informados para Med&Fis IPS y afiliados.  
+**CliniSign** — Software de gestión de consentimientos informados para Med&Fis IPS y afiliados.  
 Prohibida la redistribución sin autorización expresa del propietario del repositorio.
 
 Desarrollado por **JM Ingeniero** bajo contrato con el propietario.

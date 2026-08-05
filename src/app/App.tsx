@@ -859,6 +859,10 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp, addToast = () => {} }:
       ipsNit: ips.nit, ipsMedico: ips.medico, ipsRm: ips.rm, ipsCiudad: ips.ciudad,
       firmaConsentimiento: d?.firmaConsentimiento ?? undefined,
       firmaDoctor: ips.firmaDoctor ?? undefined,
+      aprobadoPor:    record.aprobadoPor ?? undefined,
+      fechaAprobacion: record.fechaAprobacion ? fmtFecha(record.fechaAprobacion) : undefined,
+      firmaAprobador: record.estado === "APROBADO" ? (ips.firmaDoctor ?? undefined) : undefined,
+      estadoPDF:      record.estado === "APROBADO" ? "APROBADO" : record.estado === "RECHAZADO" ? "RECHAZADO" : record.estado === "FIRMADO" ? "FIRMADO" : "PENDIENTE",
       datosPaciente: d?.paciente ? {
         direccion: d.paciente.direccion, ciudad: d.paciente.ciudad,
         fechaNacimiento: d.paciente.fechaNacimiento,
@@ -2322,16 +2326,10 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
             </button>
           </form>
           <div className="mt-5 pt-4 border-t border-border">
-            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-2">Accesos de prueba:</p>
-            {usuarios.filter(u => u.activo).slice(0, 4).map(u => (
-              <button key={u.id} onClick={() => { setEmail(u.email); setPassword(u.password); }} className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors mb-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-semibold">{u.nombre}</p>
-                  <RolBadge rol={u.rol}/>
-                </div>
-                <p className="text-[10px] text-muted-foreground font-mono">{u.email} · {u.password}</p>
-              </button>
-            ))}
+            <div className="flex items-start gap-2 p-3 bg-[#EFF3FB] rounded-xl">
+              <Shield size={13} className="text-[#0D51D9] mt-0.5 shrink-0"/>
+              <p className="text-[10px] text-[#0D51D9] leading-relaxed">Contacte al <strong>Administrador</strong> para obtener sus credenciales de acceso al sistema.</p>
+            </div>
           </div>
         </div>
         {/* Autoría y derechos reservados */}
@@ -2406,12 +2404,45 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
   );
 }
 
+// ─── PDF PARAMS HELPER (reusable outside PDFViewer) ──────────────────────────
+function buildPdfParamsForRecord(r: ConsentRecord, ips: IPSConfig) {
+  const d = r.datos as any;
+  const textoMap: Record<string, string> = {
+    escleroterapia: makeTextoEscleroterapia(ips),
+    sueroterapia:   makeTextoSueroterapia(ips),
+    laser:          makeTextoLaser(ips),
+    paquete:        makeTextoEscleroterapia(ips) + "\n\n" + makeTextoSueroterapia(ips) + "\n\n" + makeTextoLaser(ips),
+  };
+  return {
+    radicado: r.radicado, tipo: r.tipo, fecha: fmtFecha(r.fecha),
+    pacienteNombre: r.pacienteNombre, pacienteDoc: r.pacienteDoc,
+    pacienteTel: r.pacienteTel, pacienteEmail: d?.paciente?.email ?? undefined,
+    creadoPor: r.creadoPor, textoConsent: textoMap[r.tipo] ?? "",
+    ipsNombre: ips.nombre, ipsNit: ips.nit, ipsMedico: ips.medico, ipsRm: ips.rm, ipsCiudad: ips.ciudad,
+    firmaConsentimiento: d?.firmaConsentimiento ?? undefined,
+    firmaDoctor: ips.firmaDoctor ?? undefined,
+    aprobadoPor: r.aprobadoPor ?? undefined,
+    fechaAprobacion: r.fechaAprobacion ? fmtFecha(r.fechaAprobacion) : undefined,
+    firmaAprobador: r.estado === "APROBADO" ? (ips.firmaDoctor ?? undefined) : undefined,
+    estadoPDF: (r.estado === "APROBADO" ? "APROBADO" : r.estado === "RECHAZADO" ? "RECHAZADO" : r.estado === "FIRMADO" ? "FIRMADO" : "PENDIENTE") as "APROBADO"|"RECHAZADO"|"FIRMADO"|"PENDIENTE",
+    datosPaciente: d?.paciente ? {
+      direccion: d.paciente.direccion, ciudad: d.paciente.ciudad,
+      fechaNacimiento: d.paciente.fechaNacimiento,
+      contactoNombre: d.paciente.contactoNombre,
+      contactoParentesco: d.paciente.contactoParentesco,
+      contactoTelefono: d.paciente.contactoTelefono,
+    } : undefined,
+    vitales: d?.vitales ?? undefined,
+  };
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRechazar, addToast }: {
+function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRechazar, addToast, ips }: {
   records: ConsentRecord[]; onNewForm: (t: TipoConsent) => void; user: Usuario;
   onViewRecord: (r: ConsentRecord) => void;
   onAprobar: (id: string) => void; onRechazar: (id: string, motivo: string) => void;
   addToast: (t: "success"|"error"|"info"|"warning", m: string) => void;
+  ips: IPSConfig;
 }) {
   const [aprobandoRecord, setAprobandoRecord] = useState<ConsentRecord | null>(null);
   const activos   = records.filter(r => r.estado !== "ANULADO");
@@ -2522,19 +2553,34 @@ function DashboardPage({ records, onNewForm, user, onViewRecord, onAprobar, onRe
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Últimos Consentimientos</p>
           <div className="bg-card rounded-2xl border border-border overflow-hidden">
             {records.slice(-6).reverse().map((r, i, arr) => (
-              <div key={r.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors ${i<arr.length-1?"border-b border-border":""} ${r.pendienteMedico && r.estado === "FIRMADO" ? "border-l-4 border-l-amber-400":""} ${r.estado === "APROBADO" ? "border-l-4 border-l-emerald-500" : ""}`}
-                onClick={() => onViewRecord(r)}>
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <div key={r.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${i<arr.length-1?"border-b border-border":""} ${r.pendienteMedico && r.estado === "FIRMADO" ? "border-l-4 border-l-amber-400":""} ${r.estado === "APROBADO" ? "border-l-4 border-l-emerald-500" : ""}`}>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-muted/70" onClick={() => onViewRecord(r)}>
                   {r.tipo==="escleroterapia"?<Syringe size={14} className="text-[#0D51D9]"/>:r.tipo==="sueroterapia"?<Droplets size={14} className="text-[#0D8BD9]"/>:r.tipo==="laser"?<Zap size={14} className="text-amber-600"/>:<Package size={14} className="text-purple-600"/>}
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onViewRecord(r)}>
                   <p className="text-xs font-semibold truncate">{r.pacienteNombre}</p>
                   <p className="text-[10px] text-muted-foreground">{r.radicado} · {fmtFecha(r.fecha)}</p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   {r.pendienteMedico && r.estado === "FIRMADO" && <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"/>}
                   <StatusBadge estado={r.estado}/>
-                  <Eye size={13} className="text-muted-foreground"/>
+                  <button title="Ver PDF" onClick={() => onViewRecord(r)}
+                    className="p-1.5 rounded-lg bg-[#0D51D9]/10 text-[#0D51D9] hover:bg-[#0D51D9]/20 transition-colors">
+                    <Eye size={13}/>
+                  </button>
+                  <button title="Descargar PDF" onClick={async () => {
+                    try {
+                      addToast("info", "Generando PDF…");
+                      const blob = await generarPDFConsentimiento(buildPdfParamsForRecord(r, ips));
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url; a.download = `${r.radicado}.pdf`; a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 5000);
+                      addToast("success", "PDF descargado");
+                    } catch { addToast("error", "Error generando PDF"); }
+                  }} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                    <Download size={13}/>
+                  </button>
                 </div>
               </div>
             ))}
@@ -2911,6 +2957,7 @@ export default function App() {
           ipsCiudad:      ips.ciudad,
           firmaConsentimiento: rd?.firmaConsentimiento ?? undefined,
           firmaDoctor:    ips.firmaDoctor ?? undefined,
+          estadoPDF:      "FIRMADO",
           datosPaciente:  rd?.paciente ? {
             direccion: rd.paciente.direccion, ciudad: rd.paciente.ciudad,
             fechaNacimiento: rd.paciente.fechaNacimiento,
@@ -3138,7 +3185,7 @@ export default function App() {
           <main className="flex-1 p-3 sm:p-5 lg:p-6 max-w-5xl mx-auto w-full">
             {page==="dashboard" && (
               <DashboardPage records={records} onNewForm={t => { setActiveForm(t); setPage("form"); }}
-                user={user} onViewRecord={setViewRecord} onAprobar={handleAprobar} onRechazar={handleRechazar} addToast={addToast}/>
+                user={user} onViewRecord={setViewRecord} onAprobar={handleAprobar} onRechazar={handleRechazar} addToast={addToast} ips={ips}/>
             )}
             {page==="form" && !activeForm && <TipoSelectorPage onSelect={t => setActiveForm(t)}/>}
             {page==="historial" && (
