@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, createContext, useContext, useCallback } from "react";
+import { useState, useRef, useEffect, createContext, useContext, useCallback, type ReactNode, type FormEvent } from "react";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import medfisLogo from "@/imports/medfis_logo.png";
-import { subirPDF } from "@/app/lib/supabaseClient";
+import { subirPDF, getLicencia, getAllLicencias, upsertLicencia, toggleLicencia, diasRestantes, estadoLicencia, type Licencia } from "@/app/lib/supabaseClient";
 import { generarPDFConsentimiento } from "@/app/lib/pdfService";
 import { enviarEmailPaciente, enviarEmailClinica } from "@/app/lib/emailService";
 import {
@@ -15,7 +15,7 @@ import {
   Info, Users, Heart, Settings, Save, UserPlus,
   CheckSquare, XSquare, Lock, Unlock, BellRing,
   CalendarCheck, UserCog, RefreshCw, BarChart2, Edit3, KeyRound,
-  Camera, Building2, Star, User, ChevronDown, Globe, CreditCard
+  Camera, Building2, Star, User, ChevronDown, Globe, CreditCard, Edit2
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -140,7 +140,7 @@ const IPSContext = createContext<IPSConfig>(DEFAULT_IPS);
 const useIPS = () => useContext(IPSContext);
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
-type AppPage = "dashboard" | "form" | "historial" | "staff" | "admin" | "notificaciones";
+type AppPage = "dashboard" | "form" | "historial" | "staff" | "admin" | "notificaciones" | "licencias";
 type TipoConsent = "escleroterapia" | "sueroterapia" | "laser" | "paquete";
 type EstadoConsent = "FIRMADO" | "PENDIENTE" | "APROBADO" | "RECHAZADO" | "ANULADO";
 type RolUsuario = "MÉDICO" | "ADMINISTRADOR" | "AUXILIAR" | "ENFERMERA" | "TÉCNICO";
@@ -477,7 +477,7 @@ function Toast({ toasts, remove }: { toasts: ToastMsg[]; remove: (id: number) =>
 
 // ─── BADGES ──────────────────────────────────────────────────────────────────
 function StatusBadge({ estado }: { estado: EstadoConsent }) {
-  const cfg: Record<EstadoConsent, { c: string; icon: React.ReactNode; label: string }> = {
+  const cfg: Record<EstadoConsent, { c: string; icon: ReactNode; label: string }> = {
     FIRMADO:   { c: "bg-blue-50 text-blue-700 border-blue-200",       icon: <Clock size={11}/>,         label: "Firmado · Pendiente Médico" },
     PENDIENTE: { c: "bg-amber-50 text-amber-700 border-amber-200",    icon: <Clock size={11}/>,         label: "Pendiente" },
     APROBADO:  { c: "bg-emerald-50 text-emerald-700 border-emerald-200",icon: <CheckCircle size={11}/>, label: "Aprobado" },
@@ -594,7 +594,7 @@ function FirmaField({ label, value, onChange }: { label: string; value: string; 
 // ─── FIELD HELPER ─────────────────────────────────────────────────────────────
 function Field({ label, value, onChange, type = "text", placeholder = "", required = false, icon, readOnly = false }: {
   label: string; value: string; onChange: (v: string) => void;
-  type?: string; placeholder?: string; required?: boolean; icon?: React.ReactNode; readOnly?: boolean;
+  type?: string; placeholder?: string; required?: boolean; icon?: ReactNode; readOnly?: boolean;
 }) {
   return (
     <div>
@@ -775,7 +775,7 @@ const VITALES_EMPTY = {
 };
 
 function StepVitalesEnfermera({ data, onChange, extraContent }: {
-  data: typeof VITALES_EMPTY; onChange: (d: typeof VITALES_EMPTY) => void; extraContent?: React.ReactNode;
+  data: typeof VITALES_EMPTY; onChange: (d: typeof VITALES_EMPTY) => void; extraContent?: ReactNode;
 }) {
   const s = (k: keyof typeof VITALES_EMPTY) => (v: string) => {
     const updated = { ...data, [k]: v };
@@ -1239,7 +1239,7 @@ function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClos
 // ═══════════════════════════════════════════════════════════════════════════════
 // WIZARD HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
-function WizardHeader({ steps, current, titulo, icon }: { steps: string[]; current: number; titulo: string; icon: React.ReactNode }) {
+function WizardHeader({ steps, current, titulo, icon }: { steps: string[]; current: number; titulo: string; icon: ReactNode }) {
   return (
     <div className="flex-shrink-0 px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
       <div className="flex items-center gap-3 mb-3">
@@ -1272,7 +1272,7 @@ function NavButtons({ step, total, onBack, onNext, onFinish, canNext = true, fin
   );
 }
 
-function FormWrapper({ onCancel, children }: { onCancel: () => void; children: React.ReactNode }) {
+function FormWrapper({ onCancel, children }: { onCancel: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-end sm:items-center justify-center sm:p-3">
       <div className="bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-xl h-[95vh] sm:max-h-[96vh] flex flex-col">
@@ -1287,7 +1287,7 @@ function FormWrapper({ onCancel, children }: { onCancel: () => void; children: R
   );
 }
 
-function PDFWrapper({ onCancel, children, titulo }: { onCancel: () => void; children: React.ReactNode; titulo: string }) {
+function PDFWrapper({ onCancel, children, titulo }: { onCancel: () => void; children: ReactNode; titulo: string }) {
   return (
     <div className="fixed inset-0 bg-black/70 z-[100] flex items-end sm:items-center justify-center sm:p-3">
       <div className="bg-gray-50 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl h-[95vh] sm:max-h-[96vh] flex flex-col">
@@ -2566,6 +2566,270 @@ function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
+// ─── LICENSE GUARD ────────────────────────────────────────────────────────────
+const CLIENT_ID    = (import.meta as any).env?.VITE_CLIENT_ID    ?? "";
+const ADMIN_MASTER = (import.meta as any).env?.VITE_ADMIN_MASTER === "true";
+
+function LicenseGuard({ children }: { children: ReactNode }) {
+  const [licencia, setLicencia]   = useState<Licencia | null>(null);
+  const [checked,  setChecked]    = useState(false);
+
+  useEffect(() => {
+    if (!CLIENT_ID) { setChecked(true); return; }
+    getLicencia(CLIENT_ID).then(lic => { setLicencia(lic); setChecked(true); });
+  }, []);
+
+  if (!checked) return (
+    <div className="min-h-screen bg-[#031CA6] flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto"/>
+        <p className="text-white/70 text-sm">Verificando licencia…</p>
+      </div>
+    </div>
+  );
+
+  const estado = estadoLicencia(licencia);
+
+  if (estado === "expired" || estado === "blocked") {
+    const motivo = estado === "blocked" ? "suspendida por el administrador" : "vencida";
+    return (
+      <div className="min-h-screen bg-[#031CA6] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl p-8 shadow-2xl text-center space-y-5">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+            <Shield size={28} className="text-red-600"/>
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-gray-900">Acceso bloqueado</h1>
+            <p className="text-sm text-gray-500 mt-1">Su licencia está <strong>{motivo}</strong>.</p>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-left space-y-1">
+            <p className="text-xs font-bold text-red-700 uppercase tracking-wider">Licencia</p>
+            <p className="text-sm font-semibold text-gray-800">{licencia?.nombre_cliente ?? "—"}</p>
+            <p className="text-xs text-red-600">Venció: {licencia ? new Date(licencia.expira_en).toLocaleDateString("es-CO", { day:"2-digit", month:"long", year:"numeric" }) : "—"}</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
+            <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Para renovar</p>
+            <p className="text-sm text-blue-800">Contacte a <strong>JM Ingeniero</strong> para renovar su suscripción y continuar usando CliniSign.</p>
+            <a href="https://wa.me/573114048112?text=Quiero%20renovar%20mi%20licencia%20de%20CliniSign"
+               target="_blank" rel="noopener noreferrer"
+               className="mt-3 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#25D366] text-white text-sm font-bold hover:bg-[#1fbd5a] transition-colors">
+              <Phone size={14}/> Renovar por WhatsApp
+            </a>
+          </div>
+          <p className="text-[9px] text-gray-400">CliniSign by JM Ingeniero · ID: {CLIENT_ID}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {estado === "warning" && licencia && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-white px-4 py-2 flex items-center justify-center gap-3 text-sm font-semibold shadow-lg">
+          <Clock size={15}/>
+          <span>Su licencia vence en <strong>{diasRestantes(licencia.expira_en)} día{diasRestantes(licencia.expira_en) !== 1 ? "s" : ""}</strong> — Contáctenos para renovar y evitar el bloqueo.</span>
+          <a href="https://wa.me/573114048112?text=Quiero%20renovar%20mi%20licencia%20CliniSign"
+             target="_blank" rel="noopener noreferrer"
+             className="underline font-bold hover:text-amber-100">Renovar ahora</a>
+        </div>
+      )}
+      <div className={estado === "warning" ? "pt-10" : ""}>{children}</div>
+    </>
+  );
+}
+
+// ─── LICENSE MANAGER PAGE (solo master admin) ─────────────────────────────────
+function LicenseManagerPage({ addToast }: { addToast: (t: "success"|"error"|"info"|"warning", m: string) => void }) {
+  const [licencias, setLicencias] = useState<Licencia[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [showForm,  setShowForm]  = useState(false);
+  const [editing,   setEditing]   = useState<Licencia | null>(null);
+  const [form, setForm] = useState({
+    client_id: "", nombre_cliente: "", nit: "", plan: "mensual" as Licencia["plan"],
+    expira_en: "", activo: true, notas: "",
+  });
+
+  const cargar = async () => {
+    setLoading(true);
+    const data = await getAllLicencias();
+    setLicencias(data);
+    setLoading(false);
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const abrirNuevo = () => {
+    const hoy = new Date(); hoy.setMonth(hoy.getMonth() + 1);
+    setForm({ client_id: "", nombre_cliente: "", nit: "", plan: "mensual", expira_en: hoy.toISOString().slice(0,10), activo: true, notas: "" });
+    setEditing(null); setShowForm(true);
+  };
+
+  const abrirEditar = (lic: Licencia) => {
+    setForm({ client_id: lic.client_id, nombre_cliente: lic.nombre_cliente, nit: lic.nit ?? "", plan: lic.plan, expira_en: lic.expira_en.slice(0,10), activo: lic.activo, notas: lic.notas ?? "" });
+    setEditing(lic); setShowForm(true);
+  };
+
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault();
+    const saved = await upsertLicencia({ ...form, id: editing?.id });
+    if (saved) { addToast("success", `Licencia ${editing ? "actualizada" : "creada"} — ${form.nombre_cliente}`); setShowForm(false); cargar(); }
+    else addToast("error", "Error guardando licencia — verifica VITE_SUPABASE_SERVICE_KEY");
+  };
+
+  const renovar = async (lic: Licencia, meses: number) => {
+    const base = new Date(Math.max(Date.now(), new Date(lic.expira_en).getTime()));
+    base.setMonth(base.getMonth() + meses);
+    const saved = await upsertLicencia({ client_id: lic.client_id, expira_en: base.toISOString(), activo: true });
+    if (saved) { addToast("success", `Renovado ${meses} mes(es) — ${lic.nombre_cliente}`); cargar(); }
+    else addToast("error", "Error renovando");
+  };
+
+  const toggle = async (lic: Licencia) => {
+    const ok = await toggleLicencia(lic.id, !lic.activo);
+    if (ok) { addToast("info", `${lic.activo ? "Suspendido" : "Activado"} — ${lic.nombre_cliente}`); cargar(); }
+  };
+
+  const planColor = (plan: string) => ({ mensual: "bg-blue-100 text-blue-700", trimestral: "bg-purple-100 text-purple-700", semestral: "bg-indigo-100 text-indigo-700", anual: "bg-emerald-100 text-emerald-700" }[plan] ?? "bg-gray-100 text-gray-700");
+
+  const diasColor = (dias: number, activo: boolean) => {
+    if (!activo) return "text-red-600 font-bold";
+    if (dias <= 0) return "text-red-600 font-bold";
+    if (dias <= 3) return "text-amber-600 font-bold";
+    if (dias <= 10) return "text-yellow-600 font-semibold";
+    return "text-emerald-600 font-semibold";
+  };
+
+  return (
+    <div className="space-y-6 pb-8">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-black text-foreground">Gestor de Licencias</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Control de suscripciones de todos los clientes CliniSign</p>
+        </div>
+        <button onClick={abrirNuevo} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
+          <Plus size={15}/> Nueva licencia
+        </button>
+      </div>
+
+      {/* Resumen */}
+      {!loading && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Total clientes", value: licencias.length, color: "text-[#0D51D9]" },
+            { label: "Activos", value: licencias.filter(l => l.activo && diasRestantes(l.expira_en) > 0).length, color: "text-emerald-600" },
+            { label: "Por vencer (≤3d)", value: licencias.filter(l => l.activo && diasRestantes(l.expira_en) > 0 && diasRestantes(l.expira_en) <= 3).length, color: "text-amber-600" },
+            { label: "Vencidos/bloqueados", value: licencias.filter(l => !l.activo || diasRestantes(l.expira_en) <= 0).length, color: "text-red-600" },
+          ].map(s => (
+            <div key={s.label} className="bg-card border border-border rounded-xl p-3 text-center">
+              <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tabla clientes */}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-muted/40">
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Clientes registrados</p>
+        </div>
+        {loading ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">Cargando…</div>
+        ) : licencias.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">No hay licencias registradas aún. Crea la primera.</div>
+        ) : (
+          <div className="divide-y divide-border">
+            {licencias.map(lic => {
+              const dias = diasRestantes(lic.expira_en);
+              const estado = !lic.activo ? "BLOQUEADO" : dias <= 0 ? "VENCIDO" : dias <= 3 ? `VENCE EN ${dias}d` : `${dias} días`;
+              return (
+                <div key={lic.id} className="px-4 py-3 flex items-center gap-3 flex-wrap hover:bg-muted/20 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-sm text-foreground truncate">{lic.nombre_cliente}</p>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${planColor(lic.plan)}`}>{lic.plan}</span>
+                      {!lic.activo && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">SUSPENDIDO</span>}
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <p className="text-[10px] text-muted-foreground font-mono">{lic.client_id}</p>
+                      {lic.nit && <p className="text-[10px] text-muted-foreground">NIT: {lic.nit}</p>}
+                      <p className="text-[10px] text-muted-foreground">Vence: {new Date(lic.expira_en).toLocaleDateString("es-CO")}</p>
+                      <p className={`text-[10px] ${diasColor(dias, lic.activo)}`}>{estado}</p>
+                    </div>
+                    {lic.notas && <p className="text-[9px] text-muted-foreground mt-0.5 italic">"{lic.notas}"</p>}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button onClick={() => renovar(lic, 1)} className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition-colors">+1m</button>
+                    <button onClick={() => renovar(lic, 3)} className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition-colors">+3m</button>
+                    <button onClick={() => renovar(lic, 12)} className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition-colors">+1a</button>
+                    <button onClick={() => abrirEditar(lic)} className="p-1.5 rounded-lg bg-[#0D51D9]/10 text-[#0D51D9] hover:bg-[#0D51D9]/20 transition-colors"><Edit2 size={12}/></button>
+                    <button onClick={() => toggle(lic)} className={`p-1.5 rounded-lg transition-colors ${lic.activo ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}>
+                      {lic.activo ? <XCircle size={12}/> : <CheckCircle size={12}/>}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal crear/editar */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-black text-base">{editing ? "Editar licencia" : "Nueva licencia"}</h2>
+              <button onClick={() => setShowForm(false)} className="text-muted-foreground hover:text-foreground"><X size={16}/></button>
+            </div>
+            <form onSubmit={guardar} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">Nombre del cliente *</label>
+                  <input required value={form.nombre_cliente} onChange={e => setForm(f => ({...f, nombre_cliente: e.target.value}))} placeholder="Med&Fis Salud Intensa" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"/>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">Client ID *</label>
+                  <input required value={form.client_id} onChange={e => setForm(f => ({...f, client_id: e.target.value}))} placeholder="medfis-001" disabled={!!editing} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40 disabled:opacity-50"/>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">NIT</label>
+                  <input value={form.nit} onChange={e => setForm(f => ({...f, nit: e.target.value}))} placeholder="900.000.000-0" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"/>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">Plan</label>
+                  <select value={form.plan} onChange={e => setForm(f => ({...f, plan: e.target.value as Licencia["plan"]}))} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none">
+                    <option value="mensual">Mensual</option>
+                    <option value="trimestral">Trimestral</option>
+                    <option value="semestral">Semestral</option>
+                    <option value="anual">Anual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">Vence el *</label>
+                  <input required type="date" value={form.expira_en} onChange={e => setForm(f => ({...f, expira_en: e.target.value}))} className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"/>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">Notas internas</label>
+                  <textarea value={form.notas} onChange={e => setForm(f => ({...f, notas: e.target.value}))} rows={2} placeholder="Pago confirmado por transferencia…" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40 resize-none"/>
+                </div>
+                <div className="col-span-2 flex items-center gap-2">
+                  <input type="checkbox" id="activo" checked={form.activo} onChange={e => setForm(f => ({...f, activo: e.target.checked}))} className="rounded"/>
+                  <label htmlFor="activo" className="text-sm font-medium">Licencia activa</label>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors">Cancelar</button>
+                <button type="submit" className="flex-1 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">{editing ? "Guardar cambios" : "Crear licencia"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuarios: Usuario[] }) {
   const ips = useIPS();
   const [email, setEmail] = useState("");
@@ -2578,7 +2842,7 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
   const [solMensaje, setSolMensaje] = useState("");
   const [solEnviado, setSolEnviado] = useState(false);
 
-  const handleSolicitud = async (e: React.FormEvent) => {
+  const handleSolicitud = async (e: FormEvent) => {
     e.preventDefault();
     // Enviar via backend Twilio (automático, sin abrir WhatsApp)
     const ok = await enviarSolicitudAcceso(solNombre, solTel, solMensaje);
@@ -2596,7 +2860,7 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
     setSolEnviado(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault(); setError(""); setLoading(true);
 
     // 1. Intentar autenticación con backend Spring Boot
@@ -2777,6 +3041,12 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="staff"?"bg-[#0D51D9] text-white":"text-[#C5D5F0] hover:bg-white/8"}`}>
               <UserCog size={17}/> Gestión de Staff
             </button>
+            {ADMIN_MASTER && (
+              <button onClick={() => { onPage("licencias"); onClose(); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="licencias"?"bg-amber-500 text-white":"text-amber-300 hover:bg-white/8"}`}>
+                <CreditCard size={17}/> Licencias Clientes
+              </button>
+            )}
           </>)}
         </nav>
         <div className="px-3 pb-5 border-t border-white/8 pt-4 space-y-1">
@@ -3667,13 +3937,16 @@ export default function App() {
   }, [user?.id]);
 
   if (!user) return (
-    <IPSContext.Provider value={ips}>
-      <LoginPage onLogin={u => { setUser(u); addToast("success", `Bienvenido/a, ${u.nombre}`); }} usuarios={usuarios}/>
-      <Toast toasts={toasts} remove={id => setToasts(t => t.filter(x => x.id !== id))}/>
-    </IPSContext.Provider>
+    <LicenseGuard>
+      <IPSContext.Provider value={ips}>
+        <LoginPage onLogin={u => { setUser(u); addToast("success", `Bienvenido/a, ${u.nombre}`); }} usuarios={usuarios}/>
+        <Toast toasts={toasts} remove={id => setToasts(t => t.filter(x => x.id !== id))}/>
+      </IPSContext.Provider>
+    </LicenseGuard>
   );
 
   return (
+    <LicenseGuard>
     <IPSContext.Provider value={ips}>
       <div className="min-h-screen bg-background flex">
         <Sidebar page={page} onPage={setPage} user={user}
@@ -3726,6 +3999,9 @@ export default function App() {
                 addToast={addToast}
               />
             )}
+            {page==="licencias" && user.rol === "ADMINISTRADOR" && ADMIN_MASTER && (
+              <LicenseManagerPage addToast={addToast}/>
+            )}
           </main>
         </div>
 
@@ -3757,5 +4033,6 @@ export default function App() {
         <Toast toasts={toasts} remove={id => setToasts(t => t.filter(x => x.id !== id))}/>
       </div>
     </IPSContext.Provider>
+    </LicenseGuard>
   );
 }
