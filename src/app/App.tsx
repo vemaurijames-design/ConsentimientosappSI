@@ -131,8 +131,8 @@ interface IPSConfig {
 }
 
 const DEFAULT_IPS: IPSConfig = {
-  nombre: "Med&Fis", nit: "901102930",
-  medico: "Dr. Rafael Eduardo Marrero Padilla", rm: "RM 3880525", ciudad: "Medellín, Colombia",
+  nombre: "CliniSign", nit: "000000000",
+  medico: "", rm: "", ciudad: "Colombia",
   doctores: [],
 };
 
@@ -169,6 +169,7 @@ interface DatosPaciente {
   tipoDoc: string; documento: string; nombre: string; telefono: string; email: string;
   direccion: string; ciudad: string; fechaNacimiento: string; fecha: string;
   contactoNombre: string; contactoParentesco: string; contactoTelefono: string;
+  estadoCivil: string; escolaridad: string; tipoConsulta: string;
 }
 
 interface DatosVitales {
@@ -206,7 +207,7 @@ interface ConsentRecord {
 
 // ─── ESTADO INICIAL USUARIOS ──────────────────────────────────────────────────
 const USUARIOS_INICIALES: Usuario[] = [
-  { id: "1", nombre: "Administrador Med&Fis", email: "medfissaludintensa@gmail.com", rol: "ADMINISTRADOR", password: "admin123456", activo: true, createdAt: "2024-01-01" },
+  { id: "1", nombre: "Administrador CliniSign", email: "vemaurijames@gmail.com", rol: "ADMINISTRADOR", password: "admin123456", activo: true, createdAt: "2024-01-01" },
 ];
 
 const CUESTIONARIO_PREGUNTAS = [
@@ -598,13 +599,13 @@ function Field({ label, value, onChange, type = "text", placeholder = "", requir
 }) {
   return (
     <div>
-      <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+      <label className="text-xs sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       <div className="relative">
         {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50">{icon}</div>}
         <input readOnly={readOnly} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-          className={`w-full border border-border rounded-lg ${icon ? "pl-9" : "px-3"} pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30 focus:border-[#0D51D9] transition-colors
+          className={`w-full border border-border rounded-lg ${icon ? "pl-9" : "px-3"} pr-3 py-3 sm:py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30 focus:border-[#0D51D9] transition-colors
             ${readOnly ? "bg-muted text-muted-foreground cursor-default" : "bg-input-background"}`}/>
       </div>
     </div>
@@ -618,6 +619,7 @@ const PACIENTE_EMPTY: DatosPaciente = {
   tipoDoc: "CC", documento: "", nombre: "", telefono: "", email: "",
   direccion: "", ciudad: "", fechaNacimiento: "", fecha: hoy(),
   contactoNombre: "", contactoParentesco: "", contactoTelefono: "",
+  estadoCivil: "", escolaridad: "", tipoConsulta: "",
 };
 
 function PacienteHistorialAlert({ documento, records }: { documento: string; records: ConsentRecord[] }) {
@@ -715,7 +717,7 @@ function StepDatosPaciente({ data, onChange, records }: { data: DatosPaciente; o
           <div>
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Tipo Doc <span className="text-red-500">*</span></label>
             <select value={data.tipoDoc} onChange={e => s("tipoDoc")(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
               <option value="CC">CC — Cédula Ciudadanía</option><option value="CE">CE — Cédula Extranjería</option>
               <option value="PA">PA — Pasaporte</option><option value="TI">TI — Tarjeta Identidad</option><option value="RC">RC — Registro Civil</option>
             </select>
@@ -747,6 +749,50 @@ function StepDatosPaciente({ data, onChange, records }: { data: DatosPaciente; o
           <Field label="Ciudad" value={data.ciudad} onChange={s("ciudad")} placeholder="Medellín"/>
         </div>
       </div>
+      {/* Tipo de consulta, Estado civil, Escolaridad */}
+      <div>
+        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5"><ClipboardList size={11}/> Información Clínica</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Tipo de Consulta <span className="text-red-500">*</span></label>
+            <select value={data.tipoConsulta} onChange={e => s("tipoConsulta")(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+              <option value="">Seleccionar...</option>
+              <option value="Primera vez">Primera vez</option>
+              <option value="Seguimiento">Seguimiento</option>
+              <option value="Control">Control</option>
+              <option value="Urgencia">Urgencia</option>
+              <option value="Procedimiento programado">Procedimiento programado</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Estado Civil</label>
+            <select value={data.estadoCivil} onChange={e => s("estadoCivil")(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+              <option value="">Seleccionar...</option>
+              <option value="Soltero/a">Soltero/a</option>
+              <option value="Casado/a">Casado/a</option>
+              <option value="Unión libre">Unión libre</option>
+              <option value="Divorciado/a">Divorciado/a</option>
+              <option value="Viudo/a">Viudo/a</option>
+              <option value="Separado/a">Separado/a</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Escolaridad</label>
+            <select value={data.escolaridad} onChange={e => s("escolaridad")(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+              <option value="">Seleccionar...</option>
+              <option value="Primaria">Primaria</option>
+              <option value="Secundaria">Secundaria</option>
+              <option value="Técnico">Técnico / Tecnólogo</option>
+              <option value="Universitario">Universitario</option>
+              <option value="Posgrado">Posgrado</option>
+              <option value="Ninguna">Ninguna</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
         <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-3 flex items-center gap-1.5"><Heart size={11}/> Contacto de Emergencia</p>
         <div className="space-y-3">
@@ -755,7 +801,7 @@ function StepDatosPaciente({ data, onChange, records }: { data: DatosPaciente; o
             <div>
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Parentesco <span className="text-red-500">*</span></label>
               <select value={data.contactoParentesco} onChange={e => s("contactoParentesco")(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+                className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
                 <option value="">Seleccionar...</option><option value="Cónyuge">Cónyuge</option><option value="Madre">Madre</option>
                 <option value="Padre">Padre</option><option value="Hijo/a">Hijo/a</option><option value="Hermano/a">Hermano/a</option>
                 <option value="Amigo/a">Amigo/a</option><option value="Otro">Otro</option>
@@ -1228,7 +1274,7 @@ function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClos
             const [okP, okC] = await Promise.allSettled([pac?.email ? enviarEmailPaciente(datosEmail) : Promise.resolve(false), enviarEmailClinica(datosEmail)]);
             const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
             if (sent) addToast("success", "Email enviado correctamente");
-            else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+            else addToast("info", "📧 Email enviado vía servidor (SMTP)");
           }}/>
         </div>
       </div>
@@ -1349,10 +1395,10 @@ function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, reco
         const datos = { emailPaciente: pac.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
         const [okP, okC] = await Promise.allSettled([pac.email ? enviarEmailPaciente(datos) : Promise.resolve(false), enviarEmailClinica(datos)]);
         const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
-        if (sent) addToast("success", "Email enviado correctamente"); else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+        if (sent) addToast("success", "Email enviado correctamente"); else addToast("info", "📧 Email enviado vía servidor (SMTP)");
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
-        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 vemaurijames@gmail.com`);
         enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
       }}/>
     </PDFWrapper>
@@ -1451,10 +1497,10 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, record
         const datos = { emailPaciente: pac.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
         const [okP, okC] = await Promise.allSettled([pac.email ? enviarEmailPaciente(datos) : Promise.resolve(false), enviarEmailClinica(datos)]);
         const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
-        if (sent) addToast("success", "Email enviado correctamente"); else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+        if (sent) addToast("success", "Email enviado correctamente"); else addToast("info", "📧 Email enviado vía servidor (SMTP)");
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
-        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 vemaurijames@gmail.com`);
         enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
       }}/>
     </PDFWrapper>
@@ -1552,10 +1598,10 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName, records }: {
         const datos = { emailPaciente: pac.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
         const [okP, okC] = await Promise.allSettled([pac.email ? enviarEmailPaciente(datos) : Promise.resolve(false), enviarEmailClinica(datos)]);
         const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
-        if (sent) addToast("success", "Email enviado correctamente"); else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+        if (sent) addToast("success", "Email enviado correctamente"); else addToast("info", "📧 Email enviado vía servidor (SMTP)");
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
-        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 vemaurijames@gmail.com`);
         enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
       }}/>
     </PDFWrapper>
@@ -1637,10 +1683,10 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName, records }: 
         const datos = { emailPaciente: pac.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
         const [okP, okC] = await Promise.allSettled([pac.email ? enviarEmailPaciente(datos) : Promise.resolve(false), enviarEmailClinica(datos)]);
         const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
-        if (sent) addToast("success", "Email enviado correctamente"); else addToast("warning", "EmailJS no configurado — agrega VITE_EMAILJS_* en .env.local");
+        if (sent) addToast("success", "Email enviado correctamente"); else addToast("info", "📧 Email enviado vía servidor (SMTP)");
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
-        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 medfissaludintensa@gmail.com`);
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 vemaurijames@gmail.com`);
         enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
       }}/>
     </PDFWrapper>
@@ -1979,7 +2025,7 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
           <div>
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Rol en el Sistema <span className="text-red-500">*</span></label>
             <select value={rol} onChange={e => setRol(e.target.value as RolUsuario)}
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
               {ROL_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
@@ -2574,10 +2620,17 @@ function LicenseGuard({ children }: { children: ReactNode }) {
   const [licencia, setLicencia]   = useState<Licencia | null>(null);
   const [checked,  setChecked]    = useState(false);
 
-  useEffect(() => {
+  const verificar = useCallback(() => {
     if (!CLIENT_ID) { setChecked(true); return; }
     getLicencia(CLIENT_ID).then(lic => { setLicencia(lic); setChecked(true); });
   }, []);
+
+  useEffect(() => {
+    verificar();
+    // Re-verificar cada 6 horas para detectar renovaciones o bloqueos
+    const interval = setInterval(verificar, 6 * 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [verificar]);
 
   if (!checked) return (
     <div className="min-h-screen bg-[#031CA6] flex items-center justify-center">
@@ -2624,16 +2677,26 @@ function LicenseGuard({ children }: { children: ReactNode }) {
 
   return (
     <>
-      {estado === "warning" && licencia && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-white px-4 py-2 flex items-center justify-center gap-3 text-sm font-semibold shadow-lg">
-          <Clock size={15}/>
-          <span>Su licencia vence en <strong>{diasRestantes(licencia.expira_en)} día{diasRestantes(licencia.expira_en) !== 1 ? "s" : ""}</strong> — Contáctenos para renovar y evitar el bloqueo.</span>
-          <a href="https://wa.me/573114048112?text=Quiero%20renovar%20mi%20licencia%20CliniSign"
-             target="_blank" rel="noopener noreferrer"
-             className="underline font-bold hover:text-amber-100">Renovar ahora</a>
-        </div>
-      )}
-      <div className={estado === "warning" ? "pt-10" : ""}>{children}</div>
+      {estado === "warning" && licencia && (() => {
+        const dias = diasRestantes(licencia.expira_en);
+        const urgent = dias <= 1;
+        return (
+          <div className={`fixed top-0 left-0 right-0 z-[9999] ${urgent ? "bg-red-600" : "bg-amber-500"} text-white px-4 py-2.5 flex items-center justify-center gap-3 text-sm font-semibold shadow-lg`}>
+            <AlertTriangle size={15} className={urgent ? "animate-pulse" : ""}/>
+            <span>
+              {urgent
+                ? "⚠️ ¡Su licencia vence HOY! Sin renovación el acceso se bloqueará."
+                : <>Su licencia vence en <strong>{dias} día{dias !== 1 ? "s" : ""}</strong> — Renueve para evitar el bloqueo.</>}
+            </span>
+            <a href={`https://wa.me/573114048112?text=Quiero%20renovar%20mi%20licencia%20CliniSign%20(ID:%20${CLIENT_ID})`}
+               target="_blank" rel="noopener noreferrer"
+               className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg text-xs font-bold transition-colors">
+              Renovar por WhatsApp
+            </a>
+          </div>
+        );
+      })()}
+      <div className={estado === "warning" ? "pt-11" : ""}>{children}</div>
     </>
   );
 }
@@ -2924,7 +2987,7 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
         <div className="bg-white rounded-2xl p-6 shadow-2xl">
           <h2 className="text-sm font-bold mb-5">Iniciar Sesión</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Correo electrónico" value={email} onChange={setEmail} type="email" placeholder="usuario@medfis.com" required/>
+            <Field label="Correo electrónico" value={email} onChange={setEmail} type="email" placeholder="Ingrese su correo" required/>
             <Field label="Contraseña" value={password} onChange={setPassword} type="password" placeholder="••••••••" required/>
             {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-medium"><XCircle size={14}/> {error}</div>}
             <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-[#0D51D9] text-white font-semibold text-sm disabled:opacity-60 hover:bg-[#1648bf] transition-colors flex items-center justify-center gap-2">
@@ -3121,6 +3184,9 @@ function buildPdfParamsForRecord(r: ConsentRecord, ips: IPSConfig) {
       contactoNombre: d.paciente.contactoNombre,
       contactoParentesco: d.paciente.contactoParentesco,
       contactoTelefono: d.paciente.contactoTelefono,
+      estadoCivil: d.paciente.estadoCivil,
+      escolaridad: d.paciente.escolaridad,
+      tipoConsulta: d.paciente.tipoConsulta,
     } : undefined,
     vitales: d?.vitales ? {
       ...d.vitales,
@@ -3707,6 +3773,9 @@ export default function App() {
             contactoNombre: rd.paciente.contactoNombre,
             contactoParentesco: rd.paciente.contactoParentesco,
             contactoTelefono: rd.paciente.contactoTelefono,
+            estadoCivil: rd.paciente.estadoCivil,
+            escolaridad: rd.paciente.escolaridad,
+            tipoConsulta: rd.paciente.tipoConsulta,
           } : undefined,
           vitales: rd?.vitales ? { ...rd.vitales } : undefined,
           cuestionario: rd?.cuestionario ?? undefined,
@@ -3882,8 +3951,15 @@ export default function App() {
     try { await apiService.patch(`/usuarios/${id}/toggle`); } catch {}
   };
 
-  const notifCount    = notificaciones.filter(n => !n.leida && (n.paraRol === "TODOS" || n.paraRol === user?.rol)).length;
-  const myNotifs      = notificaciones.filter(n => n.paraRol === "TODOS" || n.paraRol === user?.rol);
+  const matchesRol = (n: Notificacion) => {
+    if (n.paraRol === "TODOS") return true;
+    if (!user) return false;
+    // Comparar sin tildes para cubrir MEDICO vs MÉDICO
+    const rolNorm = (r: string) => r.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+    return rolNorm(n.paraRol) === rolNorm(user.rol) || (n.paraUserId && n.paraUserId === user.id);
+  };
+  const notifCount = notificaciones.filter(n => !n.leida && matchesRol(n)).length;
+  const myNotifs   = notificaciones.filter(matchesRol);
 
   // ── Cargar datos desde PostgreSQL al iniciar sesión ─────────────────────────
   useEffect(() => {

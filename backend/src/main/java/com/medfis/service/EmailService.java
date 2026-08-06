@@ -24,6 +24,8 @@ public class EmailService {
     @Value("${medfis.mail.from}") private String from;
     @Value("${medfis.mail.from-name}") private String fromName;
     @Value("${medfis.mail.copy-to}") private String copyTo;
+    @Value("${medfis.nombre-ips:CliniSign}") private String ipsNombre;
+    @Value("${medfis.wa.admin:573114048112}") private String waAdmin;
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -37,7 +39,7 @@ public class EmailService {
                 case paquete        -> "Paquete Integral";
             };
 
-            String asunto = "✅ Consentimiento Informado Firmado — " + c.getRadicado() + " | Med&Fis";
+            String asunto = "✅ Consentimiento Informado Firmado — " + c.getRadicado() + " | " + ipsNombre;
             String html   = buildHtml(c, tipoLabel);
 
             // ── Enviar al paciente ──────────────────────────────────────────
@@ -94,7 +96,7 @@ public class EmailService {
             <!DOCTYPE html>
             <html lang="es">
             <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>Consentimiento Informado — Med&amp;Fis</title></head>
+            <title>Consentimiento Informado — %s</title></head>
             <body style="margin:0;padding:0;background:#EFF3FB;font-family:Arial,sans-serif;">
             <table width="100%%" cellpadding="0" cellspacing="0" style="background:#EFF3FB;padding:30px 0;">
               <tr><td align="center">
@@ -105,12 +107,12 @@ public class EmailService {
                     <table width="100%%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td>
-                          <p style="margin:0;font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px;">Med&amp;Fis</p>
-                          <p style="margin:4px 0 0;font-size:11px;color:#C5D5F0;">NIT 901102930 · Sistema de Consentimientos Informados</p>
+                          <p style="margin:0;font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px;">%s</p>
+                          <p style="margin:4px 0 0;font-size:11px;color:#C5D5F0;">Sistema de Consentimientos Informados</p>
                         </td>
                         <td align="right">
-                          <p style="margin:0;font-size:11px;color:#7A94C5;">Medellín, Colombia</p>
-                          <p style="margin:2px 0 0;font-size:10px;color:#5571A0;">medfis.notificaciones@gmail.com</p>
+                          <p style="margin:0;font-size:11px;color:#7A94C5;">Colombia</p>
+                          <p style="margin:2px 0 0;font-size:10px;color:#5571A0;">%s</p>
                         </td>
                       </tr>
                     </table>
@@ -129,7 +131,7 @@ public class EmailService {
                     <p style="margin:0 0 20px;font-size:14px;color:#374151;">
                       Estimado/a <strong style="color:#031CA6;">%s</strong>,<br><br>
                       Le informamos que su consentimiento informado ha sido registrado en el sistema de
-                      <strong>Med&amp;Fis</strong>. A continuación encontrará el resumen del documento.
+                      <strong>%s</strong>. A continuación encontrará el resumen del documento.
                       El PDF completo está adjunto a este correo para su archivo personal.
                     </p>
 
@@ -173,9 +175,9 @@ public class EmailService {
                     </div>
 
                     <p style="margin:0;font-size:12px;color:#6B7280;">
-                      Si tiene alguna duda, comuníquese con nosotros.<br>
-                      <strong style="color:#031CA6;">Dr. Rafael Eduardo Marrero Padilla</strong> · RM 3880525<br>
-                      Med&amp;Fis IPS · Medellín, Colombia
+                      Si tiene alguna duda, comuníquese con nosotros por WhatsApp:<br>
+                      <strong style="color:#031CA6;">+%s</strong><br>
+                      <strong>%s</strong> · Colombia
                     </p>
 
                   </td></tr>
@@ -185,10 +187,10 @@ public class EmailService {
                     <table width="100%%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td><p style="margin:0;font-size:10px;color:#7A94C5;">
-                          © %d Med&amp;Fis · Todos los derechos reservados<br>
-                          Desarrollado por JM Ingeniero · Nos reservamos el derecho de admisión
+                          © %d %s · Todos los derechos reservados<br>
+                          Desarrollado por JM Ingeniero
                         </p></td>
-                        <td align="right"><p style="margin:0;font-size:10px;color:#5571A0;">NIT 901102930</p></td>
+                        <td align="right"><p style="margin:0;font-size:10px;color:#5571A0;">CliniSign</p></td>
                       </tr>
                     </table>
                   </td></tr>
@@ -198,12 +200,19 @@ public class EmailService {
             </table>
             </body></html>
             """.formatted(
+                ipsNombre,          // <title>
+                ipsNombre,          // cabecera nombre IPS
+                from,               // cabecera email IPS
                 c.getPacienteNombre(),
+                ipsNombre,          // "registrado en el sistema de X"
                 c.getRadicado(),
                 fecha,
                 buildDetallesRows(c, tipoLabel),
                 estado,
-                java.time.LocalDate.now().getYear()
+                waAdmin,            // número WA contacto
+                ipsNombre,          // nombre IPS en firma
+                java.time.LocalDate.now().getYear(),
+                ipsNombre           // pie de página
         );
     }
 
