@@ -131,8 +131,8 @@ interface IPSConfig {
 }
 
 const DEFAULT_IPS: IPSConfig = {
-  nombre: "CliniSign", nit: "000000000",
-  medico: "", rm: "", ciudad: "Colombia",
+  nombre: "Salud Intensa Med y Fis IPS", nit: "901102930",
+  medico: "", rm: "", ciudad: "Medellín, Colombia",
   doctores: [],
 };
 
@@ -207,7 +207,7 @@ interface ConsentRecord {
 
 // ─── ESTADO INICIAL USUARIOS ──────────────────────────────────────────────────
 const USUARIOS_INICIALES: Usuario[] = [
-  { id: "1", nombre: "Administrador CliniSign", email: "vemaurijames@gmail.com", rol: "ADMINISTRADOR", password: "admin123456", activo: true, createdAt: "2024-01-01" },
+  { id: "1", nombre: "Administrador Salud Intensa", email: "saludintensaconsentimientos@hotmail.com", rol: "ADMINISTRADOR", password: "admin123456", activo: true, createdAt: "2024-01-01" },
 ];
 
 const CUESTIONARIO_PREGUNTAS = [
@@ -410,24 +410,15 @@ function genRadicado(tipo: TipoConsent, n: number) {
 }
 
 /**
- * Envía WhatsApp automático via backend Twilio.
- * Si el backend no está disponible, abre wa.me como fallback silencioso.
+ * Abre WhatsApp Web/App con el mensaje pre-cargado.
+ * El usuario solo toca "Enviar" — sin costo, sin Twilio.
  */
-async function enviarWhatsAppAuto(numero: string, mensaje: string): Promise<void> {
+function enviarWhatsAppAuto(numero: string, mensaje: string): void {
   const numLimpio = numero.replace(/[^0-9]/g, "");
   if (!numLimpio) return;
-  try {
-    const resp = await fetch(`${API_BASE}/whatsapp/enviar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ numero: numLimpio, mensaje }),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!resp.ok) throw new Error("backend WA error " + resp.status);
-  } catch {
-    // Fallback silencioso — el backend Twilio envía el mensaje principal al crear/aprobar/rechazar
-    // Este método es solo para reenvíos manuales
-  }
+  // Asegura formato Colombia: si empieza con 3 (celular local) agregar 57
+  const numFinal = numLimpio.startsWith("57") ? numLimpio : "57" + numLimpio;
+  window.open(`https://wa.me/${numFinal}?text=${encodeURIComponent(mensaje)}`, "_blank");
 }
 
 async function enviarSolicitudAcceso(nombre: string, contacto: string, mensaje: string): Promise<boolean> {
@@ -1237,8 +1228,18 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp, addToast = () => {} }:
       </div>
 
       <div className="flex gap-2 mt-5">
-        <button onClick={onSendWhatsApp} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20ba5a] transition-colors"><MessageSquare size={16}/> WhatsApp</button>
-        <button onClick={onSendEmail} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"><Mail size={16}/> Email</button>
+        <button onClick={onSendWhatsApp}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20ba5a] active:scale-95 transition-all">
+          <MessageSquare size={18}/>
+          <span className="text-xs font-bold">WhatsApp</span>
+          <span className="text-[9px] font-normal opacity-80">Toca Enviar en la app</span>
+        </button>
+        <button onClick={onSendEmail}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] active:scale-95 transition-all">
+          <Mail size={18}/>
+          <span className="text-xs font-bold">Email</span>
+          <span className="text-[9px] font-normal opacity-80">Enviar por correo</span>
+        </button>
       </div>
       <div className="flex gap-2 mt-2">
         <button onClick={handlePrint} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted"><Printer size={14}/> Imprimir</button>
@@ -1252,10 +1253,10 @@ function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClos
   const ips = useIPS();
   const d = record.datos as any;
   const pac = d.paciente as DatosPaciente;
-  const handleWA = async () => {
-    const msg = `*${ips.nombre}* — Consentimiento Informado\n\nEstimado/a ${pac?.nombre},\n\n📋 Radicado: ${record.radicado}\n📅 Fecha: ${fmtFecha(record.fecha)}\n✅ Estado: ${record.estado}\n\n_${ips.nombre} · NIT ${ips.nit}_`;
-    await enviarWhatsAppAuto(pac?.telefono ?? "", msg);
-    addToast("info", "📱 WhatsApp enviado automáticamente");
+  const handleWA = () => {
+    const msg = `*${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac?.nombre ?? record.pacienteNombre}*,\n\n📋 *Procedimiento:* ${record.tipo}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n✅ *Estado:* ${record.estado}\n\n_${ips.nombre}_`;
+    enviarWhatsAppAuto(pac?.telefono ?? record.pacienteTel ?? "", msg);
+    addToast("info", "📱 WhatsApp abierto — toca Enviar en la app");
   };
   return (
     <div className="fixed inset-0 bg-black/70 z-[200] flex items-end sm:items-center justify-center sm:p-3">
@@ -1398,8 +1399,8 @@ function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, reco
         if (sent) addToast("success", "Email enviado correctamente"); else addToast("info", "📧 Email enviado vía servidor (SMTP)");
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
-        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 vemaurijames@gmail.com`);
-        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 saludintensaconsentimientos@hotmail.com`);
+        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp abierto — toca Enviar en la app");
       }}/>
     </PDFWrapper>
   );
@@ -1500,8 +1501,8 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, record
         if (sent) addToast("success", "Email enviado correctamente"); else addToast("info", "📧 Email enviado vía servidor (SMTP)");
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
-        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 vemaurijames@gmail.com`);
-        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 saludintensaconsentimientos@hotmail.com`);
+        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp abierto — toca Enviar en la app");
       }}/>
     </PDFWrapper>
   );
@@ -1601,8 +1602,8 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName, records }: {
         if (sent) addToast("success", "Email enviado correctamente"); else addToast("info", "📧 Email enviado vía servidor (SMTP)");
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
-        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 vemaurijames@gmail.com`);
-        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 saludintensaconsentimientos@hotmail.com`);
+        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp abierto — toca Enviar en la app");
       }}/>
     </PDFWrapper>
   );
@@ -1686,8 +1687,8 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName, records }: 
         if (sent) addToast("success", "Email enviado correctamente"); else addToast("info", "📧 Email enviado vía servidor (SMTP)");
       }} onSendWhatsApp={() => {
         const tLabel = {escleroterapia:"Escleroterapia",sueroterapia:"Sueroterapia Vit C/B",laser:"Terapia Láser",paquete:"Paquete Integral"}[record.tipo] ?? record.tipo;
-        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 vemaurijames@gmail.com`);
-        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp enviado automáticamente");
+        const waMsg = encodeURIComponent(`✅ *${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac.nombre}*,\n\nSu consentimiento ha sido registrado exitosamente.\n\n📋 *Procedimiento:* ${tLabel}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n⏳ *Estado:* Firmado — Pendiente aprobación médica\n\n${record.pdfUrl ? `📄 *PDF:* ${record.pdfUrl}\n\n` : ""}📞 *Clínica:* +57 311 404 8112\n📧 saludintensaconsentimientos@hotmail.com`);
+        enviarWhatsAppAuto(pac.telefono, decodeURIComponent(waMsg)); addToast("info", "📱 WhatsApp abierto — toca Enviar en la app");
       }}/>
     </PDFWrapper>
   );
@@ -2020,7 +2021,7 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nombre completo" value={nombre} onChange={setNombre} placeholder="Dr. Nombre Apellido" required icon={<UserCheck size={13}/>}/>
-            <Field label="Correo electrónico" value={email} onChange={setEmail} placeholder="usuario@medfis.com" type="email" required icon={<AtSign size={13}/>}/>
+            <Field label="Correo electrónico" value={email} onChange={setEmail} placeholder="Ingrese su correo" type="email" required icon={<AtSign size={13}/>}/>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Rol en el Sistema <span className="text-red-500">*</span></label>
@@ -2067,7 +2068,7 @@ function StaffPage({ usuarios, onAddUser, onToggleActivo, onEditUser, onChangePa
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nombre completo" value={nombre} onChange={setNombre} placeholder="Nombre completo" required icon={<UserCheck size={13}/>}/>
-            <Field label="Correo electrónico" value={email} onChange={setEmail} placeholder="correo@medfis.com" type="email" required icon={<AtSign size={13}/>}/>
+            <Field label="Correo electrónico" value={email} onChange={setEmail} placeholder="correo@ejemplo.com" type="email" required icon={<AtSign size={13}/>}/>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Rol</label>
@@ -2435,7 +2436,7 @@ function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             {form.logo ? <img src={form.logo} alt="Logo" className="w-8 h-8 rounded-lg object-contain bg-gray-50 border border-border"/> : <div className="w-8 h-8 rounded-lg bg-[#0D51D9]/10 flex items-center justify-center"><Settings size={15} className="text-[#0D51D9]"/></div>}
-            <div><p className="font-bold text-sm">Configuración IPS — CliniSign</p><p className="text-[10px] text-muted-foreground">Panel de Administración · Control Total</p></div>
+            <div><p className="font-bold text-sm">Configuración IPS — Salud Intensa</p><p className="text-[10px] text-muted-foreground">Panel de Administración · Control Total</p></div>
           </div>
           <button onClick={onClose}><X size={18} className="text-muted-foreground"/></button>
         </div>
@@ -2456,7 +2457,7 @@ function IPSSettingsModal({ ips, onSave, onClose }: { ips: IPSConfig; onSave: (c
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
                 <p className="text-[10px] text-amber-800 font-semibold flex items-center gap-1.5"><AlertTriangle size={11}/> Estos valores aparecen en todos los consentimientos y PDFs</p>
               </div>
-              <Field label="Nombre de la IPS / Clínica" value={form.nombre} onChange={s("nombre")} placeholder="Ej. Med&Fis IPS" required icon={<Building2 size={13}/>}/>
+              <Field label="Nombre de la IPS / Clínica" value={form.nombre} onChange={s("nombre")} placeholder="Ej. Salud Intensa Med y Fis IPS" required icon={<Building2 size={13}/>}/>
               <Field label="NIT" value={form.nit} onChange={s("nit")} placeholder="000000000-0" icon={<CreditCard size={13}/>} required/>
               <Field label="Médico Responsable Principal" value={form.medico} onChange={s("medico")} placeholder="Dr. Nombre Apellido" icon={<Stethoscope size={13}/>} required/>
               <Field label="Registro Médico (RM)" value={form.rm} onChange={s("rm")} placeholder="RM 0000000"/>
@@ -2767,7 +2768,7 @@ function LicenseManagerPage({ addToast }: { addToast: (t: "success"|"error"|"inf
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-black text-foreground">Gestor de Licencias</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Control de suscripciones de todos los clientes CliniSign</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Control de suscripciones de todos los clientes</p>
         </div>
         <button onClick={abrirNuevo} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors">
           <Plus size={15}/> Nueva licencia
@@ -2849,7 +2850,7 @@ function LicenseManagerPage({ addToast }: { addToast: (t: "success"|"error"|"inf
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">Nombre del cliente *</label>
-                  <input required value={form.nombre_cliente} onChange={e => setForm(f => ({...f, nombre_cliente: e.target.value}))} placeholder="Med&Fis Salud Intensa" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"/>
+                  <input required value={form.nombre_cliente} onChange={e => setForm(f => ({...f, nombre_cliente: e.target.value}))} placeholder="Salud Intensa Med y Fis IPS" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"/>
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">Client ID *</label>
@@ -2905,21 +2906,16 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
   const [solMensaje, setSolMensaje] = useState("");
   const [solEnviado, setSolEnviado] = useState(false);
 
-  const handleSolicitud = async (e: FormEvent) => {
+  const handleSolicitud = (e: FormEvent) => {
     e.preventDefault();
-    // Enviar via backend Twilio (automático, sin abrir WhatsApp)
-    const ok = await enviarSolicitudAcceso(solNombre, solTel, solMensaje);
-    if (!ok) {
-      // Fallback: abrir WhatsApp web si el backend no responde
-      const adminWA = (import.meta as any).env?.VITE_WA_CLINICA ?? "573114048112";
-      const msg = encodeURIComponent(
-        `🔔 *SOLICITUD DE ACCESO — ${ips.nombre}*\n\n` +
-        `👤 *Nombre:* ${solNombre}\n📱 *Contacto:* ${solTel}\n` +
-        (solMensaje ? `💬 *Mensaje:* ${solMensaje}\n` : "") +
-        `\n_Enviado desde el login de CliniSign_`
-      );
-      window.open(`https://wa.me/${adminWA}?text=${msg}`, "_blank");
-    }
+    const adminWA = (import.meta as any).env?.VITE_WA_CLINICA ?? "573114048112";
+    const msg = encodeURIComponent(
+      `🔔 *SOLICITUD DE ACCESO — ${ips.nombre}*\n\n` +
+      `👤 *Nombre:* ${solNombre}\n📱 *Contacto:* ${solTel}\n` +
+      (solMensaje ? `💬 *Mensaje:* ${solMensaje}\n` : "") +
+      `\n_Enviado desde el login de CliniSign_`
+    );
+    window.open(`https://wa.me/${adminWA}?text=${msg}`, "_blank");
     setSolEnviado(true);
   };
 
@@ -3836,7 +3832,7 @@ export default function App() {
         localStorage.setItem("medfis_records", JSON.stringify(updated));
         return updated;
       });
-      if (telPac) addToast("info", `📱 WhatsApp enviado automáticamente a ${rBase.pacienteNombre}`);
+      // WhatsApp se abre desde el botón en el PDF — sin Twilio, sin costo
     };
 
     pipeline();
