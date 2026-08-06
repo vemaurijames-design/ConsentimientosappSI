@@ -3,8 +3,8 @@ import emailjs from "@emailjs/browser";
 const SERVICE_ID    = import.meta.env.VITE_EMAILJS_SERVICE_ID  ?? "";
 const TEMPLATE_ID   = import.meta.env.VITE_EMAILJS_TEMPLATE_ID ?? "";
 const PUBLIC_KEY    = import.meta.env.VITE_EMAILJS_PUBLIC_KEY  ?? "";
-const CLINICA_EMAIL = import.meta.env.VITE_EMAIL_CLINICA        ?? "medfissaludintensa@gmail.com";
-const REPLY_TO      = import.meta.env.VITE_EMAILJS_REPLY_TO    ?? "medfissaludintensa@gmail.com";
+const CLINICA_EMAIL = import.meta.env.VITE_EMAIL_CLINICA        ?? "saludintensaconsentimientos@hotmail.com";
+const REPLY_TO      = import.meta.env.VITE_EMAILJS_REPLY_TO    ?? "saludintensaconsentimientos@hotmail.com";
 
 const configurado = () => Boolean(SERVICE_ID && TEMPLATE_ID && PUBLIC_KEY);
 
@@ -26,7 +26,7 @@ const TIPO_LABEL: Record<string, string> = {
   escleroterapia: "Escleroterapia (Inyección de Várices)",
   sueroterapia:   "Sueroterapia Vitamina C y/o Complejo B",
   laser:          "Terapia Láser — Control de Venas Várices",
-  paquete:        "Paquete Integral Med&Fis",
+  paquete:        "Paquete Integral Salud Intensa",
 };
 
 /** Envía email al paciente con todos los datos del consentimiento. */
@@ -61,7 +61,7 @@ export async function enviarEmailPaciente(datos: DatosEmail): Promise<boolean> {
   }
 }
 
-/** Envía copia del consentimiento firmado a medfissaludintensa@gmail.com. */
+/** Envía copia del consentimiento firmado a la clínica. */
 export async function enviarEmailClinica(datos: DatosEmail): Promise<boolean> {
   if (!configurado()) return false;
   if (!CLINICA_EMAIL) return false;

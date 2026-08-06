@@ -27,7 +27,7 @@ public class DataInitializer implements ApplicationRunner {
     }
 
     private void crearAdminSiNoExiste() {
-        final String adminEmail = "medfissaludintensa@gmail.com";
+        final String adminEmail = "saludintensaconsentimientos@hotmail.com";
 
         if (usuarioRepo.findByEmail(adminEmail).isPresent()) {
             log.info("✅ Usuario administrador ya existe — omitiendo inicialización");
@@ -35,7 +35,7 @@ public class DataInitializer implements ApplicationRunner {
         }
 
         Usuario admin = new Usuario();
-        admin.setNombre("Administrador Med&Fis Salud Intensa");
+        admin.setNombre("Administrador Salud Intensa");
         admin.setEmail(adminEmail);
         admin.setPassword(passwordEncoder.encode("admin123456"));
         admin.setRol(Usuario.RolUsuario.ADMINISTRADOR);

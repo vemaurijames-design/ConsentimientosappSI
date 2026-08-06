@@ -24,6 +24,7 @@ interface DatosConsentimiento {
   datosPaciente?: {
     direccion?: string; ciudad?: string; fechaNacimiento?: string;
     contactoNombre?: string; contactoParentesco?: string; contactoTelefono?: string;
+    estadoCivil?: string; escolaridad?: string; tipoConsulta?: string;
   };
   vitales?: {
     oximetria?: string; tension?: string; frecuenciaCardiaca?: string;
@@ -147,10 +148,10 @@ export async function generarPDFConsentimiento(
 
   // Datos adicionales del paciente
   const dp = datos.datosPaciente;
-  if (dp && (dp.direccion || dp.fechaNacimiento || dp.contactoNombre)) {
-    checkPage(28);
+  if (dp && (dp.direccion || dp.fechaNacimiento || dp.contactoNombre || dp.estadoCivil || dp.escolaridad || dp.tipoConsulta)) {
+    checkPage(36);
     doc.setFillColor(239, 243, 251);
-    doc.roundedRect(M, y, ANCHO, 26, 2, 2, "F");
+    doc.roundedRect(M, y, ANCHO, 34, 2, 2, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
     doc.setTextColor(...AZUL_OSCURO);
@@ -159,12 +160,15 @@ export async function generarPDFConsentimiento(
     doc.setFontSize(7);
     doc.setTextColor(...GRIS_TEXTO);
     let dy = y + 12;
-    if (dp.direccion)   { doc.text(`Dirección: ${dp.direccion}${dp.ciudad ? ` — ${dp.ciudad}` : ""}`, M + 4, dy); dy += 5; }
-    if (dp.fechaNacimiento) { doc.text(`Fecha de nacimiento: ${dp.fechaNacimiento}`, M + 4, dy); dy += 5; }
-    if (dp.contactoNombre) {
-      doc.text(`Contacto emergencia: ${dp.contactoNombre} (${dp.contactoParentesco ?? "—"}) · Tel: ${dp.contactoTelefono ?? "—"}`, M + 4, dy);
+    if (dp.tipoConsulta)   { doc.text(`Tipo de consulta: ${dp.tipoConsulta}`, M + 4, dy); dy += 5; }
+    if (dp.estadoCivil || dp.escolaridad) {
+      const linea = [dp.estadoCivil ? `Estado civil: ${dp.estadoCivil}` : "", dp.escolaridad ? `Escolaridad: ${dp.escolaridad}` : ""].filter(Boolean).join("   ·   ");
+      doc.text(linea, M + 4, dy); dy += 5;
     }
-    y += 32;
+    if (dp.direccion)        { doc.text(`Dirección: ${dp.direccion}${dp.ciudad ? ` — ${dp.ciudad}` : ""}`, M + 4, dy); dy += 5; }
+    if (dp.fechaNacimiento)  { doc.text(`Fecha de nacimiento: ${dp.fechaNacimiento}`, M + 4, dy); dy += 5; }
+    if (dp.contactoNombre)   { doc.text(`Contacto emergencia: ${dp.contactoNombre} (${dp.contactoParentesco ?? "—"}) · Tel: ${dp.contactoTelefono ?? "—"}`, M + 4, dy); }
+    y += 40;
   }
 
   // ══════════════════════════════════════════════════════
