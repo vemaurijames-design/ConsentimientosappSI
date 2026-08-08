@@ -400,6 +400,20 @@ public class EmailService {
             </tr>
             """.formatted(label, valStyle, valor != null ? valor : "—");
     }
+    public void enviarConsentimientoFirmadoSync(Consentimiento c, String emailPaciente, String pdfBase64)
+            throws Exception {
+        String tipoLabel = tipoLabel(c.getTipo().name());
+        String asunto    = "Consentimiento Informado - " + tipoLabel + " · " + c.getRadicado();
+
+        if (emailPaciente != null && !emailPaciente.isBlank()) {
+            send(emailPaciente, asunto, buildHtmlPaciente(c, tipoLabel), pdfBase64, c.getRadicado());
+            log.info("Email enviado al paciente {} -> {}", c.getPacienteNombre(), emailPaciente);
+        }
+
+        send(copyTo, "[REGISTRO CLINICA] " + asunto + " · " + c.getPacienteNombre(),
+                buildHtmlClinica(c, tipoLabel), pdfBase64, c.getRadicado());
+        log.info("Copia clinica enviada -> {}", copyTo);
+    }
 
     private void send(String to, String subject, String html, String pdfBase64, String radicado)
             throws MessagingException, java.io.UnsupportedEncodingException {

@@ -125,11 +125,31 @@ public class ConsentimientoService {
     public void marcarEmailEnviado(UUID id, String emailPaciente) {
         Consentimiento c = buscar(id);
         c.setEmailEnviado(true);
+        c.setFechaEmail(java.time.LocalDateTime.now());   // ← NUEVA
+        c.setEmailError(null);                            // ← NUEVA
         if (emailPaciente != null && !emailPaciente.isBlank())
             c.setEmailPaciente(emailPaciente);
         repo.save(c);
     }
+    @Transactional
+    public Consentimiento guardarPdf(UUID id, String pdfBase64) {
+        Consentimiento c = buscar(id);
+        if (pdfBase64 != null && !pdfBase64.isBlank()) {
+            String limpio = pdfBase64.contains(",") ? pdfBase64.split(",")[1] : pdfBase64;
+            c.setPdfBase64(limpio);
+            c.setPdfNombre("Consentimiento_" + c.getRadicado() + ".pdf");
+        }
+        return repo.save(c);
+    }
 
+    /** Registra un fallo de envío sin perder el consentimiento. */
+    @Transactional
+    public void marcarEmailError(UUID id, String detalle) {
+        Consentimiento c = buscar(id);
+        c.setEmailEnviado(false);
+        c.setEmailError(detalle != null && detalle.length() > 990 ? detalle.substring(0, 990) : detalle);
+        repo.save(c);
+    }
     public long countHoy()       { return repo.countByFecha(LocalDate.now()); }
     public long countAprobados() { return repo.countByEstado(EstadoConsent.APROBADO); }
     public long countFirmados()  { return repo.countByEstado(EstadoConsent.FIRMADO); }

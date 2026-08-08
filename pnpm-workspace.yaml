@@ -1,5 +1,9 @@
 packages:
   - '.'
+allowBuilds:
+  '@tailwindcss/oxide': true
+  core-js: true
+  esbuild: true
 supportedArchitectures:
   os:
     - linux
