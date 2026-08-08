@@ -30,17 +30,49 @@ public class ConsentimientoController {
     @PatchMapping("/{id}/pdfurl") public ResponseEntity<Void> pdfUrl(@PathVariable UUID id, @RequestBody Map<String,String> body) { svc.actualizarPdfUrl(id, body.get("pdfUrl")); return ResponseEntity.ok().build(); }
     @GetMapping("/estadisticas") public ResponseEntity<Map<String,Long>> stats() { return ResponseEntity.ok(Map.of("total",svc.countTotal(),"firmados",svc.countFirmados(),"aprobados",svc.countAprobados(),"hoy",svc.countHoy())); }
 
-    /** Envía email con PDF adjunto al paciente y copia a la clínica. */
+    /** Guarda el PDF, envía el correo y solo marca enviado si el SMTP respondió OK. */
     @PostMapping("/{id}/enviar-notificacion")
-    public ResponseEntity<Map<String,String>> enviarNotificacion(
+    public ResponseEntity<Map<String, String>> enviarNotificacion(
             @PathVariable UUID id,
             @RequestBody EnviarNotificacionRequest req) {
+
+        // 1) El PDF queda almacenado pase lo que pase con el correo
+        Consentimiento c = svc.guardarPdf(id, req.getPdfBase64());
+
+        try {
+            // 2) Envío sincrónico: si falla, lanza excepción
+            emailService.enviarConsentimientoFirmadoSync(c, req.getEmailPaciente(), req.getPdfBase64());
+
+            // 3) Recién ahora se marca como enviado
+            svc.marcarEmailEnviado(id, req.getEmailPaciente());
+
+            return ResponseEntity.ok(Map.of(
+                    "status",      "ok",
+                    "mensaje",     "Notificacion enviada a " +
+                            (req.getEmailPaciente() != null ? req.getEmailPaciente() : "clinica"),
+                    "pdfGuardado", "true"
+            ));
+        } catch (Exception e) {
+            svc.marcarEmailError(id, e.getMessage());
+            return ResponseEntity.status(502).body(Map.of(
+                    "status",      "error",
+                    "mensaje",     "El consentimiento y su PDF quedaron guardados, pero el correo no salio",
+                    "pdfGuardado", "true",
+                    "detalle",     String.valueOf(e.getMessage())
+            ));
+        }
+    }
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> descargarPdf(@PathVariable UUID id) {
         Consentimiento c = svc.buscar(id);
-        svc.marcarEmailEnviado(id, req.getEmailPaciente());
-        emailService.enviarConsentimientoFirmado(c, req.getEmailPaciente(), req.getPdfBase64());
-        return ResponseEntity.ok(Map.of(
-            "status", "ok",
-            "mensaje", "Notificación enviada a " + (req.getEmailPaciente() != null ? req.getEmailPaciente() : "clínica")
-        ));
+        if (c.getPdfBase64() == null || c.getPdfBase64().isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+        byte[] pdf = java.util.Base64.getDecoder().decode(c.getPdfBase64());
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition",
+                        "inline; filename=\"Consentimiento_" + c.getRadicado() + ".pdf\"")
+                .body(pdf);
     }
 }

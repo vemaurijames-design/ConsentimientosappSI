@@ -33,6 +33,10 @@ public class Consentimiento {
     @Column(name = "pdf_url", length = 1000) private String pdfUrl;
     @Column(name = "email_enviado", nullable = false) private boolean emailEnviado = false;
     @Column(name = "whatsapp_enviado", nullable = false) private boolean whatsappEnviado = false;
+    @Column(name = "pdf_nombre", length = 200)              private String pdfNombre;
+    @Column(name = "pdf_base64", columnDefinition = "text") private String pdfBase64;
+    @Column(name = "fecha_email")                           private LocalDateTime fechaEmail;
+    @Column(name = "email_error", length = 1000)            private String emailError;
     @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb", nullable = false) private Map<String, Object> datos;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;

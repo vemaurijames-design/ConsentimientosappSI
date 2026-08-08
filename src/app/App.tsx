@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, createContext, useContext, useCallback, ty
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import medfisLogo from "@/imports/medfis_logo.png";
 import { subirPDF, getLicencia, getAllLicencias, upsertLicencia, toggleLicencia, diasRestantes, estadoLicencia, type Licencia } from "@/app/lib/supabaseClient";
-import { generarPDFConsentimiento } from "@/app/lib/pdfService";
+import { generarPDFConsentimiento, blobToBase64 } from "@/app/lib/pdfService";
 import { enviarEmailPaciente, enviarEmailClinica } from "@/app/lib/emailService";
 import {
   FileText, LogOut, Plus, Search, Eye, Trash2, Download,
@@ -36,17 +36,43 @@ const API_BASE = (typeof import.meta !== "undefined" && (import.meta as any).env
  * Notificaciones: GET /api/notificaciones  PATCH /{id}/leer  DELETE /{id}
  * WS: /ws/notificaciones (Spring STOMP)
  */
-const apiService = {
-  _token: "",
-  setToken(t: string) { this._token = t; },
-  headers() { return { "Content-Type": "application/json", Authorization: `Bearer ${this._token}` }; },
-  async get(path: string) { return fetch(`${API_BASE}${path}`, { headers: this.headers(), signal: AbortSignal.timeout(8000) }); },
-  async post(path: string, body: unknown) { return fetch(`${API_BASE}${path}`, { method: "POST", headers: this.headers(), body: JSON.stringify(body), signal: AbortSignal.timeout(8000) }); },
-  async put(path: string, body: unknown) { return fetch(`${API_BASE}${path}`, { method: "PUT", headers: this.headers(), body: JSON.stringify(body), signal: AbortSignal.timeout(8000) }); },
-  async patch(path: string, body?: unknown) { return fetch(`${API_BASE}${path}`, { method: "PATCH", headers: this.headers(), body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(8000) }); },
-  async delete(path: string) { return fetch(`${API_BASE}${path}`, { method: "DELETE", headers: this.headers(), signal: AbortSignal.timeout(8000) }); },
-};
+const TOKEN_KEY = "medfis_token";
 
+const apiService = {
+  _token: (typeof localStorage !== "undefined" ? localStorage.getItem(TOKEN_KEY) : "") || "",
+
+  setToken(t: string) {
+    this._token = t || "";
+    if (typeof localStorage === "undefined") return;
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+    else localStorage.removeItem(TOKEN_KEY);
+  },
+
+  headers() {
+    return { "Content-Type": "application/json", Authorization: `Bearer ${this._token}` };
+  },
+
+  async get(path: string) {
+    return fetch(`${API_BASE}${path}`, { headers: this.headers(), signal: AbortSignal.timeout(8000) });
+  },
+  // timeoutMs configurable: el envío SMTP puede tardar 15-30 s
+  async post(path: string, body: unknown, timeoutMs = 8000) {
+    return fetch(`${API_BASE}${path}`, { method: "POST", headers: this.headers(),
+      body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
+  },
+  async put(path: string, body: unknown) {
+    return fetch(`${API_BASE}${path}`, { method: "PUT", headers: this.headers(),
+      body: JSON.stringify(body), signal: AbortSignal.timeout(8000) });
+  },
+  async patch(path: string, body?: unknown) {
+    return fetch(`${API_BASE}${path}`, { method: "PATCH", headers: this.headers(),
+      body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(8000) });
+  },
+  async delete(path: string) {
+    return fetch(`${API_BASE}${path}`, { method: "DELETE", headers: this.headers(),
+      signal: AbortSignal.timeout(8000) });
+  },
+};
 // ─── ROL MAPPERS (backend sin tildes ↔ frontend con tildes) ──────────────────
 function toBackendRol(rol: string): string {
   return rol.normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -207,7 +233,7 @@ interface ConsentRecord {
 
 // ─── ESTADO INICIAL USUARIOS ──────────────────────────────────────────────────
 const USUARIOS_INICIALES: Usuario[] = [
-  { id: "1", nombre: "Administrador Salud Intensa", email: "saludintensaconsentimientos@hotmail.com", rol: "ADMINISTRADOR", password: "admin123456", activo: true, createdAt: "2024-01-01" },
+  { id: "1", nombre: "Administrador Salud Intensa", email: "mantenimientojms@hotmail.com", rol: "ADMINISTRADOR", password: "", activo: true, createdAt: "2026-01-01" },
 ];
 
 const CUESTIONARIO_PREGUNTAS = [
@@ -2951,10 +2977,15 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
         setLoading(false);
         return;
       }
-    } catch {
-      // Backend no disponible — usar autenticación local
-    }
-
+     } catch {
+          // Backend no disponible
+          if (!(import.meta as any).env?.DEV) {
+            setError("No hay conexión con el servidor. Verifique su internet e intente de nuevo.");
+            setLoading(false);
+            return;
+          }
+          // En desarrollo se permite el fallback local para trabajar sin backend
+        }
     // 2. Fallback: autenticación local (sin backend)
     const user = usuarios.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password && u.activo);
     if (user) { onLogin(user); }
@@ -3055,6 +3086,8 @@ function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuar
 }
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
+apiService.setToken("");                 // limpia el token en memoria y en localStorage
+localStorage.removeItem("medfis_token"); // por si acaso
 function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, onSettings, onChangePwd, notifCount }: {
   page: AppPage; onPage: (p: AppPage) => void; user: Usuario; onLogout: () => void;
   records: ConsentRecord[]; mobileOpen: boolean; onClose: () => void; onSettings: () => void;
@@ -3792,37 +3825,31 @@ export default function App() {
             apiService.patch(`/consentimientos/${backendId}/pdfurl`, { pdfUrl }).catch(() => {});
           }
         }
+               // ── 4. Enviar email + PDF adjunto POR EL BACKEND (SMTP) ─────────
+               if (backendId) {
+                 const pdfBase64 = await blobToBase64(pdfBlob);
+                 const resp = await apiService.post(
+                   `/consentimientos/${backendId}/enviar-notificacion`,
+                   { emailPaciente: emailPac || null, pdfBase64 },
+                   60000, // el SMTP puede tardar: 60 s de margen
+                 );
+                 const data = await resp.json().catch(() => ({} as Record<string, string>));
 
-        // ── 4. Enviar email via EmailJS ──────────────────────────────────
-        const datosEmail = {
-          emailPaciente:  emailPac,
-          nombrePaciente: rBase.pacienteNombre,
-          radicado:       rBase.radicado,
-          tipo:           rBase.tipo,
-          fecha:          fmtFecha(rBase.fecha),
-          documento:      rBase.pacienteDoc,
-          telefono:       rBase.pacienteTel,
-          creadoPor:      rBase.creadoPor ?? "—",
-          pdfUrl:         pdfUrl ?? undefined,
-          ipsNombre:      ips.nombre,
-          ipsMedico:      ips.medico,
-        };
-
-        const [okPac, okCli] = await Promise.allSettled([
-          emailPac ? enviarEmailPaciente(datosEmail) : Promise.resolve(false),
-          enviarEmailClinica(datosEmail),
-        ]);
-        emailEnviado = (okPac.status === "fulfilled" && !!okPac.value) ||
-                       (okCli.status === "fulfilled" && !!okCli.value);
-
-        if (emailEnviado && emailPac) addToast("success", `📧 Email enviado a ${emailPac}`);
-        else if (emailEnviado)        addToast("success", `📧 Copia enviada a la clínica`);
-
-      } catch (err) {
-        console.error("Pipeline PDF/email:", err);
-        addToast("warning", "PDF: error generando — verifique la conexión");
-      }
-
+                 if (resp.ok) {
+                   emailEnviado = true;
+                   addToast("success", emailPac
+                     ? `Email con PDF enviado a ${emailPac}`
+                     : "Copia del consentimiento enviada a la clínica");
+                 } else {
+                   emailEnviado = false;
+                   addToast("warning",
+                     `El PDF quedó guardado, pero el correo no salió: ${data.detalle ?? resp.status}`);
+                 }
+               } else {
+                 emailEnviado = false;
+                 addToast("warning",
+                   "Sin conexión al servidor: el consentimiento quedó local y el correo no se envió");
+               }
       // ── 5. Actualizar flags localmente ───────────────────────────────
       setRecords(prev => {
         // WhatsApp lo envía el backend automáticamente al crear el consentimiento
@@ -3831,12 +3858,15 @@ export default function App() {
           : x);
         localStorage.setItem("medfis_records", JSON.stringify(updated));
         return updated;
-      });
+     });
       // WhatsApp se abre desde el botón en el PDF — sin Twilio, sin costo
+     } catch (e) {
+       console.error(e);
+         addToast("error", "Error generando PDF o enviando notificaciones — revisar consola");
+     }
     };
-
-    pipeline();
-  };
+     pipeline();
+    };
 
   const handleAprobar = async (id: string) => {
     // Actualizar optimistamente en local
