@@ -4,10 +4,16 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite"
+    "dev":       "vite",
+    "build":     "vite build",
+    "dev:web":   "vite",
+    "dev:api":   "mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=local",
+    "dev:full":  "concurrently -n API,WEB -c blue,green \"pnpm dev:api\" \"pnpm dev:web\"",
+    "build:api": "mvn -f backend/pom.xml clean package -DskipTests",
+    "build:all": "pnpm build:api && pnpm build"
   },
   "dependencies": {
+    "concurrently": "^9.1.0",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@mui/icons-material": "7.3.5",
