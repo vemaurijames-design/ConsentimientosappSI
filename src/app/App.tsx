@@ -4,6 +4,18 @@ import medfisLogo from "@/imports/medfis_logo.png";
 import { subirPDF, getLicencia, getAllLicencias, upsertLicencia, toggleLicencia, diasRestantes, estadoLicencia, type Licencia } from "@/app/lib/supabaseClient";
 import { generarPDFConsentimiento, blobToBase64 } from "@/app/lib/pdfService";
 import { enviarEmailPaciente, enviarEmailClinica } from "@/app/lib/emailService";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthContext, AuthProvider } from './lib/AuthContext';
+import AdminUsuarios from "./components/ui/AdminUsuarios";
+import PacientesPage from "./components/PacientesPage";
+import AgendaPage from "./components/AgendaPage";
+import clinisignLogo from "@/imports/clinisign_logo.png";
+import {
+  buscarPacienteBasico,
+  pacienteBasicoToDatosConsent,
+  nombreDesdePaciente,
+} from "./lib/pacienteLookup";
+
 import {
   FileText, LogOut, Plus, Search, Eye, Trash2, Download,
   CheckCircle, Clock, XCircle, Mail, MessageSquare,
@@ -49,7 +61,7 @@ const apiService = {
   },
 
   headers() {
-    return { "Content-Type": "application/json", Authorization: `Bearer ${this._token}` };
+    return { "Content-Type": "application/json", Authorization: `Bearer ${this._token}` } ;
   },
 
   async get(path: string) {
@@ -73,6 +85,116 @@ const apiService = {
       signal: AbortSignal.timeout(8000) });
   },
 };
+/** Reenvía el consentimiento por email usando el backend SMTP */
+async function reenviarEmailConsentimiento(
+  record: ConsentRecord,
+  ips: IPSConfig,
+  addToast: (t: "success" | "error" | "info" | "warning", m: string) => void
+) {
+  const d = record.datos as any;
+  const emailPac =
+    record.emailPaciente ||
+    d?.paciente?.email ||
+    d?.email ||
+    "";
+
+  if (!emailPac || !String(emailPac).includes("@")) {
+    addToast("error", "Este consentimiento no tiene email de paciente guardado.");
+    return;
+  }
+
+  addToast("info", `Enviando email a ${emailPac}…`);
+
+  try {
+    const textoMap: Record<string, string> = {
+      escleroterapia: makeTextoEscleroterapia(ips),
+      sueroterapia: makeTextoSueroterapia(ips),
+      laser: makeTextoLaser(ips),
+      paquete:
+        makeTextoEscleroterapia(ips) +
+        "\n\n" +
+        makeTextoSueroterapia(ips) +
+        "\n\n" +
+        makeTextoLaser(ips),
+    };
+
+    const params = {
+      radicado: record.radicado,
+      tipo: record.tipo,
+      fecha: fmtFecha(record.fecha),
+      pacienteNombre: record.pacienteNombre,
+      pacienteDoc: record.pacienteDoc,
+      pacienteTel: record.pacienteTel,
+      pacienteEmail: emailPac,
+      creadoPor: record.creadoPor || "—",
+      textoConsent: textoMap[record.tipo] || "",
+      ipsNombre: ips.nombre,
+      ipsNit: ips.nit,
+      ipsMedico: ips.medico,
+      ipsRm: ips.rm,
+      ipsCiudad: ips.ciudad,
+      firmaConsentimiento: d?.firmaConsentimiento ?? undefined,
+      firmaDoctor:
+        ips.doctores?.find((doc) => doc.activo)?.firma ??
+        ips.firmaDoctor ??
+        undefined,
+      aprobadoPor: record.aprobadoPor ?? undefined,
+      fechaAprobacion: record.fechaAprobacion
+        ? fmtFecha(record.fechaAprobacion)
+        : undefined,
+      estadoPDF:
+        record.estado === "APROBADO"
+          ? "APROBADO"
+          : record.estado === "RECHAZADO"
+          ? "RECHAZADO"
+          : record.estado === "FIRMADO"
+          ? "FIRMADO"
+          : "PENDIENTE",
+      datosPaciente: d?.paciente
+        ? {
+            direccion: d.paciente.direccion || "",
+            ciudad: d.paciente.ciudad || "",
+            fechaNacimiento: d.paciente.fechaNacimiento || "",
+            contactoNombre: d.paciente.contactoNombre || "",
+            contactoParentesco: d.paciente.contactoParentesco || "",
+            contactoTelefono: d.paciente.contactoTelefono || "",
+          }
+        : undefined,
+      vitales: d?.vitales ?? undefined,
+    };
+
+    const pdfBlob = await generarPDFConsentimiento(params as any);
+    const pdfBase64 = await blobToBase64(pdfBlob);
+
+    const resp = await apiService.post(
+      `/consentimientos/${record.id}/enviar-notificacion`,
+      { emailPaciente: emailPac, pdfBase64 },
+      60000
+    );
+
+    const data = await resp.json().catch(() => ({} as Record<string, string>));
+
+    if (resp.ok) {
+      addToast("success", `Email con PDF enviado a ${emailPac}`);
+    } else {
+      addToast(
+        "error",
+        data?.mensaje ||
+          data?.detalle ||
+          data?.message ||
+          `No se pudo enviar el email (${resp.status})`
+      );
+    }
+  } catch (err) {
+    console.error("Error reenviando email:", err);
+    addToast(
+      "error",
+      "Error al enviar el email. Revisa que el backend esté activo y el SMTP configurado."
+    );
+  }
+}
+
+
 // ─── ROL MAPPERS (backend sin tildes ↔ frontend con tildes) ──────────────────
 function toBackendRol(rol: string): string {
   return rol.normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -123,19 +245,19 @@ function fromBackendConsent(b: Record<string, unknown>): ConsentRecord {
 
 function fromBackendUser(b: Record<string, unknown>, cache?: Usuario): Usuario {
   return {
-    id:          String(b.id ?? ""),
-    nombre:      String(b.nombre ?? ""),
-    email:       String(b.email ?? ""),
-    rol:         fromBackendRol(String(b.rol ?? "AUXILIAR")),
-    password:    cache?.password ?? "••••••••",
-    activo:      Boolean(b.activo ?? true),
-    createdAt:   String(b.createdAt ?? hoy()).slice(0, 10),
-    foto:        cache?.foto,
-    rm:          cache?.rm,
+    id:           String(b.id ?? ""),
+    nombre:       String(b.nombre ?? ""),
+    email:        String(b.email ?? ""),
+    rol:          fromBackendRol(String(b.rol ?? "AUXILIAR")),
+    password:     cache?.password ?? "••••••••",
+    activo:       Boolean(b.activo ?? true),
+    createdAt:    String(b.createdAt ?? hoy()).slice(0, 10),
+    foto:         cache?.foto,
+    rm:           cache?.rm,
     especialidad: cache?.especialidad,
+    puedeEditarHc: Boolean(b.puedeEditarHc ?? false),
   };
 }
-
 // ─── IPS CONFIG ───────────────────────────────────────────────────────────────
 interface Doctor {
   id: string;
@@ -166,7 +288,8 @@ const IPSContext = createContext<IPSConfig>(DEFAULT_IPS);
 const useIPS = () => useContext(IPSContext);
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
-type AppPage = "dashboard" | "form" | "historial" | "staff" | "admin" | "notificaciones" | "licencias";
+//cambio y agrego usuarios
+type AppPage = "dashboard" | "form" | "historial" | "staff" | "admin" | "notificaciones" | "licencias" | "usuarios" | "pacientes" | "agenda";
 type TipoConsent = "escleroterapia" | "sueroterapia" | "laser" | "paquete";
 type EstadoConsent = "FIRMADO" | "PENDIENTE" | "APROBADO" | "RECHAZADO" | "ANULADO";
 type RolUsuario = "MÉDICO" | "ADMINISTRADOR" | "AUXILIAR" | "ENFERMERA" | "TÉCNICO";
@@ -177,6 +300,7 @@ interface Usuario {
   foto?: string;         // base64 foto de perfil
   rm?: string;           // registro médico (solo MÉDICO)
   especialidad?: string; // especialidad clínica (solo MÉDICO)
+  puedeEditarHc?: boolean; // ← NUEVO
 }
 
 interface Notificacion {
@@ -609,21 +733,54 @@ function FirmaField({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
+
+
 // ─── FIELD HELPER ─────────────────────────────────────────────────────────────
-function Field({ label, value, onChange, type = "text", placeholder = "", required = false, icon, readOnly = false }: {
-  label: string; value: string; onChange: (v: string) => void;
-  type?: string; placeholder?: string; required?: boolean; icon?: ReactNode; readOnly?: boolean;
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder = "",
+  required = false,
+  icon,
+  readOnly = false,
+  autoComplete = "off",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+  icon?: ReactNode;
+  readOnly?: boolean;
+  autoComplete?: string;
 }) {
   return (
     <div>
       <label className="text-xs sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       <div className="relative">
-        {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50">{icon}</div>}
-        <input readOnly={readOnly} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-          className={`w-full border border-border rounded-lg ${icon ? "pl-9" : "px-3"} pr-3 py-3 sm:py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30 focus:border-[#0D51D9] transition-colors
-            ${readOnly ? "bg-muted text-muted-foreground cursor-default" : "bg-input-background"}`}/>
+        {icon && (
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50">
+            {icon}
+          </div>
+        )}
+        <input
+          readOnly={readOnly}
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          required={required}
+          autoComplete={autoComplete}
+          className={`w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40 ${
+            icon ? "pl-9" : ""
+          } ${readOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+        />
       </div>
     </div>
   );
@@ -639,153 +796,388 @@ const PACIENTE_EMPTY: DatosPaciente = {
   estadoCivil: "", escolaridad: "", tipoConsulta: "",
 };
 
-function PacienteHistorialAlert({ documento, records }: { documento: string; records: ConsentRecord[] }) {
-  const visitas = records.filter(r => r.pacienteDoc === documento.trim() && documento.trim().length >= 5);
+function PacienteHistorialAlert({
+  documento,
+  records,
+}: {
+  documento: string;
+  records: ConsentRecord[];
+}) {
+  const visitas = records.filter(
+    (r) => r.pacienteDoc === documento.trim() && documento.trim().length >= 5
+  );
   if (!visitas.length) return null;
-  const tipoLabel = { escleroterapia: "Escleroterapia", sueroterapia: "Sueroterapia", laser: "Láser", paquete: "Paquete" };
-  const colorEstado = { FIRMADO: "text-amber-700 bg-amber-50 border-amber-300", APROBADO: "text-emerald-700 bg-emerald-50 border-emerald-300", RECHAZADO: "text-red-700 bg-red-50 border-red-300", ANULADO: "text-gray-500 bg-gray-50 border-gray-300", PENDIENTE: "text-amber-700 bg-amber-50 border-amber-300" };
+
+  const tipoLabel: Record<string, string> = {
+    escleroterapia: "Escleroterapia",
+    sueroterapia: "Sueroterapia",
+    laser: "Láser",
+    paquete: "Paquete",
+  };
+
+  const colorEstado: Record<string, string> = {
+    FIRMADO: "text-amber-700 bg-amber-50 border-amber-300",
+    APROBADO: "text-emerald-700 bg-emerald-50 border-emerald-300",
+    RECHAZADO: "text-red-700 bg-red-50 border-red-300",
+    ANULADO: "text-gray-500 bg-gray-50 border-gray-300",
+    PENDIENTE: "text-amber-700 bg-amber-50 border-amber-300",
+  };
+
   return (
     <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 overflow-hidden">
-      {/* Cabecera de alerta */}
       <div className="flex items-center gap-3 px-4 py-3 bg-amber-400">
-        <AlertTriangle size={18} className="text-white flex-shrink-0"/>
+        <AlertTriangle size={18} className="text-white flex-shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-white">¡Paciente registrado anteriormente!</p>
+          <p className="text-sm font-black text-white">
+            Consentimientos previos con este documento
+          </p>
           <p className="text-[11px] text-amber-100">
-            Se encontraron <strong>{visitas.length}</strong> visita{visitas.length > 1 ? "s" : ""} previas con este documento.
-            Los datos se han cargado automáticamente.
+            Se encontraron <strong>{visitas.length}</strong> visita
+            {visitas.length > 1 ? "s" : ""} en el historial de consentimientos.
+            Use <strong>Buscar</strong> para cargar datos básicos desde pacientes (BD).
           </p>
         </div>
-        <span className="flex-shrink-0 bg-white text-amber-700 font-black text-sm rounded-full w-8 h-8 flex items-center justify-center">{visitas.length}</span>
+        <span className="flex-shrink-0 bg-white text-amber-700 font-black text-sm rounded-full w-8 h-8 flex items-center justify-center">
+          {visitas.length}
+        </span>
       </div>
-      {/* Historial de visitas */}
+
       <div className="px-4 py-3 space-y-2 max-h-52 overflow-y-auto">
-        <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center gap-1"><ClipboardList size={10}/> Historial de visitas del paciente</p>
-        {visitas.slice().reverse().map(v => (
-          <div key={v.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-xl border text-[11px] ${colorEstado[v.estado] ?? "text-gray-600 bg-gray-50 border-gray-200"}`}>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold truncate">{tipoLabel[v.tipo] ?? v.tipo} <span className="font-mono">· {v.radicado}</span></p>
-              <p className="opacity-80">{fmtFecha(v.fecha)}{v.creadoPor ? ` · ${v.creadoPor}` : ""}</p>
+        <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <ClipboardList size={10} /> Historial de consentimientos
+        </p>
+        {visitas
+          .slice()
+          .reverse()
+          .map((v) => (
+            <div
+              key={v.id}
+              className={`flex items-center justify-between gap-3 px-3 py-2 rounded-xl border text-[11px] ${
+                colorEstado[v.estado] ?? "text-gray-600 bg-gray-50 border-gray-200"
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-bold truncate">
+                  {tipoLabel[v.tipo] ?? v.tipo}{" "}
+                  <span className="font-mono">· {v.radicado}</span>
+                </p>
+                <p className="opacity-80">
+                  {fmtFecha(v.fecha)}
+                  {v.creadoPor ? ` · ${v.creadoPor}` : ""}
+                </p>
+              </div>
+              <div className="flex-shrink-0 text-right">
+                <span
+                  className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black border ${
+                    colorEstado[v.estado] ?? ""
+                  }`}
+                >
+                  {v.estado}
+                </span>
+                {v.aprobadoPor && (
+                  <p className="text-[9px] opacity-70 mt-0.5">✓ {v.aprobadoPor}</p>
+                )}
+              </div>
             </div>
-            <div className="flex-shrink-0 text-right">
-              <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black border ${colorEstado[v.estado] ?? ""}`}>{v.estado}</span>
-              {v.aprobadoPor && <p className="text-[9px] opacity-70 mt-0.5">✓ {v.aprobadoPor}</p>}
-            </div>
-          </div>
-        ))}
+          ))}
       </div>
+
       <div className="px-4 py-2 bg-amber-100 border-t border-amber-300">
         <p className="text-[10px] text-amber-800">
-          <strong>✓ Datos del paciente cargados.</strong> Verifique que la información esté actualizada antes de continuar.
-          Puede editar cualquier campo si ha cambiado.
+          Esto es solo el historial de <strong>consentimientos</strong>, no la
+          historia clínica confidencial. Verifique los datos del paciente antes de continuar.
         </p>
       </div>
     </div>
   );
 }
-
-function StepDatosPaciente({ data, onChange, records }: { data: DatosPaciente; onChange: (d: DatosPaciente) => void; records: ConsentRecord[] }) {
+function StepDatosPaciente({
+  data,
+  onChange,
+  records,
+  apiService,
+  addToast,
+}: {
+  data: DatosPaciente;
+  onChange: (d: DatosPaciente) => void;
+  records: ConsentRecord[];
+  apiService?: { get: (path: string) => Promise<Response> };
+  addToast?: (t: "success" | "error" | "info" | "warning", m: string) => void;
+}) {
   const ips = useIPS();
   const s = (k: keyof DatosPaciente) => (v: string) => onChange({ ...data, [k]: v });
+  const [buscando, setBuscando] = useState(false);
+  const [msgBusqueda, setMsgBusqueda] = useState("");
 
-  // Auto-completar datos del paciente si el documento ya existe
   const handleDocChange = (doc: string) => {
     onChange({ ...data, documento: doc });
-    if (doc.trim().length < 5) return;
-    const previo = records.find(r => r.pacienteDoc === doc.trim());
-    if (previo) {
-      const d = (previo.datos as any)?.paciente;
-      if (d) {
+    setMsgBusqueda("");
+  };
+
+  const buscarEnBd = async () => {
+    if (!apiService) {
+      addToast?.("warning", "API no disponible en este formulario");
+      return;
+    }
+    if (!data.documento.trim()) {
+      addToast?.("error", "Ingrese el número de documento");
+      return;
+    }
+    setBuscando(true);
+    setMsgBusqueda("");
+    try {
+      const res = await buscarPacienteBasico(
+        apiService,
+        data.tipoDoc || "CC",
+        data.documento
+      );
+      if (res.ok) {
+        const basico = pacienteBasicoToDatosConsent(res.data);
         onChange({
           ...data,
-          documento:          doc,
-          nombre:             d.nombre             ?? data.nombre,
-          tipoDoc:            d.tipoDoc            ?? data.tipoDoc,
-          telefono:           d.telefono           ?? data.telefono,
-          email:              d.email              ?? data.email,
-          direccion:          d.direccion          ?? data.direccion,
-          ciudad:             d.ciudad             ?? data.ciudad,
-          fechaNacimiento:    d.fechaNacimiento    ?? data.fechaNacimiento,
-          contactoNombre:     d.contactoNombre     ?? data.contactoNombre,
-          contactoParentesco: d.contactoParentesco ?? data.contactoParentesco,
-          contactoTelefono:   d.contactoTelefono   ?? data.contactoTelefono,
-          fecha: hoy(), // siempre la fecha de hoy para la nueva visita
+          ...basico,
+          contactoNombre: data.contactoNombre || "",
+          contactoParentesco: data.contactoParentesco || "",
+          contactoTelefono: data.contactoTelefono || "",
+          estadoCivil: data.estadoCivil || "",
+          escolaridad: data.escolaridad || "",
+          tipoConsulta: data.tipoConsulta || "",
+          fecha: hoy(),
         });
+        setMsgBusqueda(
+          `✓ ${nombreDesdePaciente(res.data)} (BD · solo datos básicos)`
+        );
+        addToast?.("success", `Paciente: ${nombreDesdePaciente(res.data)}`);
+      } else if (res.status === 404) {
+        onChange({
+          ...data,
+          documento: data.documento,
+          nombre: "",
+          telefono: "",
+          email: "",
+          direccion: "",
+          ciudad: "",
+          fechaNacimiento: "",
+          fecha: hoy(),
+        });
+        setMsgBusqueda("No está en pacientes: complete los datos manualmente");
+        addToast?.("info", "No registrado en pacientes");
+      } else {
+        setMsgBusqueda("Error al buscar");
+        addToast?.("error", "Error al buscar paciente");
       }
+    } catch (e) {
+      console.error(e);
+      setMsgBusqueda("Sin conexión al buscar");
+      addToast?.("error", "Sin conexión al buscar en BD");
+    } finally {
+      setBuscando(false);
     }
   };
 
   return (
     <div className="space-y-5">
       <div className="p-3 bg-[#031CA6] rounded-xl flex items-center gap-3">
-        <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-9 h-9 object-contain flex-shrink-0 rounded-lg bg-white p-0.5"/>
+        <ImageWithFallback
+          src={medfisLogo}
+          alt="Med&Fis Logo"
+          className="w-9 h-9 object-contain flex-shrink-0 rounded-lg bg-white p-0.5"
+        />
         <div>
-          <p className="text-[10px] font-bold text-white uppercase tracking-wider">{ips.nombre} · NIT {ips.nit}</p>
-          <p className="text-[10px] text-[#7A94C5]">{ips.medico} · {ips.rm}</p>
+          <p className="text-[10px] font-bold text-white uppercase tracking-wider">
+            {ips.nombre} · NIT {ips.nit}
+          </p>
+          <p className="text-[10px] text-[#7A94C5]">
+            {ips.medico} · {ips.rm}
+          </p>
         </div>
       </div>
 
-      {/* Alerta + historial del paciente si el doc ya existe */}
-      <PacienteHistorialAlert documento={data.documento} records={records}/>
+      {/* Buscar en BD — solo datos básicos */}
+      <div className="p-3 rounded-xl border border-[#0D51D9]/25 bg-[#EFF3FB] space-y-2">
+        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider">
+          Buscar paciente registrado (solo datos básicos · no historia clínica)
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={data.tipoDoc}
+            onChange={(e) => s("tipoDoc")(e.target.value)}
+            className="px-2 py-2 rounded-lg border text-sm bg-white"
+          >
+            <option value="CC">CC</option>
+            <option value="CE">CE</option>
+            <option value="PA">PA</option>
+            <option value="TI">TI</option>
+            <option value="RC">RC</option>
+          </select>
+          <input
+            value={data.documento}
+            onChange={(e) => handleDocChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                buscarEnBd();
+              }
+            }}
+            placeholder="Número de documento"
+            className="flex-1 min-w-[120px] px-3 py-2 rounded-lg border text-sm bg-white"
+          />
+          <button
+            type="button"
+            onClick={buscarEnBd}
+            disabled={buscando}
+            className="px-3 py-2 rounded-lg bg-[#0D51D9] text-white text-sm font-semibold disabled:opacity-50"
+          >
+            {buscando ? "..." : "Buscar"}
+          </button>
+        </div>
+        {msgBusqueda && (
+          <p className="text-xs text-emerald-700">{msgBusqueda}</p>
+        )}
+      </div>
+
+      <PacienteHistorialAlert documento={data.documento} records={records} />
 
       <div>
-        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Shield size={11}/> Identificación</p>
+        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Shield size={11} /> Identificación
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Tipo Doc <span className="text-red-500">*</span></label>
-            <select value={data.tipoDoc} onChange={e => s("tipoDoc")(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
-              <option value="CC">CC — Cédula Ciudadanía</option><option value="CE">CE — Cédula Extranjería</option>
-              <option value="PA">PA — Pasaporte</option><option value="TI">TI — Tarjeta Identidad</option><option value="RC">RC — Registro Civil</option>
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+              Tipo Doc <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={data.tipoDoc}
+              onChange={(e) => s("tipoDoc")(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"
+            >
+              <option value="CC">CC — Cédula Ciudadanía</option>
+              <option value="CE">CE — Cédula Extranjería</option>
+              <option value="PA">PA — Pasaporte</option>
+              <option value="TI">TI — Tarjeta Identidad</option>
+              <option value="RC">RC — Registro Civil</option>
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">No. Documento <span className="text-red-500">*</span></label>
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+              No. Documento <span className="text-red-500">*</span>
+            </label>
             <div className="relative">
-              <Shield size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
-              <input value={data.documento} onChange={e => handleDocChange(e.target.value)}
-                placeholder="Número" required
-                className="w-full border border-border rounded-lg pl-8 pr-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"/>
+              <Shield
+                size={13}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                value={data.documento}
+                onChange={(e) => handleDocChange(e.target.value)}
+                placeholder="Número"
+                required
+                className="w-full border border-border rounded-lg pl-8 pr-3 py-2.5 text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"
+              />
             </div>
           </div>
         </div>
-        <div className="mt-3"><Field label="Nombre completo" value={data.nombre} onChange={s("nombre")} placeholder="Nombres y apellidos completos" required icon={<UserCheck size={13}/>}/></div>
+        <div className="mt-3">
+          <Field
+            label="Nombre completo"
+            value={data.nombre}
+            onChange={s("nombre")}
+            placeholder="Nombres y apellidos completos"
+            required
+            icon={<UserCheck size={13} />}
+          />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-          <Field label="Fecha de nacimiento" value={data.fechaNacimiento} onChange={s("fechaNacimiento")} type="date"/>
-          <Field label="Fecha de consulta" value={data.fecha} onChange={s("fecha")} type="date" required/>
+          <Field
+            label="Fecha de nacimiento"
+            value={data.fechaNacimiento}
+            onChange={s("fechaNacimiento")}
+            type="date"
+          />
+          <Field
+            label="Fecha de consulta"
+            value={data.fecha}
+            onChange={s("fecha")}
+            type="date"
+            required
+          />
         </div>
       </div>
+
       <div>
-        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Phone size={11}/> Contacto</p>
+        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Phone size={11} /> Contacto
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Teléfono / Celular" value={data.telefono} onChange={s("telefono")} placeholder="3001234567" type="tel" icon={<Phone size={13}/>} required/>
-          <Field label="Correo electrónico" value={data.email} onChange={s("email")} placeholder="correo@ejemplo.com" type="email" icon={<AtSign size={13}/>}/>
+          <Field
+            label="Teléfono / Celular"
+            value={data.telefono}
+            onChange={s("telefono")}
+            placeholder="3001234567"
+            type="tel"
+            icon={<Phone size={13} />}
+            required
+          />
+          <Field
+            label="Correo electrónico"
+            value={data.email}
+            onChange={s("email")}
+            placeholder="correo@ejemplo.com"
+            type="email"
+            icon={<AtSign size={13} />}
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-          <Field label="Dirección" value={data.direccion} onChange={s("direccion")} placeholder="Cra 45 #23-10" icon={<MapPin size={13}/>}/>
-          <Field label="Ciudad" value={data.ciudad} onChange={s("ciudad")} placeholder="Medellín"/>
+          <Field
+            label="Dirección"
+            value={data.direccion}
+            onChange={s("direccion")}
+            placeholder="Cra 45 #23-10"
+            icon={<MapPin size={13} />}
+          />
+          <Field
+            label="Ciudad"
+            value={data.ciudad}
+            onChange={s("ciudad")}
+            placeholder="Medellín"
+          />
         </div>
       </div>
-      {/* Tipo de consulta, Estado civil, Escolaridad */}
+
       <div>
-        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5"><ClipboardList size={11}/> Información Clínica</p>
+        <p className="text-[10px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <ClipboardList size={11} /> Información Clínica
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Tipo de Consulta <span className="text-red-500">*</span></label>
-            <select value={data.tipoConsulta} onChange={e => s("tipoConsulta")(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+              Tipo de Consulta <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={data.tipoConsulta}
+              onChange={(e) => s("tipoConsulta")(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"
+            >
               <option value="">Seleccionar...</option>
               <option value="Primera vez">Primera vez</option>
               <option value="Seguimiento">Seguimiento</option>
               <option value="Control">Control</option>
               <option value="Urgencia">Urgencia</option>
-              <option value="Procedimiento programado">Procedimiento programado</option>
+              <option value="Procedimiento programado">
+                Procedimiento programado
+              </option>
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Estado Civil</label>
-            <select value={data.estadoCivil} onChange={e => s("estadoCivil")(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+              Estado Civil
+            </label>
+            <select
+              value={data.estadoCivil}
+              onChange={(e) => s("estadoCivil")(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"
+            >
               <option value="">Seleccionar...</option>
               <option value="Soltero/a">Soltero/a</option>
               <option value="Casado/a">Casado/a</option>
@@ -796,9 +1188,14 @@ function StepDatosPaciente({ data, onChange, records }: { data: DatosPaciente; o
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Escolaridad</label>
-            <select value={data.escolaridad} onChange={e => s("escolaridad")(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+              Escolaridad
+            </label>
+            <select
+              value={data.escolaridad}
+              onChange={(e) => s("escolaridad")(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"
+            >
               <option value="">Seleccionar...</option>
               <option value="Primaria">Primaria</option>
               <option value="Secundaria">Secundaria</option>
@@ -810,21 +1207,49 @@ function StepDatosPaciente({ data, onChange, records }: { data: DatosPaciente; o
           </div>
         </div>
       </div>
+
       <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-        <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-3 flex items-center gap-1.5"><Heart size={11}/> Contacto de Emergencia</p>
+        <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <Heart size={11} /> Contacto de Emergencia
+        </p>
         <div className="space-y-3">
-          <Field label="Nombre del contacto" value={data.contactoNombre} onChange={s("contactoNombre")} placeholder="Nombre completo" icon={<Users size={13}/>} required/>
+          <Field
+            label="Nombre del contacto"
+            value={data.contactoNombre}
+            onChange={s("contactoNombre")}
+            placeholder="Nombre completo"
+            icon={<Users size={13} />}
+            required
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Parentesco <span className="text-red-500">*</span></label>
-              <select value={data.contactoParentesco} onChange={e => s("contactoParentesco")(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30">
-                <option value="">Seleccionar...</option><option value="Cónyuge">Cónyuge</option><option value="Madre">Madre</option>
-                <option value="Padre">Padre</option><option value="Hijo/a">Hijo/a</option><option value="Hermano/a">Hermano/a</option>
-                <option value="Amigo/a">Amigo/a</option><option value="Otro">Otro</option>
+              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                Parentesco <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={data.contactoParentesco}
+                onChange={(e) => s("contactoParentesco")(e.target.value)}
+                className="w-full border border-border rounded-lg px-3 py-3 sm:py-2.5 text-base sm:text-sm bg-input-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/30"
+              >
+                <option value="">Seleccionar...</option>
+                <option value="Cónyuge">Cónyuge</option>
+                <option value="Madre">Madre</option>
+                <option value="Padre">Padre</option>
+                <option value="Hijo/a">Hijo/a</option>
+                <option value="Hermano/a">Hermano/a</option>
+                <option value="Amigo/a">Amigo/a</option>
+                <option value="Otro">Otro</option>
               </select>
             </div>
-            <Field label="Teléfono emergencia" value={data.contactoTelefono} onChange={s("contactoTelefono")} placeholder="3001234567" type="tel" icon={<Phone size={13}/>} required/>
+            <Field
+              label="Teléfono emergencia"
+              value={data.contactoTelefono}
+              onChange={s("contactoTelefono")}
+              placeholder="3001234567"
+              type="tel"
+              icon={<Phone size={13} />}
+              required
+            />
           </div>
         </div>
       </div>
@@ -1003,43 +1428,327 @@ function StepFirmaFinal({ consentido, onConsentido, firma, onFirma, nombrePacien
 // ═══════════════════════════════════════════════════════════════════════════════
 // PDF VIEWER
 // ═══════════════════════════════════════════════════════════════════════════════
-function PDFViewer({ record, onSendEmail, onSendWhatsApp, addToast = () => {} }: {
-  record: ConsentRecord; onSendEmail: () => void; onSendWhatsApp: () => void;
-  addToast?: (t: "success"|"error"|"info"|"warning", m: string) => void;
+function PDFViewer({
+  record,
+  onSendEmail,
+  onSendWhatsApp,
+  addToast = () => {},
+}: {
+  record: ConsentRecord;
+  onSendEmail: () => void;
+  onSendWhatsApp: () => void;
+  addToast?: (t: "success" | "error" | "info" | "warning", m: string) => void;
 }) {
   const ips = useIPS();
+  const [useFallback, setUseFallback] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [htmlError, setHtmlError] = useState<string | null>(null);
 
-  const buildTexto = () => {
-    const textoMap: Record<string, string> = {
-      escleroterapia: makeTextoEscleroterapia(ips),
-      sueroterapia:   makeTextoSueroterapia(ips),
-      laser:          makeTextoLaser(ips),
-      paquete:        makeTextoEscleroterapia(ips) + "\n\n" + makeTextoSueroterapia(ips) + "\n\n" + makeTextoLaser(ips),
-    };
-    return textoMap[record.tipo] ?? "";
+  // Datos del consentimiento (sin setState en el render)
+  const d: any = (record.datos as any) || {};
+  const pac = d?.paciente as DatosPaciente | undefined;
+  const vitales = d?.vitales as typeof VITALES_EMPTY | undefined;
+
+  // ── Fallback PDF con jsPDF ──────────────────────────────────────────────────
+  const generarFallbackPDF = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF("p", "mm", "a4");
+
+      doc.setFontSize(16);
+      doc.text("CONSENTIMIENTO INFORMADO", 105, 20, { align: "center" });
+      doc.setFontSize(12);
+      doc.text(`Radicado: ${record.radicado || "SIN RADICADO"}`, 20, 40);
+      doc.text(`Paciente: ${record.pacienteNombre || "SIN NOMBRE"}`, 20, 50);
+      doc.text(`Documento: ${record.pacienteDoc || "SIN DOC"}`, 20, 60);
+      doc.text(`Fecha: ${fmtFecha(record.fecha) || "SIN FECHA"}`, 20, 70);
+      doc.text(`Estado: ${record.estado || "PENDIENTE"}`, 20, 80);
+      doc.text(`Tipo: ${record.tipo || "NO ESPECIFICADO"}`, 20, 90);
+
+      const paciente = d?.paciente;
+      if (paciente) {
+        doc.text("DATOS DEL PACIENTE", 20, 110);
+        doc.setFontSize(10);
+        doc.text(`Nombre: ${paciente.nombre || "No disponible"}`, 20, 120);
+        doc.text(`Teléfono: ${paciente.telefono || "No disponible"}`, 20, 130);
+        doc.text(`Email: ${paciente.email || "No disponible"}`, 20, 140);
+      }
+
+      const vitalesData = d?.vitales;
+      if (vitalesData) {
+        doc.setFontSize(12);
+        doc.text("SIGNOS VITALES", 20, 160);
+        doc.setFontSize(10);
+        const lines = [
+          `SpO2: ${vitalesData.oximetria || "—"}%`,
+          `T.A.: ${vitalesData.tension || "—"}`,
+          `F.C.: ${vitalesData.frecuenciaCardiaca || "—"} lpm`,
+          `Temp.: ${vitalesData.temperatura || "—"} °C`,
+          `Peso: ${vitalesData.peso || "—"} kg`,
+          `Talla: ${vitalesData.talla || "—"} cm`,
+          `IMC: ${vitalesData.imc || "—"} kg/m²`,
+        ];
+        lines.forEach((text, index) => {
+          doc.text(text, 20 + (index % 3) * 60, 170 + Math.floor(index / 3) * 10);
+        });
+      }
+
+      const firma = d?.firmaConsentimiento;
+      if (firma) {
+        doc.setFontSize(12);
+        doc.text("FIRMA DEL PACIENTE", 20, 210);
+        try {
+          doc.addImage(firma, "PNG", 20, 215, 60, 20);
+        } catch {
+          doc.setFontSize(10);
+          doc.text("(Firma no disponible)", 20, 220);
+        }
+      } else {
+        doc.setFontSize(10);
+        doc.text("Firma del paciente: ________________________", 20, 210);
+      }
+
+      doc.setFontSize(10);
+      doc.text(`Médico: ${ips.medico || "No especificado"}`, 20, 250);
+      doc.text(`RM: ${ips.rm || "No especificado"}`, 20, 260);
+      doc.setFontSize(8);
+      doc.text(
+        `Documento generado desde CliniSign · ${new Date().toLocaleDateString("es-CO")}`,
+        105,
+        280,
+        { align: "center" }
+      );
+
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      return url;
+    } catch (err) {
+      console.error("Error generando fallback PDF:", err);
+      addToast("error", "Error generando el PDF de respaldo");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [record, ips, d, addToast]);
+
+  useEffect(() => {
+    if (useFallback) {
+      generarFallbackPDF();
+    }
+  }, [useFallback, generarFallbackPDF]);
+
+  const handlePrintFallback = () => {
+    if (!pdfUrl) {
+      addToast("info", "No hay PDF generado para imprimir");
+      return;
+    }
+    const win = window.open(pdfUrl, "_blank");
+    if (win) win.onload = () => win.print();
+    else addToast("warning", "Habilite ventanas emergentes para imprimir");
+  };
+
+  const handleDownloadFallback = () => {
+    if (!pdfUrl) {
+      addToast("info", "No hay PDF generado para descargar");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = pdfUrl;
+    a.download = `Consentimiento_${record.radicado || "sin-radicado"}.pdf`;
+    a.click();
+    addToast("success", "PDF descargado correctamente");
+  };
+
+  // ── Vista fallback ──────────────────────────────────────────────────────────
+  if (useFallback) {
+    if (loading) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0D51D9]" />
+          <p className="text-sm text-muted-foreground mt-4">Generando PDF...</p>
+        </div>
+      );
+    }
+
+    if (pdfUrl) {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="flex-1 min-h-[400px] bg-gray-100 rounded-lg overflow-hidden">
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full min-h-[500px] border-0"
+              title="PDF"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
+            <button
+              type="button"
+              onClick={onSendWhatsApp}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20ba5a] transition-colors"
+            >
+              <MessageSquare size={16} /> WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={onSendEmail}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] transition-colors"
+            >
+              <Mail size={16} /> Email
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintFallback}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
+            >
+              <Printer size={16} /> Imprimir
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadFallback}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
+            >
+              <Download size={16} /> Descargar PDF
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-8 text-center text-red-600">
+        <AlertTriangle size={32} className="mx-auto mb-3" />
+        <p className="font-bold">Error al generar el PDF de respaldo</p>
+        <p className="text-sm text-muted-foreground">
+          {htmlError || "Error desconocido"}
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setUseFallback(false);
+            setHtmlError(null);
+            setPdfUrl(null);
+          }}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Reintentar con HTML original
+        </button>
+      </div>
+    );
+  }
+
+  // ── Vista HTML normal ───────────────────────────────────────────────────────
+  return (
+    <OriginalHTMLContent
+      record={record}
+      ips={ips}
+      d={d}
+      pac={pac}
+      vitales={vitales}
+      onSendEmail={onSendEmail}
+      onSendWhatsApp={onSendWhatsApp}
+      addToast={addToast}
+      onForceFallback={(msg: string) => {
+        setHtmlError(msg);
+        setUseFallback(true);
+      }}
+    />
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HTML ORIGINAL DEL CONSENTIMIENTO + BOTONES
+// ═══════════════════════════════════════════════════════════════════════════════
+function OriginalHTMLContent({
+  record,
+  ips,
+  d,
+  pac,
+  vitales,
+  onSendEmail,
+  onSendWhatsApp,
+  addToast,
+}: {
+  record: ConsentRecord;
+  ips: IPSConfig;
+  d: any;
+  pac?: DatosPaciente;
+  vitales?: any;
+  onSendEmail: () => void;
+  onSendWhatsApp: () => void;
+  addToast: (t: "success" | "error" | "info" | "warning", m: string) => void;
+  onForceFallback?: (msg: string) => void;
+}) {
+  const TITULOS: Record<TipoConsent, string> = {
+    escleroterapia:
+      "ESCLEROTERAPIA (INYECCIÓN) DE VÁRICES DE LOS MIEMBROS INFERIORES",
+    sueroterapia: "SUEROTERAPIA VITAMINA C Y/O COMPLEJO B",
+    laser: "TERAPIA LÁSER ND:YAG PARA CONTROL DE VENAS VÁRICES",
+    paquete:
+      "PAQUETE COMPLETO — ESCLEROTERAPIA · SUEROTERAPIA · LÁSER ND:YAG",
   };
 
   const buildPdfParams = () => {
-    const d = record.datos as any;
+    const textoMap: Record<string, string> = {
+      escleroterapia: makeTextoEscleroterapia(ips),
+      sueroterapia: makeTextoSueroterapia(ips),
+      laser: makeTextoLaser(ips),
+      paquete:
+        makeTextoEscleroterapia(ips) +
+        "\n\n" +
+        makeTextoSueroterapia(ips) +
+        "\n\n" +
+        makeTextoLaser(ips),
+    };
+
     return {
-      radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha),
-      pacienteNombre: record.pacienteNombre, pacienteDoc: record.pacienteDoc,
-      pacienteTel: record.pacienteTel, pacienteEmail: d?.paciente?.email ?? undefined,
-      creadoPor: record.creadoPor, textoConsent: buildTexto(), ipsNombre: ips.nombre,
-      ipsNit: ips.nit, ipsMedico: ips.medico, ipsRm: ips.rm, ipsCiudad: ips.ciudad,
+      radicado: record.radicado,
+      tipo: record.tipo,
+      fecha: fmtFecha(record.fecha),
+      pacienteNombre: record.pacienteNombre,
+      pacienteDoc: record.pacienteDoc,
+      pacienteTel: record.pacienteTel,
+      pacienteEmail: d?.paciente?.email ?? record.emailPaciente ?? "",
+      creadoPor: record.creadoPor || "—",
+      textoConsent: textoMap[record.tipo] || "",
+      ipsNombre: ips.nombre,
+      ipsNit: ips.nit,
+      ipsMedico: ips.medico,
+      ipsRm: ips.rm,
+      ipsCiudad: ips.ciudad,
       firmaConsentimiento: d?.firmaConsentimiento ?? undefined,
-      firmaDoctor: (ips.doctores?.find(doc => doc.activo)?.firma) ?? ips.firmaDoctor ?? undefined,
-      aprobadoPor:    record.aprobadoPor ?? undefined,
-      fechaAprobacion: record.fechaAprobacion ? fmtFecha(record.fechaAprobacion) : undefined,
-      firmaAprobador: record.estado === "APROBADO" ? resolveAprobadorFirma(record.aprobadoPor, ips) : undefined,
-      estadoPDF:      record.estado === "APROBADO" ? "APROBADO" : record.estado === "RECHAZADO" ? "RECHAZADO" : record.estado === "FIRMADO" ? "FIRMADO" : "PENDIENTE",
-      datosPaciente: d?.paciente ? {
-        direccion: d.paciente.direccion, ciudad: d.paciente.ciudad,
-        fechaNacimiento: d.paciente.fechaNacimiento,
-        contactoNombre: d.paciente.contactoNombre,
-        contactoParentesco: d.paciente.contactoParentesco,
-        contactoTelefono: d.paciente.contactoTelefono,
-      } : undefined,
+      firmaDoctor:
+        ips.doctores?.find((doc) => doc.activo)?.firma ??
+        ips.firmaDoctor ??
+        undefined,
+      aprobadoPor: record.aprobadoPor ?? undefined,
+      fechaAprobacion: record.fechaAprobacion
+        ? fmtFecha(record.fechaAprobacion)
+        : undefined,
+      firmaAprobador:
+        record.estado === "APROBADO"
+          ? resolveAprobadorFirma(record.aprobadoPor, ips)
+          : undefined,
+      estadoPDF:
+        record.estado === "APROBADO"
+          ? "APROBADO"
+          : record.estado === "RECHAZADO"
+          ? "RECHAZADO"
+          : record.estado === "FIRMADO"
+          ? "FIRMADO"
+          : "PENDIENTE",
+      datosPaciente: d?.paciente
+        ? {
+            direccion: d.paciente.direccion || "",
+            ciudad: d.paciente.ciudad || "",
+            fechaNacimiento: d.paciente.fechaNacimiento || "",
+            contactoNombre: d.paciente.contactoNombre || "",
+            contactoParentesco: d.paciente.contactoParentesco || "",
+            contactoTelefono: d.paciente.contactoTelefono || "",
+          }
+        : undefined,
       vitales: d?.vitales ?? undefined,
     };
   };
@@ -1047,151 +1756,309 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp, addToast = () => {} }:
   const handleDownload = async () => {
     try {
       addToast("info", "Generando PDF…");
-      const blob = await generarPDFConsentimiento(buildPdfParams());
+      const blob = await generarPDFConsentimiento(buildPdfParams() as any);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `Consentimiento_${record.radicado}.pdf`;
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a); URL.revokeObjectURL(url);
+      a.href = url;
+      a.download = `Consentimiento_${record.radicado}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
       addToast("success", "PDF descargado correctamente");
-    } catch { addToast("error", "Error generando el PDF"); }
+    } catch (err) {
+      console.error("Error descargando PDF:", err);
+      addToast("error", "Error al descargar el PDF");
+    }
   };
 
   const handlePrint = async () => {
     try {
       addToast("info", "Preparando impresión…");
-      const blob = await generarPDFConsentimiento(buildPdfParams());
+      const blob = await generarPDFConsentimiento(buildPdfParams() as any);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank");
-      if (win) { win.onload = () => { win.print(); setTimeout(() => URL.revokeObjectURL(url), 5000); }; }
-      else { addToast("warning", "Habilite ventanas emergentes para imprimir"); }
-    } catch { addToast("error", "Error preparando impresión"); }
-  };
-  const d = record.datos as any;
-  const pac = d.paciente as DatosPaciente;
-  const vitales = d.vitales as typeof VITALES_EMPTY;
-
-  const TITULOS: Record<TipoConsent, string> = {
-    escleroterapia: "ESCLEROTERAPIA (INYECCIÓN) DE VÁRICES DE LOS MIEMBROS INFERIORES",
-    sueroterapia:   "SUEROTERAPIA VITAMINA C Y/O COMPLEJO B",
-    laser:          "TERAPIA LÁSER ND:YAG PARA CONTROL DE VENAS VÁRICES",
-    paquete:        "PAQUETE COMPLETO — ESCLEROTERAPIA · SUEROTERAPIA · LÁSER ND:YAG",
+      if (win) {
+        win.onload = () => {
+          win.print();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        };
+      } else {
+        addToast("warning", "Habilite ventanas emergentes para imprimir");
+      }
+    } catch (err) {
+      console.error("Error imprimiendo:", err);
+      addToast("error", "Error al imprimir");
+    }
   };
 
   return (
-    <div className="bg-white p-7 max-w-[640px] mx-auto text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div
+      className="bg-white p-7 max-w-[640px] mx-auto text-sm"
+      style={{ fontFamily: "Inter, sans-serif" }}
+    >
+      {/* ENCABEZADO */}
       <div className="flex items-start justify-between pb-4 mb-4 border-b-2 border-[#0D51D9]">
         <div className="flex items-center gap-3">
-          <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-14 h-14 object-contain"/>
-          <div><p className="font-black text-2xl text-[#031CA6] tracking-tight">{ips.nombre}</p><p className="text-[10px] text-muted-foreground font-mono">NIT {ips.nit}</p><p className="text-[10px] text-muted-foreground">{ips.ciudad}</p></div>
+          <ImageWithFallback
+            src={medfisLogo}
+            alt="Med&Fis Logo"
+            className="w-14 h-14 object-contain"
+          />
+          <div>
+            <p className="font-black text-2xl text-[#031CA6] tracking-tight">
+              {ips.nombre}
+            </p>
+            <p className="text-[10px] text-muted-foreground font-mono">
+              NIT {ips.nit}
+            </p>
+            <p className="text-[10px] text-muted-foreground">{ips.ciudad}</p>
+          </div>
         </div>
         <div className="text-right">
-          <p className="text-xs font-mono text-[#0D51D9] font-bold">{record.radicado}</p>
-          <p className="text-[10px] text-muted-foreground">{fmtFecha(record.fecha)}</p>
-          <div className="mt-1 flex flex-col items-end gap-1"><StatusBadge estado={record.estado}/></div>
+          <p className="text-xs font-mono text-[#0D51D9] font-bold">
+            {record.radicado}
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            {fmtFecha(record.fecha)}
+          </p>
+          <div className="mt-1 flex flex-col items-end gap-1">
+            <StatusBadge estado={record.estado} />
+          </div>
         </div>
       </div>
 
       {record.estado === "APROBADO" && (
         <div className="mb-4 p-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl flex items-center gap-3">
-          <CalendarCheck size={18} className="text-emerald-600"/>
+          <CalendarCheck size={18} className="text-emerald-600" />
           <div>
-            <p className="text-xs font-bold text-emerald-800">✓ VISTO BUENO MÉDICO — PROCEDER CON CITA DE CONSULTA</p>
-            {record.aprobadoPor && <p className="text-[10px] text-emerald-700">Aprobado por: {record.aprobadoPor} · {record.fechaAprobacion ? fmtFecha(record.fechaAprobacion) : ""}</p>}
+            <p className="text-xs font-bold text-emerald-800">
+              ✓ VISTO BUENO MÉDICO — PROCEDER CON CITA DE CONSULTA
+            </p>
+            {record.aprobadoPor && (
+              <p className="text-[10px] text-emerald-700">
+                Aprobado por: {record.aprobadoPor} ·{" "}
+                {record.fechaAprobacion
+                  ? fmtFecha(record.fechaAprobacion)
+                  : ""}
+              </p>
+            )}
           </div>
         </div>
       )}
 
       {record.estado === "RECHAZADO" && record.motivoRechazo && (
         <div className="mb-4 p-3 bg-red-50 border-2 border-red-300 rounded-xl">
-          <p className="text-xs font-bold text-red-800">✗ RECHAZADO POR EL MÉDICO</p>
-          <p className="text-[10px] text-red-700 mt-1">Motivo: {record.motivoRechazo}</p>
+          <p className="text-xs font-bold text-red-800">
+            ✗ RECHAZADO POR EL MÉDICO
+          </p>
+          <p className="text-[10px] text-red-700 mt-1">
+            Motivo: {record.motivoRechazo}
+          </p>
         </div>
       )}
 
-      <p className="text-center font-black text-sm uppercase tracking-wide text-[#031CA6] mb-1">CONSENTIMIENTO INFORMADO</p>
-      <p className="text-center text-xs font-bold text-[#0D51D9] mb-5">{TITULOS[record.tipo]}</p>
+      <p className="text-center font-black text-sm uppercase tracking-wide text-[#031CA6] mb-1">
+        CONSENTIMIENTO INFORMADO
+      </p>
+      <p className="text-center text-xs font-bold text-[#0D51D9] mb-5">
+        {TITULOS[record.tipo]}
+      </p>
 
       {record.tipo === "paquete" && (
         <div className="mb-4 flex items-center gap-2 flex-wrap justify-center">
-          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#0D51D9]/10 text-[#0D51D9] rounded-full text-[10px] font-bold"><Syringe size={10}/> Escleroterapia</span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#0D8BD9]/10 text-[#0D8BD9] rounded-full text-[10px] font-bold"><Droplets size={10}/> Sueroterapia</span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold"><Zap size={10}/> Láser ND:YAG</span>
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#0D51D9]/10 text-[#0D51D9] rounded-full text-[10px] font-bold">
+            <Syringe size={10} /> Escleroterapia
+          </span>
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#0D8BD9]/10 text-[#0D8BD9] rounded-full text-[10px] font-bold">
+            <Droplets size={10} /> Sueroterapia
+          </span>
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold">
+            <Zap size={10} /> Láser ND:YAG
+          </span>
         </div>
       )}
 
+      {/* DATOS DEL PACIENTE */}
       <div className="mb-4 p-3 bg-[#EFF3FB] rounded-xl">
-        <p className="text-[9px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2">Datos del Paciente</p>
+        <p className="text-[9px] font-bold text-[#0D51D9] uppercase tracking-wider mb-2">
+          Datos del Paciente
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-0.5">
-            <p className="text-xs font-bold">{pac?.nombre}</p>
-            <p className="text-[10px] text-muted-foreground font-mono">{pac?.tipoDoc}: {pac?.documento}</p>
-            {pac?.fechaNacimiento && <p className="text-[10px] text-muted-foreground">Nac: {fmtFecha(pac.fechaNacimiento)}</p>}
-            <p className="text-[10px] text-muted-foreground">Tel: {pac?.telefono}</p>
-            {pac?.email && <p className="text-[10px] text-muted-foreground">{pac.email}</p>}
-            {pac?.direccion && <p className="text-[10px] text-muted-foreground">{pac.direccion}{pac.ciudad ? `, ${pac.ciudad}` : ""}</p>}
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Médico Tratante</p>
-            <p className="text-xs font-bold">{ips.medico}</p>
-            <p className="text-[10px] text-muted-foreground">{ips.rm}</p>
-            <p className="text-[10px] text-muted-foreground">Fecha: {fmtFecha(record.fecha)}</p>
-            {record.creadoPor && <p className="text-[10px] text-muted-foreground">Registrado por: {record.creadoPor}</p>}
-            {pac?.contactoNombre && (
-              <div className="mt-2 p-2 bg-red-50 rounded-lg">
-                <p className="text-[9px] font-bold text-red-700 uppercase">Emergencia:</p>
-                <p className="text-[10px]">{pac.contactoNombre} ({pac.contactoParentesco})</p>
-                <p className="text-[10px]">{pac.contactoTelefono}</p>
-              </div>
+            <p className="text-xs font-bold">
+              {pac?.nombre || record.pacienteNombre || "No disponible"}
+            </p>
+            <p className="text-[10px] text-muted-foreground font-mono">
+              {pac?.tipoDoc || "Doc"}:{" "}
+              {pac?.documento || record.pacienteDoc || "No disponible"}
+            </p>
+            {pac?.fechaNacimiento && (
+              <p className="text-[10px] text-muted-foreground">
+                Nac: {fmtFecha(pac.fechaNacimiento)}
+              </p>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Tel: {pac?.telefono || record.pacienteTel || "No disponible"}
+            </p>
+            {(pac?.email || record.emailPaciente) && (
+              <p className="text-[10px] text-muted-foreground">
+                {pac?.email || record.emailPaciente}
+              </p>
+            )}
+            {pac?.direccion && (
+              <p className="text-[10px] text-muted-foreground">
+                {pac.direccion}
+                {pac.ciudad ? `, ${pac.ciudad}` : ""}
+              </p>
             )}
           </div>
-        </div>
-      </div>
+                    <div className="space-y-0.5">
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Médico Tratante
+                      </p>
+                      <p className="text-xs font-bold">{ips.medico}</p>
+                      <p className="text-[10px] text-muted-foreground">{ips.rm}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Fecha: {fmtFecha(record.fecha)}
+                      </p>
+                      {record.creadoPor && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Registrado por: {record.creadoPor}
+                        </p>
+                      )}
+                      {pac?.contactoNombre && (
+                        <div className="mt-2 p-2 bg-red-50 rounded-lg">
+                          <p className="text-[9px] font-bold text-red-700 uppercase">
+                            Emergencia:
+                          </p>
+                          <p className="text-[10px]">
+                            {pac.contactoNombre} ({pac.contactoParentesco})
+                          </p>
+                          <p className="text-[10px]">{pac.contactoTelefono}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-      {vitales && (
-        <div className="mb-4">
-          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Signos Vitales — Enfermería</p>
+                {/* SIGNOS VITALES */}
+                {vitales && (
+                  <div className="mb-4">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                      Signos Vitales — Enfermería
+                    </p>
           <div className="grid grid-cols-5 gap-1 mb-2">
-            {[["SpO2", vitales.oximetria + "%"], ["T.A.", vitales.tension], ["F.C.", vitales.frecuenciaCardiaca + " lpm"], ["F.R.", vitales.frecuenciaRespiratoria + " rpm"], ["Temp.", vitales.temperatura + "°C"]].map(([l,v]) => (
-              <div key={l} className="bg-[#EFF3FB] rounded-lg p-2 text-center"><p className="text-[8px] text-muted-foreground font-bold">{l}</p><p className="text-[10px] font-bold">{v || "—"}</p></div>
+            {(
+              [
+                ["SpO2", `${vitales.oximetria || "—"}%`],
+                ["T.A.", vitales.tension || "—"],
+                ["F.C.", `${vitales.frecuenciaCardiaca || "—"} lpm`],
+                ["F.R.", `${vitales.frecuenciaRespiratoria || "—"} rpm`],
+                ["Temp.", `${vitales.temperatura || "—"}°C`],
+              ] as const
+            ).map(([l, v]) => (
+              <div key={l} className="bg-[#EFF3FB] rounded-lg p-2 text-center">
+                <p className="text-[8px] text-muted-foreground font-bold">{l}</p>
+                <p className="text-[10px] font-bold">{v}</p>
+              </div>
             ))}
           </div>
           <div className="grid grid-cols-3 gap-1">
-            {[["Peso", vitales.peso + " kg"], ["Talla", vitales.talla + " cm"], ["IMC", vitales.imc + " kg/m²"]].map(([l,v]) => (
-              <div key={l} className="bg-emerald-50 rounded-lg p-2 text-center"><p className="text-[8px] text-muted-foreground font-bold">{l}</p><p className="text-[10px] font-bold text-emerald-700">{v || "—"}</p></div>
-            ))}
-          </div>
-          {vitales.observaciones && <div className="mt-1 p-2 bg-blue-50 border border-blue-200 rounded-lg"><p className="text-[9px] font-bold text-blue-700 uppercase">Obs. Enfermería:</p><p className="text-[10px]">{vitales.observaciones}</p></div>}
-        </div>
-      )}
-
-      {(record.tipo === "escleroterapia" || record.tipo === "paquete") && d.cuestionario && Object.keys(d.cuestionario).length > 0 && (
-        <div className="mb-4">
-          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1"><Syringe size={9}/> Test Diagnóstico</p>
-          <div className="grid grid-cols-2 gap-1">
-            {Object.entries(d.cuestionario).map(([pregunta, resp]: [string, any]) => (
-              <div key={pregunta} className="flex items-start gap-1.5 p-1.5 bg-[#F8FAFF] rounded text-[9px]">
-                <span className={`font-bold flex-shrink-0 px-1 rounded text-[9px] ${resp === "Si" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>{resp}</span>
-                <span className="text-muted-foreground leading-tight">{pregunta.substring(0, 60)}{pregunta.length > 60 ? "..." : ""}</span>
+            {(
+              [
+                ["Peso", `${vitales.peso || "—"} kg`],
+                ["Talla", `${vitales.talla || "—"} cm`],
+                ["IMC", `${vitales.imc || "—"} kg/m²`],
+              ] as const
+            ).map(([l, v]) => (
+              <div key={l} className="bg-emerald-50 rounded-lg p-2 text-center">
+                <p className="text-[8px] text-muted-foreground font-bold">{l}</p>
+                <p className="text-[10px] font-bold text-emerald-700">{v}</p>
               </div>
             ))}
           </div>
+          {vitales.observaciones && (
+            <div className="mt-1 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-[9px] font-bold text-blue-700 uppercase">
+                Obs. Enfermería:
+              </p>
+              <p className="text-[10px]">{vitales.observaciones}</p>
+            </div>
+          )}
         </div>
       )}
 
+      {/* CUESTIONARIO */}
+      {(record.tipo === "escleroterapia" || record.tipo === "paquete") &&
+        d?.cuestionario &&
+        Object.keys(d.cuestionario).length > 0 && (
+          <div className="mb-4">
+            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+              <Syringe size={9} /> Test Diagnóstico
+            </p>
+            <div className="grid grid-cols-2 gap-1">
+              {Object.entries(d.cuestionario).map(
+                ([pregunta, resp]: [string, any]) => (
+                  <div
+                    key={pregunta}
+                    className="flex items-start gap-1.5 p-1.5 bg-[#F8FAFF] rounded text-[9px]"
+                  >
+                    <span
+                      className={`font-bold flex-shrink-0 px-1 rounded text-[9px] ${
+                        resp === "Si"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-emerald-100 text-emerald-700"
+                      }`}
+                    >
+                      {resp}
+                    </span>
+                    <span className="text-muted-foreground leading-tight">
+                      {pregunta.substring(0, 60)}
+                      {pregunta.length > 60 ? "..." : ""}
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        )}
+
+      {/* SUEROTERAPIA */}
       {(record.tipo === "sueroterapia" || record.tipo === "paquete") && (
         <div className="mb-4">
-          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1"><Droplets size={9}/> Prescripción — Sueroterapia</p>
+          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+            <Droplets size={9} /> Prescripción — Sueroterapia
+          </p>
           <div className="grid grid-cols-2 gap-2 mb-2">
-            <div className="bg-[#EFF3FB] rounded-lg p-2 text-center"><p className="text-[9px] text-muted-foreground">Vitamina C</p><p className="text-xs font-bold">{d.dosis_vitC || "—"}</p></div>
-            <div className="bg-[#EFF3FB] rounded-lg p-2 text-center"><p className="text-[9px] text-muted-foreground">Complejo B</p><p className="text-xs font-bold">{d.dosis_compB || "—"}</p></div>
+            <div className="bg-[#EFF3FB] rounded-lg p-2 text-center">
+              <p className="text-[9px] text-muted-foreground">Vitamina C</p>
+              <p className="text-xs font-bold">{d?.dosis_vitC || "—"}</p>
+            </div>
+            <div className="bg-[#EFF3FB] rounded-lg p-2 text-center">
+              <p className="text-[9px] text-muted-foreground">Complejo B</p>
+              <p className="text-xs font-bold">{d?.dosis_compB || "—"}</p>
+            </div>
           </div>
-          {d.trazabilidad && (
+          {d?.trazabilidad && (
             <div className="grid grid-cols-3 gap-1">
               {Object.entries(d.trazabilidad).map(([k, v]) => (
-                <div key={k} className="bg-[#F8FAFF] border border-border rounded p-1.5 text-center">
-                  <p className="text-[8px] text-muted-foreground">{k === "nacl" ? "NaCl 0.9%" : k === "vitC" ? "Vit C" : k === "compB" ? "Comp B" : k === "pericraneal" ? "Pericran." : k}</p>
-                  <p className="text-[9px] font-mono font-bold">{v as string || "—"}</p>
+                <div
+                  key={k}
+                  className="bg-[#F8FAFF] border border-border rounded p-1.5 text-center"
+                >
+                  <p className="text-[8px] text-muted-foreground">
+                    {k === "nacl"
+                      ? "NaCl 0.9%"
+                      : k === "vitC"
+                      ? "Vit C"
+                      : k === "compB"
+                      ? "Comp B"
+                      : k === "pericraneal"
+                      ? "Pericran."
+                      : k}
+                  </p>
+                  <p className="text-[9px] font-mono font-bold">
+                    {(v as string) || "—"}
+                  </p>
                 </div>
               ))}
             </div>
@@ -1199,50 +2066,123 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp, addToast = () => {} }:
         </div>
       )}
 
-      {(record.tipo === "laser" || record.tipo === "paquete") && d.parametros?.length > 0 && (
-        <div className="mb-4">
-          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1"><Zap size={9}/> Parámetros ND:YAG</p>
-          <table className="w-full text-[9px] border border-border rounded-lg overflow-hidden">
-            <thead><tr className="bg-[#031CA6] text-[#C5D5F0]">{["Fototipo","Pieza","Modo","Hz","J/cm²","mJ","cm²","Pases"].map(h => <th key={h} className="px-1.5 py-1.5 text-left font-semibold">{h}</th>)}</tr></thead>
-            <tbody>
-              {d.parametros.map((row: LaserRow, i: number) => (
-                <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-[#F8FAFF]"}>
-                  {[row.fototipo,row.pieza,row.modo,row.frecuencia,row.fluencia,row.energia,row.area,row.pases].map((v, j) => <td key={j} className="px-1.5 py-1 border-t border-border font-mono">{v || "—"}</td>)}
+      {/* LÁSER */}
+      {(record.tipo === "laser" || record.tipo === "paquete") &&
+        d?.parametros?.length > 0 && (
+          <div className="mb-4">
+            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+              <Zap size={9} /> Parámetros ND:YAG
+            </p>
+            <table className="w-full text-[9px] border border-border rounded-lg overflow-hidden">
+              <thead>
+                <tr className="bg-[#031CA6] text-[#C5D5F0]">
+                  {[
+                    "Fototipo",
+                    "Pieza",
+                    "Modo",
+                    "Hz",
+                    "J/cm²",
+                    "mJ",
+                    "cm²",
+                    "Pases",
+                  ].map((h) => (
+                    <th key={h} className="px-1.5 py-1.5 text-left font-semibold">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {d.parametros.map((row: LaserRow, i: number) => (
+                  <tr
+                    key={i}
+                    className={i % 2 === 0 ? "bg-white" : "bg-[#F8FAFF]"}
+                  >
+                    {[
+                      row.fototipo,
+                      row.pieza,
+                      row.modo,
+                      row.frecuencia,
+                      row.fluencia,
+                      row.energia,
+                      row.area,
+                      row.pases,
+                    ].map((v, j) => (
+                      <td
+                        key={j}
+                        className="px-1.5 py-1 border-t border-border font-mono"
+                      >
+                        {v || "—"}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
+      {/* FIRMA */}
       <div className="mt-5 pt-5 border-t-2 border-dashed border-border">
-        <p className="text-[9px] text-center text-muted-foreground mb-4 font-medium">El paciente declara haber LEÍDO, COMPRENDIDO y tomado su decisión de manera LIBRE y VOLUNTARIA.</p>
+        <p className="text-[9px] text-center text-muted-foreground mb-4 font-medium">
+          El paciente declara haber LEÍDO, COMPRENDIDO y tomado su decisión de
+          manera LIBRE y VOLUNTARIA.
+        </p>
         <div className="flex justify-center mb-3">
           <div className="text-center w-56">
-            {d.firmaConsentimiento ? (
-              <img src={d.firmaConsentimiento} alt="firma" className="w-full h-20 object-contain border-2 border-[#0D51D9]/20 rounded-xl bg-[#f8faff] mb-2"/>
+            {d?.firmaConsentimiento ? (
+              <img
+                src={d.firmaConsentimiento}
+                alt="firma"
+                className="w-full h-20 object-contain border-2 border-[#0D51D9]/20 rounded-xl bg-[#f8faff] mb-2"
+              />
             ) : (
-              <div className="w-full h-20 border-2 border-dashed border-muted-foreground/30 rounded-xl mb-2 flex items-center justify-center"><p className="text-[9px] text-muted-foreground">Firma pendiente</p></div>
+              <div className="w-full h-20 border-2 border-dashed border-muted-foreground/30 rounded-xl mb-2 flex items-center justify-center">
+                <p className="text-[9px] text-muted-foreground">
+                  Firma pendiente
+                </p>
+              </div>
             )}
             <div className="border-t border-foreground/40 pt-2">
-              <p className="text-[10px] font-bold">{pac?.nombre}</p>
-              <p className="text-[9px] text-muted-foreground">{pac?.tipoDoc}: {pac?.documento}</p>
-              <p className="text-[9px] text-muted-foreground">Firma del Paciente</p>
+              <p className="text-[10px] font-bold">
+                {pac?.nombre || record.pacienteNombre || "Paciente"}
+              </p>
+              <p className="text-[9px] text-muted-foreground">
+                {pac?.tipoDoc || "Doc"}:{" "}
+                {pac?.documento || record.pacienteDoc || "Sin documento"}
+              </p>
+              <p className="text-[9px] text-muted-foreground">
+                Firma del Paciente
+              </p>
             </div>
           </div>
         </div>
-        <div className={`mt-3 p-3 rounded-xl text-center text-xs font-bold border ${d.consentido === true ? "bg-emerald-50 border-emerald-300 text-emerald-800" : d.consentido === false ? "bg-red-50 border-red-300 text-red-800" : "bg-muted text-muted-foreground border-border"}`}>
-          {d.consentido === true ? "✓ PACIENTE CONSINTIÓ — AUTORIZA LA REALIZACIÓN DEL PROCEDIMIENTO" : d.consentido === false ? "✗ PACIENTE DISENTIÓ — NO AUTORIZA" : "Decisión no registrada"}
+
+        <div
+          className={`mt-3 p-3 rounded-xl text-center text-xs font-bold border ${
+            d?.consentido === true
+              ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+              : d?.consentido === false
+              ? "bg-red-50 border-red-300 text-red-800"
+              : "bg-muted text-muted-foreground border-border"
+          }`}
+        >
+          {d?.consentido === true
+            ? "✓ PACIENTE CONSINTIÓ — AUTORIZA LA REALIZACIÓN DEL PROCEDIMIENTO"
+            : d?.consentido === false
+            ? "✗ PACIENTE DISENTIÓ — NO AUTORIZA"
+            : "Decisión no registrada"}
         </div>
+
         <div className="grid grid-cols-2 gap-4 mt-4">
           <div className="text-center">
-            <div className="h-12 border-b border-foreground/30 mb-1"/>
+            <div className="h-12 border-b border-foreground/30 mb-1" />
             <p className="text-[9px] font-bold">{ips.medico}</p>
             <p className="text-[9px] text-muted-foreground">{ips.rm}</p>
             <p className="text-[9px] text-muted-foreground">Médico Responsable</p>
           </div>
           <div className="text-center">
-            <div className="h-12 border-b border-foreground/30 mb-1"/>
+            <div className="h-12 border-b border-foreground/30 mb-1" />
             <p className="text-[9px] font-bold">Auxiliar de Enfermería</p>
             <p className="text-[9px] text-muted-foreground">{ips.nombre}</p>
           </div>
@@ -1250,64 +2190,123 @@ function PDFViewer({ record, onSendEmail, onSendWhatsApp, addToast = () => {} }:
       </div>
 
       <div className="mt-4 pt-3 border-t border-border text-center">
-        <p className="text-[8px] text-muted-foreground">Documento digital · {ips.nombre} · NIT {ips.nit} · {new Date().toLocaleDateString("es-CO", { day:"2-digit", month:"long", year:"numeric" })}</p>
+        <p className="text-[8px] text-muted-foreground">
+          Documento digital · {ips.nombre} · NIT {ips.nit} ·{" "}
+          {new Date().toLocaleDateString("es-CO", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          })}
+        </p>
       </div>
 
+      {/* BOTONES — Email usa onSendEmail del padre (backend SMTP) */}
       <div className="flex gap-2 mt-5">
-        <button onClick={onSendWhatsApp}
-          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20ba5a] active:scale-95 transition-all">
-          <MessageSquare size={18}/>
-          <span className="text-xs font-bold">WhatsApp</span>
-          <span className="text-[9px] font-normal opacity-80">Toca Enviar en la app</span>
+        <button
+          type="button"
+          onClick={onSendWhatsApp}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-[#25D366] text-white text-sm font-semibold hover:bg-[#20ba5a] active:scale-95 transition-all"
+        >
+          <MessageSquare size={18} /> WhatsApp
         </button>
-        <button onClick={onSendEmail}
-          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] active:scale-95 transition-all">
-          <Mail size={18}/>
-          <span className="text-xs font-bold">Email</span>
-          <span className="text-[9px] font-normal opacity-80">Enviar por correo</span>
+        <button
+          type="button"
+          onClick={onSendEmail}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-[#0D51D9] text-white text-sm font-semibold hover:bg-[#1648bf] active:scale-95 transition-all"
+        >
+          <Mail size={18} /> Email
         </button>
       </div>
       <div className="flex gap-2 mt-2">
-        <button onClick={handlePrint} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted"><Printer size={14}/> Imprimir</button>
-        <button onClick={handleDownload} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted"><Download size={14}/> Descargar PDF</button>
+        <button
+          type="button"
+          onClick={handlePrint}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
+        >
+          <Printer size={14} /> Imprimir
+        </button>
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
+        >
+          <Download size={14} /> Descargar PDF
+        </button>
       </div>
     </div>
   );
 }
 
-function PDFModal({ record, onClose, addToast }: { record: ConsentRecord; onClose: () => void; addToast: (t: "success"|"error"|"info"|"warning", m: string) => void }) {
+// ═══════════════════════════════════════════════════════════════════════════════
+// pdfMODAL VIEWER FIN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PDF MODAL / se cambio
+// ═══════════════════════════════════════════════════════════════════════════════
+function PDFModal({
+  record,
+  onClose,
+  addToast,
+}: {
+  record: ConsentRecord;
+  onClose: () => void;
+  addToast: (t: "success" | "error" | "info" | "warning", m: string) => void;
+}) {
   const ips = useIPS();
   const d = record.datos as any;
-  const pac = d.paciente as DatosPaciente;
+  const pac = d?.paciente as DatosPaciente | undefined;
+
   const handleWA = () => {
-    const msg = `*${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${pac?.nombre ?? record.pacienteNombre}*,\n\n📋 *Procedimiento:* ${record.tipo}\n🔖 *Radicado:* ${record.radicado}\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n✅ *Estado:* ${record.estado}\n\n_${ips.nombre}_`;
+    const msg = `*${ips.nombre}* — Consentimiento Informado\n\nEstimado/a *${
+      pac?.nombre ?? record.pacienteNombre
+    }*,\n\n📋 *Procedimiento:* ${record.tipo}\n🔖 *Radicado:* ${
+      record.radicado
+    }\n📅 *Fecha:* ${fmtFecha(record.fecha)}\n✅ *Estado:* ${
+      record.estado
+    }\n\n_${ips.nombre}_`;
     enviarWhatsAppAuto(pac?.telefono ?? record.pacienteTel ?? "", msg);
     addToast("info", "📱 WhatsApp abierto — toca Enviar en la app");
   };
+
   return (
     <div className="fixed inset-0 bg-black/70 z-[200] flex items-end sm:items-center justify-center sm:p-3">
       <div className="bg-gray-50 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl h-[95vh] sm:max-h-[94vh] flex flex-col">
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-white border-b border-border rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3">
-            <FileText size={16} className="text-[#0D51D9]"/>
-            <div><p className="font-bold text-sm">{record.radicado}</p><div className="flex items-center gap-2 flex-wrap"><StatusBadge estado={record.estado}/><TipoBadge tipo={record.tipo}/></div></div>
+            <FileText size={16} className="text-[#0D51D9]" />
+            <div>
+              <p className="font-bold text-sm">{record.radicado}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <StatusBadge estado={record.estado} />
+                <TipoBadge tipo={record.tipo} />
+              </div>
+            </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"><X size={16} className="text-muted-foreground"/></button>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted"
+          >
+            <X size={16} className="text-muted-foreground" />
+          </button>
         </div>
         <div className="overflow-y-auto flex-1 p-3 sm:p-4">
-          <PDFViewer record={record} addToast={addToast} onSendWhatsApp={handleWA} onSendEmail={async () => {
-            addToast("info", "Enviando email…");
-            const datosEmail = { emailPaciente: pac?.email ?? "", nombrePaciente: record.pacienteNombre, radicado: record.radicado, tipo: record.tipo, fecha: fmtFecha(record.fecha), documento: record.pacienteDoc, telefono: record.pacienteTel, creadoPor: record.creadoPor ?? "—", pdfUrl: record.pdfUrl, ipsNombre: ips.nombre, ipsMedico: ips.medico };
-            const [okP, okC] = await Promise.allSettled([pac?.email ? enviarEmailPaciente(datosEmail) : Promise.resolve(false), enviarEmailClinica(datosEmail)]);
-            const sent = (okP.status === "fulfilled" && okP.value) || (okC.status === "fulfilled" && okC.value);
-            if (sent) addToast("success", "Email enviado correctamente");
-            else addToast("info", "📧 Email enviado vía servidor (SMTP)");
-          }}/>
+          <PDFViewer
+            record={record}
+            addToast={addToast}
+            onSendWhatsApp={handleWA}
+            onSendEmail={() =>
+              reenviarEmailConsentimiento(record, ips, addToast)
+            }
+          />
         </div>
       </div>
     </div>
   );
 }
+// ═══════════════════════════════════════════════════════════════════════════════
+// FIN PDF MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // WIZARD HELPERS
@@ -1377,9 +2376,14 @@ function PDFWrapper({ onCancel, children, titulo }: { onCancel: () => void; chil
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORM ESCLEROTERAPIA
 // ═══════════════════════════════════════════════════════════════════════════════
-function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, records }: {
-  onSave: (r: ConsentRecord) => void; onCancel: () => void;
-  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string; records: ConsentRecord[];
+function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, records, apiService }: {
+  onSave: (r: ConsentRecord) => void;
+  onCancel: () => void;
+  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void;
+  nextId: number;
+  userName: string;
+  records: ConsentRecord[];
+  apiService: { get: (path: string) => Promise<Response> };
 }) {
   const ips = useIPS();
   const STEPS = ["Datos del Paciente", "Vitales — Enfermería", "Cuestionario Médico", "Leer Consentimiento", "Firma del Paciente"];
@@ -1432,7 +2436,15 @@ function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, reco
   );
 
   const content = () => {
-    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} records={records}/>;
+    if (step === 1) return (
+      <StepDatosPaciente
+        data={pac}
+        onChange={setPac}
+        records={records}
+        apiService={apiService}
+        addToast={addToast}
+      />
+    );
     if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales}/>;
     if (step === 3) return <StepCuestionario data={cuest} onChange={setCuest}/>;
     if (step === 4) return <StepLeerConsentimiento titulo="Escleroterapia de Várices" texto={makeTextoEscleroterapia(ips)} leido={leido} onLeido={setLeido}/>;
@@ -1452,9 +2464,14 @@ function FormEscleroterapia({ onSave, onCancel, addToast, nextId, userName, reco
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORM SUEROTERAPIA
 // ═══════════════════════════════════════════════════════════════════════════════
-function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, records }: {
-  onSave: (r: ConsentRecord) => void; onCancel: () => void;
-  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string; records: ConsentRecord[];
+function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, records, apiService }: {
+  onSave: (r: ConsentRecord) => void;
+  onCancel: () => void;
+  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void;
+  nextId: number;
+  userName: string;
+  records: ConsentRecord[];
+  apiService: { get: (path: string) => Promise<Response> };
 }) {
   const ips = useIPS();
   const STEPS = ["Datos del Paciente", "Vitales + Prescripción", "Leer Consentimiento", "Firma del Paciente"];
@@ -1534,7 +2551,15 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, record
   );
 
   const content = () => {
-    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} records={records}/>;
+   if (step === 1) return (
+     <StepDatosPaciente
+       data={pac}
+       onChange={setPac}
+       records={records}
+       apiService={apiService}
+       addToast={addToast}
+     />
+   );
     if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales} extraContent={PrescripcionExtra}/>;
     if (step === 3) return <StepLeerConsentimiento titulo="Sueroterapia Vitamina C / Complejo B" texto={makeTextoSueroterapia(ips)} leido={leido} onLeido={setLeido}/>;
     if (step === 4) return <StepFirmaFinal consentido={consentido} onConsentido={setConsentido} firma={firma} onFirma={setFirma} nombrePaciente={pac.nombre}/>;
@@ -1553,9 +2578,14 @@ function FormSueroterapia({ onSave, onCancel, addToast, nextId, userName, record
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORM LASER
 // ═══════════════════════════════════════════════════════════════════════════════
-function FormLaser({ onSave, onCancel, addToast, nextId, userName, records }: {
-  onSave: (r: ConsentRecord) => void; onCancel: () => void;
-  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string; records: ConsentRecord[];
+function FormLaser({ onSave, onCancel, addToast, nextId, userName, records, apiService }: {
+  onSave: (r: ConsentRecord) => void;
+  onCancel: () => void;
+  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void;
+  nextId: number;
+  userName: string;
+  records: ConsentRecord[];
+  apiService: { get: (path: string) => Promise<Response> };
 }) {
   const ips = useIPS();
   const STEPS = ["Datos del Paciente", "Vitales + Parámetros", "Leer Consentimiento", "Firma del Paciente"];
@@ -1635,7 +2665,15 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName, records }: {
   );
 
   const content = () => {
-    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} records={records}/>;
+    if (step === 1) return (
+      <StepDatosPaciente
+        data={pac}
+        onChange={setPac}
+        records={records}
+        apiService={apiService}
+        addToast={addToast}
+      />
+    );
     if (step === 2) return <StepVitalesEnfermera data={vitales} onChange={setVitales} extraContent={ParamsExtra}/>;
     if (step === 3) return <StepLeerConsentimiento titulo="Terapia Láser ND:YAG" texto={makeTextoLaser(ips)} leido={leido} onLeido={setLeido}/>;
     if (step === 4) return <StepFirmaFinal consentido={consentido} onConsentido={setConsentido} firma={firma} onFirma={setFirma} nombrePaciente={pac.nombre}/>;
@@ -1654,9 +2692,14 @@ function FormLaser({ onSave, onCancel, addToast, nextId, userName, records }: {
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORM PAQUETE COMPLETO
 // ═══════════════════════════════════════════════════════════════════════════════
-function FormPaquete({ onSave, onCancel, addToast, nextId, userName, records }: {
-  onSave: (r: ConsentRecord) => void; onCancel: () => void;
-  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void; nextId: number; userName: string; records: ConsentRecord[];
+function FormPaquete({ onSave, onCancel, addToast, nextId, userName, records, apiService }: {
+  onSave: (r: ConsentRecord) => void;
+  onCancel: () => void;
+  addToast: (t: "success"|"error"|"info"|"warning", m: string) => void;
+  nextId: number;
+  userName: string;
+  records: ConsentRecord[];
+  apiService: { get: (path: string) => Promise<Response> };
 }) {
   const ips = useIPS();
   const STEPS = ["Datos del Paciente","Vitales + Cuestionario","Suero + Láser","Leer · Escleroterapia","Leer · Sueroterapia","Leer · Láser","Firma del Paciente"];
@@ -1746,7 +2789,15 @@ function FormPaquete({ onSave, onCancel, addToast, nextId, userName, records }: 
   );
 
   const content = () => {
-    if (step === 1) return <StepDatosPaciente data={pac} onChange={setPac} records={records}/>;
+        if (step === 1) return (
+          <StepDatosPaciente
+            data={pac}
+            onChange={setPac}
+            records={records}
+            apiService={apiService}
+            addToast={addToast}
+          />
+        );
     if (step === 2) return <div className="space-y-6"><StepVitalesEnfermera data={vitales} onChange={setVitales}/><div className="border-t border-border pt-5"><div className="flex items-center gap-2 p-2.5 bg-[#0D51D9]/8 border border-[#0D51D9]/20 rounded-xl mb-4"><Syringe size={14} className="text-[#0D51D9]"/><p className="text-xs font-bold text-[#0D51D9]">Cuestionario — Escleroterapia</p></div><StepCuestionario data={cuest} onChange={setCuest}/></div></div>;
     if (step === 3) return SueroLaserExtra;
     if (step === 4) return <div><div className="flex items-center gap-2 mb-3 p-2 bg-[#0D51D9]/8 rounded-lg"><Syringe size={14} className="text-[#0D51D9]"/><p className="text-xs font-bold text-[#0D51D9]">1 de 3 — Escleroterapia</p></div><StepLeerConsentimiento titulo="Escleroterapia de Várices" texto={makeTextoEscleroterapia(ips)} leido={leido1} onLeido={setLeido1}/></div>;
@@ -2921,173 +3972,387 @@ function LicenseManagerPage({ addToast }: { addToast: (t: "success"|"error"|"inf
 }
 
 function LoginPage({ onLogin, usuarios }: { onLogin: (u: Usuario) => void; usuarios: Usuario[] }) {
-  const ips = useIPS();
+  type Lang = "es" | "en";
+  const i18n = {
+    es: {
+      brand: "Clinisign",
+      tagline: "Sistema de Consentimientos Informados",
+      welcome: "Iniciar sesión",
+      email: "Correo electrónico",
+      password: "Contraseña",
+      submit: "Entrar",
+      loading: "Verificando…",
+      remember: "Recordarme",
+      adminHelp: "¿Sin acceso? Contacte al administrador de su clínica.",
+      contact: "Solicitar acceso / Contactar",
+      back: "Volver al login",
+      requestTitle: "Solicitar acceso",
+      requestHint: "Complete el formulario y se abrirá WhatsApp para escribir al administrador.",
+      fullName: "Nombre completo",
+      phone: "Teléfono / WhatsApp",
+      message: "Mensaje (opcional)",
+      sendWa: "Enviar por WhatsApp",
+      sentOk: "WhatsApp abierto. Envíe el mensaje para completar la solicitud.",
+      errorCreds: "Correo o contraseña incorrectos",
+      errorInactive: "Usuario inactivo. Contacte al administrador.",
+      errorEmpty: "Ingrese correo y contraseña",
+      feature1: "Consentimientos digitales",
+      feature2: "Agenda y pacientes",
+      feature3: "Multi-clínica",
+      show: "Ver",
+      hide: "Ocultar",
+    },
+    en: {
+      brand: "Clinisign",
+      tagline: "Informed Consent System",
+      welcome: "Sign in",
+      email: "Email",
+      password: "Password",
+      submit: "Sign in",
+      loading: "Checking…",
+      remember: "Remember me",
+      adminHelp: "No access? Contact your clinic administrator.",
+      contact: "Request access / Contact",
+      back: "Back to login",
+      requestTitle: "Request access",
+      requestHint: "Fill the form and WhatsApp will open to message the administrator.",
+      fullName: "Full name",
+      phone: "Phone / WhatsApp",
+      message: "Message (optional)",
+      sendWa: "Send via WhatsApp",
+      sentOk: "WhatsApp opened. Send the message to complete your request.",
+      errorCreds: "Invalid email or password",
+      errorInactive: "Inactive user. Contact your administrator.",
+      errorEmpty: "Enter email and password",
+      feature1: "Digital consents",
+      feature2: "Scheduling & patients",
+      feature3: "Multi-clinic ready",
+      show: "Show",
+      hide: "Hide",
+    },
+  };
+
+  const [lang, setLang] = useState<Lang>(() => {
+    try {
+      return localStorage.getItem("clinisign_lang") === "en" ? "en" : "es";
+    } catch {
+      return "es";
+    }
+  });
+  const t = i18n[lang];
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [showSolicitud, setShowSolicitud] = useState(false);
   const [solNombre, setSolNombre] = useState("");
   const [solTel, setSolTel] = useState("");
   const [solMensaje, setSolMensaje] = useState("");
   const [solEnviado, setSolEnviado] = useState(false);
 
+  const adminWA =
+    (import.meta as any).env?.VITE_WA_CLINICA ?? "573114048112";
+
+  const setLanguage = (l: Lang) => {
+    setLang(l);
+    try {
+      localStorage.setItem("clinisign_lang", l);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const handleSolicitud = (e: FormEvent) => {
     e.preventDefault();
-    const adminWA = (import.meta as any).env?.VITE_WA_CLINICA ?? "573114048112";
     const msg = encodeURIComponent(
-      `🔔 *SOLICITUD DE ACCESO — ${ips.nombre}*\n\n` +
-      `👤 *Nombre:* ${solNombre}\n📱 *Contacto:* ${solTel}\n` +
-      (solMensaje ? `💬 *Mensaje:* ${solMensaje}\n` : "") +
-      `\n_Enviado desde el login de CliniSign_`
+      `🔔 *SOLICITUD DE ACCESO — Clinisign*\n\n` +
+        `👤 *Nombre:* ${solNombre}\n` +
+        `📱 *Contacto:* ${solTel}\n` +
+        (solMensaje ? `💬 *Mensaje:* ${solMensaje}\n` : "") +
+        `\n_Enviado desde el login de Clinisign_`
     );
     window.open(`https://wa.me/${adminWA}?text=${msg}`, "_blank");
     setSolEnviado(true);
   };
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault(); setError(""); setLoading(true);
+    e.preventDefault();
+    setError("");
+    if (!email.trim() || !password) {
+      setError(t.errorEmpty);
+      return;
+    }
+    setLoading(true);
 
-    // 1. Intentar autenticación con backend Spring Boot
     try {
       const resp = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        signal: AbortSignal.timeout(4000),
+        body: JSON.stringify({ email: email.trim(), password }),
+        signal: AbortSignal.timeout(8000),
       });
+
       if (resp.ok) {
         const data = await resp.json();
         apiService.setToken(data.token ?? "");
+        const rawRol = data.rol ?? data.usuario?.rol ?? data.user?.rol ?? "AUXILIAR";
         const u: Usuario = {
-          id:        String(data.id ?? data.usuario?.id ?? "1"),
-          nombre:    data.nombre ?? data.usuario?.nombre ?? email,
-          email:     data.email ?? email,
-          rol:       (data.rol ?? data.usuario?.rol ?? "AUXILIAR") as RolUsuario,
-          password:  "",
-          activo:    true,
+          id: String(data.id ?? data.usuario?.id ?? data.user?.id ?? "1"),
+          nombre: data.nombre ?? data.usuario?.nombre ?? data.user?.nombre ?? email,
+          email: data.email ?? data.usuario?.email ?? data.user?.email ?? email,
+          rol: fromBackendRol(String(rawRol)),
+          password: "",
+          activo: data.activo ?? data.usuario?.activo ?? true,
           createdAt: new Date().toISOString().split("T")[0],
+          puedeEditarHc: Boolean(
+            data.puedeEditarHc ?? data.usuario?.puedeEditarHc ?? data.user?.puedeEditarHc ?? false
+          ),
         };
-        setLoading(false);
-        onLogin(u);
-        return;
-      }
-      if (resp.status === 401 || resp.status === 403) {
-        setError("Credenciales incorrectas en el servidor. Verifique email y contraseña.");
-        setLoading(false);
-        return;
-      }
-     } catch {
-          // Backend no disponible
-          if (!(import.meta as any).env?.DEV) {
-            setError("No hay conexión con el servidor. Verifique su internet e intente de nuevo.");
-            setLoading(false);
-            return;
-          }
-          // En desarrollo se permite el fallback local para trabajar sin backend
+        if (u.activo === false) {
+          setError(t.errorInactive);
+          setLoading(false);
+          return;
         }
-    // 2. Fallback: autenticación local (sin backend)
-    const user = usuarios.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password && u.activo);
-    if (user) { onLogin(user); }
-    else {
-      const exists = usuarios.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (exists && !exists.activo) setError("Este usuario está inactivo. Contacte al Administrador.");
-      else setError("Credenciales incorrectas. Verifique su email y contraseña.");
+        onLogin(u);
+        setLoading(false);
+        return;
+      }
+    } catch {
+      /* fallback local */
     }
+
+    const u = usuarios.find(
+      (x) =>
+        x.email.toLowerCase() === email.trim().toLowerCase() &&
+        x.password === password
+    );
+    if (!u) {
+      setError(t.errorCreds);
+      setLoading(false);
+      return;
+    }
+    if (!u.activo) {
+      setError(t.errorInactive);
+      setLoading(false);
+      return;
+    }
+    onLogin(u);
     setLoading(false);
   };
 
+  const LogoBadge = ({ size = "lg" }: { size?: "lg" | "md" }) => (
+    <div
+      className={
+        size === "lg"
+          ? "w-28 h-28 rounded-full bg-white shadow-xl border-4 border-white/80 flex items-center justify-center overflow-hidden"
+          : "w-20 h-20 rounded-full bg-white shadow-lg border-4 border-slate-100 flex items-center justify-center overflow-hidden"
+      }
+    >
+      <img
+        src={clinisignLogo}
+        alt="Clinisign"
+        className={size === "lg" ? "w-20 h-20 object-contain" : "w-14 h-14 object-contain"}
+      />
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-[#031CA6] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white mb-4 shadow-lg overflow-hidden">
-            {ips.logo
-              ? <img src={ips.logo} alt="Logo IPS" className="w-16 h-16 object-contain"/>
-              : <ImageWithFallback src={medfisLogo} alt="Med&Fis Logo" className="w-16 h-16 object-contain"/>
-            }
-          </div>
-          <h1 className="text-2xl font-black text-white">{ips.nombre}</h1>
-          <p className="text-[#C5D5F0] text-sm mt-1">Sistema de Consentimientos Informados</p>
-          <p className="text-[#7A94C5] text-[10px] mt-0.5 font-mono">NIT {ips.nit}</p>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#0A4F8A] via-[#066AAB] to-[#0B8FD9]">
+      <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-0 rounded-3xl overflow-hidden shadow-2xl border border-white/20 bg-white/10 backdrop-blur-sm">
+        {/* Izquierda: logo grande centrado */}
+        <div className="hidden lg:flex flex-col items-center justify-center p-12 text-white text-center">
+          <LogoBadge size="lg" />
+          <h1 className="mt-6 text-4xl font-bold tracking-tight">{t.brand}</h1>
+          <p className="mt-3 text-sky-100 text-base max-w-xs leading-relaxed">{t.tagline}</p>
+          <ul className="mt-12 space-y-3 text-sm text-sky-100/90 text-left">
+            <li className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#4FC3F7]" /> {t.feature1}
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#4FC3F7]" /> {t.feature2}
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#4FC3F7]" /> {t.feature3}
+            </li>
+          </ul>
         </div>
-        <div className="bg-white rounded-2xl p-6 shadow-2xl">
-          <h2 className="text-sm font-bold mb-5">Iniciar Sesión</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Correo electrónico" value={email} onChange={setEmail} type="email" placeholder="Ingrese su correo" required/>
-            <Field label="Contraseña" value={password} onChange={setPassword} type="password" placeholder="••••••••" required/>
-            {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-medium"><XCircle size={14}/> {error}</div>}
-            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-[#0D51D9] text-white font-semibold text-sm disabled:opacity-60 hover:bg-[#1648bf] transition-colors flex items-center justify-center gap-2">
-              {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Verificando...</> : "Ingresar"}
-            </button>
-          </form>
-          <div className="mt-5 pt-4 border-t border-border">
-            {!showSolicitud ? (
+
+        {/* Derecha: form centrado */}
+        <div className="bg-white p-8 sm:p-12 flex flex-col justify-center">
+          <div className="flex justify-end gap-2 text-xs font-bold mb-4">
+            <button type="button" onClick={() => setLanguage("es")}
+              className={lang === "es" ? "text-[#0B8FD9]" : "text-slate-400"}>ES</button>
+            <span className="text-slate-300">|</span>
+            <button type="button" onClick={() => setLanguage("en")}
+              className={lang === "en" ? "text-[#0B8FD9]" : "text-slate-400"}>EN</button>
+          </div>
+
+          {/* Logo centrado también en móvil / tablet */}
+          <div className="flex flex-col items-center mb-6">
+            <LogoBadge size="md" />
+            <p className="text-[11px] text-slate-500 mt-3 text-center max-w-[220px]">{t.tagline}</p>
+          </div>
+
+          {!showSolicitud ? (
+            <>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 text-center mb-1">
+                {t.welcome}
+              </h2>
+              <p className="text-sm text-slate-500 text-center mb-8">{t.brand}</p>
+
+              <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto w-full">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 text-center sm:text-left">
+                    {t.email}
+                  </label>
+                  <input
+                    type="email"
+                    autoComplete="username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-[#0B8FD9]/40 focus:border-[#0B8FD9]"
+                    placeholder="correo@clinica.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 text-center sm:text-left">
+                    {t.password}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPass ? "text" : "password"}
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="w-full px-4 py-3.5 pr-16 rounded-xl border border-slate-200 bg-slate-50 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-[#0B8FD9]/40 focus:border-[#0B8FD9]"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"
+                    >
+                      {showPass ? t.hide : t.show}
+                    </button>
+                  </div>
+                </div>
+
+                <label className="flex items-center justify-center sm:justify-start gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    className="rounded border-slate-300 text-[#0B8FD9]"
+                  />
+                  {t.remember}
+                </label>
+
+                {error && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-medium">
+                    <XCircle size={14} /> {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl bg-[#0B8FD9] hover:bg-[#066AAB] text-white font-semibold text-base disabled:opacity-60 shadow-lg shadow-sky-500/20"
+                >
+                  {loading ? t.loading : t.submit}
+                </button>
+              </form>
+
+              <div className="mt-8 pt-5 border-t border-slate-100 text-center space-y-2 max-w-md mx-auto">
+                <p className="text-xs text-slate-500">{t.adminHelp}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSolicitud(true);
+                    setSolEnviado(false);
+                  }}
+                  className="text-sm font-semibold text-[#0B8FD9] hover:underline"
+                >
+                  {t.contact}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="max-w-md mx-auto w-full">
               <button
                 type="button"
-                onClick={() => setShowSolicitud(true)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#0D51D9]/30 bg-[#EFF3FB] text-[#0D51D9] text-[11px] font-semibold hover:bg-[#0D51D9]/10 transition-colors"
+                onClick={() => setShowSolicitud(false)}
+                className="text-xs text-slate-500 hover:text-slate-700 mb-4"
               >
-                <Phone size={13}/>
-                ¿No tienes acceso? Contactar Administrador
+                ← {t.back}
               </button>
-            ) : solEnviado ? (
-              <div className="flex flex-col items-center gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                <CheckCircle size={22} className="text-emerald-600"/>
-                <p className="text-xs font-bold text-emerald-800">¡Solicitud enviada!</p>
-                <p className="text-[10px] text-emerald-700">El Administrador recibirá tu mensaje por WhatsApp y te contactará pronto.</p>
-                <button type="button" onClick={() => { setSolEnviado(false); setShowSolicitud(false); setSolNombre(""); setSolTel(""); setSolMensaje(""); }} className="mt-1 text-[10px] text-emerald-600 underline">Volver al login</button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-bold text-foreground">Solicitar acceso al sistema</p>
-                  <button type="button" onClick={() => setShowSolicitud(false)} className="text-muted-foreground hover:text-foreground"><XCircle size={14}/></button>
+              <h2 className="text-xl font-bold text-slate-800 text-center mb-1">{t.requestTitle}</h2>
+              <p className="text-xs text-slate-500 text-center mb-5">{t.requestHint}</p>
+
+              {solEnviado ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 text-center">
+                  {t.sentOk}
+                  <button
+                    type="button"
+                    onClick={() => setShowSolicitud(false)}
+                    className="block mx-auto mt-3 text-[#0B8FD9] font-semibold"
+                  >
+                    {t.back}
+                  </button>
                 </div>
-                <form onSubmit={handleSolicitud} className="space-y-2">
-                  <input
-                    required value={solNombre} onChange={e => setSolNombre(e.target.value)}
-                    placeholder="Tu nombre completo"
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"
-                  />
-                  <input
-                    required value={solTel} onChange={e => setSolTel(e.target.value)}
-                    placeholder="Teléfono o email de contacto"
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40"
-                  />
-                  <textarea
-                    value={solMensaje} onChange={e => setSolMensaje(e.target.value)}
-                    placeholder="Mensaje (opcional) — ej: soy médico, necesito acceso"
-                    rows={2}
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-[#0D51D9]/40 resize-none"
-                  />
+              ) : (
+                <form onSubmit={handleSolicitud} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">{t.fullName}</label>
+                    <input
+                      required
+                      value={solNombre}
+                      onChange={(e) => setSolNombre(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:ring-2 focus:ring-[#0B8FD9]/40 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">{t.phone}</label>
+                    <input
+                      required
+                      value={solTel}
+                      onChange={(e) => setSolTel(e.target.value)}
+                      placeholder="3001234567"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:ring-2 focus:ring-[#0B8FD9]/40 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">{t.message}</label>
+                    <textarea
+                      value={solMensaje}
+                      onChange={(e) => setSolMensaje(e.target.value)}
+                      rows={3}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:ring-2 focus:ring-[#0B8FD9]/40 outline-none resize-none"
+                    />
+                  </div>
                   <button
                     type="submit"
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#25D366] text-white text-[11px] font-bold hover:bg-[#1fbd5a] transition-colors"
+                    className="w-full py-3.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-semibold text-sm"
                   >
-                    <Phone size={13}/>
-                    Enviar solicitud por WhatsApp
+                    {t.sendWa}
                   </button>
                 </form>
-                <p className="text-[9px] text-muted-foreground text-center">El mensaje se enviará automáticamente al Administrador por WhatsApp</p>
-              </div>
-            )}
-          </div>
-        </div>
-        {/* Autoría y derechos reservados */}
-        <div className="mt-6 text-center space-y-0.5">
-          <p className="text-[10px] text-[#7A94C5]">Desarrollado por <span className="font-bold text-white">JM Ingeniero</span></p>
-          <p className="text-[9px] text-[#5571A0]">© {new Date().getFullYear()} Todos los derechos reservados · Uso exclusivo {ips.nombre}</p>
-          <p className="text-[9px] text-[#5571A0]">Nos reservamos el derecho de admisión</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── SIDEBAR ──────────────────────────────────────────────────────────────────
-apiService.setToken("");                 // limpia el token en memoria y en localStorage
-localStorage.removeItem("medfis_token"); // por si acaso
+
 function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, onSettings, onChangePwd, notifCount }: {
   page: AppPage; onPage: (p: AppPage) => void; user: Usuario; onLogout: () => void;
   records: ConsentRecord[]; mobileOpen: boolean; onClose: () => void; onSettings: () => void;
@@ -3096,11 +4361,13 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
 }) {
   const ips = useIPS();
   const pendientes = records.filter(r => r.pendienteMedico).length;
-  const nav = [
-    { id: "dashboard" as AppPage, label: "Dashboard",            icon: <LayoutDashboard size={17}/>, badge: user.rol === "MÉDICO" ? pendientes : 0 },
-    { id: "historial" as AppPage, label: "Historial",            icon: <ClipboardList size={17}/>   },
-    { id: "form"      as AppPage, label: "Nuevo Consentimiento", icon: <Plus size={17}/>             },
-  ];
+    const nav = [
+      { id: "dashboard" as AppPage, label: "Dashboard",            icon: <LayoutDashboard size={17}/>, badge: user.rol === "MÉDICO" ? pendientes : 0 },
+      { id: "historial" as AppPage, label: "Historial",            icon: <ClipboardList size={17}/>   },
+      { id: "pacientes" as AppPage, label: "Pacientes",            icon: <Users size={17}/>           },
+      { id: "form"      as AppPage, label: "Nuevo Consentimiento", icon: <Plus size={17}/>             },
+      { id: "agenda" as AppPage, label: "Agenda", icon: <CalendarCheck size={17}/> },
+    ];
   return (
     <>
       {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose}/>}
@@ -3133,6 +4400,11 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="staff"?"bg-[#0D51D9] text-white":"text-[#C5D5F0] hover:bg-white/8"}`}>
               <UserCog size={17}/> Gestión de Staff
             </button>
+            {/* 👇 NUEVO BOTÓN: Administrar Usuarios */}
+            <button onClick={() => { onPage("usuarios"); onClose(); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="usuarios"?"bg-[#0D51D9] text-white":"text-[#C5D5F0] hover:bg-white/8"}`}>
+              <Users size={17}/> Administrar Usuarios
+            </button>
             {ADMIN_MASTER && (
               <button onClick={() => { onPage("licencias"); onClose(); }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${page==="licencias"?"bg-amber-500 text-white":"text-amber-300 hover:bg-white/8"}`}>
@@ -3150,8 +4422,12 @@ function Sidebar({ page, onPage, user, onLogout, records, mobileOpen, onClose, o
           </div>
           <button onClick={onLogout} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#C5D5F0] hover:bg-white/8 text-sm font-medium transition-colors"><LogOut size={15}/> Cerrar Sesión</button>
           <div className="px-3 pt-2 border-t border-white/8 mt-1">
-            <p className="text-[9px] text-[#5571A0]">Dev: <span className="text-[#7A94C5] font-semibold">JM Ingeniero</span></p>
-            <p className="text-[9px] text-[#5571A0]">© {new Date().getFullYear()} · Derechos reservados</p>
+            <p className="text-[9px] text-[#5571A0]">
+              <span className="text-[#7A94C5] font-semibold">Collobia</span> · {new Date().getFullYear()}
+            </p>
+            <p className="text-[8px] text-[#5571A0] opacity-60">
+              Todos los derechos reservados
+            </p>
           </div>
         </div>
       </aside>
@@ -3692,15 +4968,21 @@ export default function App() {
   };
 
   // Merge usuarios del backend con cache local (para mantener foto/rm/especialidad)
-  const mergeWithLocalUsers = (backendUsers: Record<string, unknown>[]): Usuario[] => {
-    const localCache = (() => {
-      try { return JSON.parse(localStorage.getItem("medfis_usuarios") ?? "[]") as Usuario[]; } catch { return [] as Usuario[]; }
-    })();
-    return backendUsers.map(b => {
-      const cached = localCache.find(u => u.id === String(b.id) || u.email === String(b.email));
-      return fromBackendUser(b, cached);
-    });
-  };
+    const mergeWithLocalUsers = (backendUsers: Record<string, unknown>[]): Usuario[] => {
+      const localCache = (() => {
+        try {
+          return JSON.parse(localStorage.getItem("medfis_usuarios") ?? "[]") as Usuario[];
+        } catch {
+          return [] as Usuario[];
+        }
+      })();
+      return backendUsers.map((b) => {
+        const cached = localCache.find(
+          (u) => u.id === String(b.id) || u.email === String(b.email)
+        );
+        return fromBackendUser(b, cached);
+      });
+    };
 
   const addToast = useCallback((type: "success"|"error"|"info"|"warning", msg: string) => {
     const id = Date.now();
@@ -3919,42 +5201,51 @@ export default function App() {
     addToast("info", "Consentimiento anulado");
   };
 
-  const handleAddUser = async (u: Usuario) => {
-    // Guardar en local primero (para respuesta inmediata de UI)
-    const localList = [...usuarios, u];
-    setUsuarios(localList);
-    syncUsuariosCache(localList);
-    // Sync backend
-    try {
-      const resp = await apiService.post("/usuarios", {
-        nombre: u.nombre, email: u.email, password: u.password,
-        rol: toBackendRol(u.rol),
-      });
-      if (resp.ok) {
-        const created: Record<string, unknown> = await resp.json();
-        // Actualizar con el ID real del servidor
-        const merged = fromBackendUser(created, u);
-        setUsuarios(prev => prev.map(x => x.email === u.email ? merged : x));
-        syncUsuariosCache(usuarios.map(x => x.email === u.email ? merged : x));
-        addToast("success", `Usuario ${u.nombre} creado en la base de datos`);
+    const handleAddUser = async (u: Usuario) => {
+      const localList = [...usuarios, u];
+      setUsuarios(localList);
+      syncUsuariosCache(localList);
+      try {
+        const resp = await apiService.post("/usuarios", {
+          nombre: u.nombre,
+          email: u.email,
+          password: u.password,
+          rol: toBackendRol(u.rol),
+          puedeEditarHc: u.puedeEditarHc === true,
+        });
+        if (resp.ok) {
+          const created: Record<string, unknown> = await resp.json();
+          const merged = fromBackendUser(created, u);
+          setUsuarios((prev) => prev.map((x) => (x.email === u.email ? merged : x)));
+          syncUsuariosCache(
+            localList.map((x) => (x.email === u.email ? merged : x))
+          );
+          addToast("success", `Usuario ${u.nombre} creado en la base de datos`);
+        }
+      } catch {
+        addToast("warning", "Usuario guardado localmente — sincronizará con backend al conectar");
       }
-    } catch { addToast("warning", "Usuario guardado localmente — sincronizará con backend al conectar"); }
-  };
+    };
 
-  const handleEditUser = async (updatedUser: Usuario) => {
-    const list = usuarios.map(u => u.id === updatedUser.id ? updatedUser : u);
-    setUsuarios(list);
-    syncUsuariosCache(list);
-    if (user?.id === updatedUser.id) setUser(updatedUser);
-    // Sync backend
-    try {
-      await apiService.put(`/usuarios/${updatedUser.id}`, {
-        nombre: updatedUser.nombre, email: updatedUser.email,
-        rol: toBackendRol(updatedUser.rol),
-      });
-      addToast("success", `Usuario ${updatedUser.nombre} actualizado`);
-    } catch { addToast("warning", "Cambios guardados localmente"); }
-  };
+      const handleEditUser = async (updatedUser: Usuario) => {
+        const list = usuarios.map((u) =>
+          u.id === updatedUser.id ? updatedUser : u
+        );
+        setUsuarios(list);
+        syncUsuariosCache(list);
+        if (user?.id === updatedUser.id) setUser(updatedUser);
+        try {
+          await apiService.put(`/usuarios/${updatedUser.id}`, {
+            nombre: updatedUser.nombre,
+            email: updatedUser.email,
+            rol: toBackendRol(updatedUser.rol),
+            puedeEditarHc: updatedUser.puedeEditarHc === true,
+          });
+          addToast("success", `Usuario ${updatedUser.nombre} actualizado`);
+        } catch {
+          addToast("warning", "Cambios guardados localmente");
+        }
+      };
 
   const handleChangeUserPassword = async (userId: string, newPassword: string) => {
     const list = usuarios.map(u => u.id === userId ? { ...u, password: newPassword } : u);
@@ -3966,17 +5257,92 @@ export default function App() {
       addToast("success", "Contraseña actualizada en la base de datos");
     } catch { addToast("success", "Contraseña actualizada localmente"); }
   };
+//correccion deactivar
 
-  const handleToggleActivo = async (id: string) => {
-    const target = usuarios.find(u => u.id === id);
-    if (target?.rol === "ADMINISTRADOR") { addToast("error", "No se puede desactivar al Administrador"); return; }
-    const updated = usuarios.map(u => u.id === id ? { ...u, activo: !u.activo } : u);
-    setUsuarios(updated);
-    syncUsuariosCache(updated);
-    // Sync backend
-    try { await apiService.patch(`/usuarios/${id}/toggle`); } catch {}
-  };
+      const handleToggleActivo = async (id: string) => {
+        const target = usuarios.find((u) => u.id === id);
+        if (!target) {
+          addToast("error", "Usuario no encontrado");
+          return;
+        }
+        if (target.rol === "ADMINISTRADOR") {
+          addToast("error", "No se puede desactivar al Administrador");
+          return;
+        }
 
+        const estadoAnterior = target.activo;
+        const nuevoEstado = !target.activo;
+
+        const updated = usuarios.map((u) =>
+          u.id === id ? { ...u, activo: nuevoEstado } : u
+        );
+        setUsuarios(updated);
+        syncUsuariosCache(updated);
+
+        try {
+          const resp = await apiService.patch(`/usuarios/${id}/toggle`);
+
+          if (!resp.ok) {
+            const reverted = usuarios.map((u) =>
+              u.id === id ? { ...u, activo: estadoAnterior } : u
+            );
+            setUsuarios(reverted);
+            syncUsuariosCache(reverted);
+
+            let mensaje = `Error ${resp.status} al ${nuevoEstado ? "activar" : "desactivar"}`;
+            try {
+              const body = await resp.json();
+              if (body?.message) mensaje = body.message;
+              else if (typeof body === "string") mensaje = body;
+            } catch {
+              /* ignore */
+            }
+
+            if (resp.status === 403) {
+              mensaje =
+                "No tienes permiso (403). Verifica que seas ADMINISTRADOR y que CORS esté bien configurado.";
+            } else if (resp.status === 404) {
+              mensaje =
+                "Usuario no encontrado en la base de datos. Puede tener un ID local. Recarga la página.";
+            } else if (resp.status === 401) {
+              mensaje = "Sesión expirada. Cierra sesión y vuelve a entrar.";
+            }
+
+            addToast("error", mensaje);
+            return;
+          }
+
+          try {
+            const data = await resp.json();
+            const finalList = usuarios.map((u) =>
+              u.id === id ? { ...u, activo: data.activo ?? nuevoEstado } : u
+            );
+            setUsuarios(finalList);
+            syncUsuariosCache(finalList);
+          } catch {
+            /* dejamos estado optimista */
+          }
+
+          addToast(
+            nuevoEstado ? "success" : "warning",
+            `${target.nombre} ha sido ${nuevoEstado ? "activado" : "desactivado"}`
+          );
+        } catch (err) {
+          const reverted = usuarios.map((u) =>
+            u.id === id ? { ...u, activo: estadoAnterior } : u
+          );
+          setUsuarios(reverted);
+          syncUsuariosCache(reverted);
+          addToast(
+            "error",
+            "No se pudo conectar con el servidor. Revisa que el backend esté corriendo."
+          );
+          console.error("Error toggle usuario:", err);
+        }
+      };
+
+
+//fin handleToggleActiv
   const matchesRol = (n: Notificacion) => {
     if (n.paraRol === "TODOS") return true;
     if (!user) return false;
@@ -4052,7 +5418,12 @@ export default function App() {
     <IPSContext.Provider value={ips}>
       <div className="min-h-screen bg-background flex">
         <Sidebar page={page} onPage={setPage} user={user}
-          onLogout={() => { setUser(null); setPage("dashboard"); addToast("info","Sesión cerrada"); }}
+          onLogout={() => {
+            apiService.setToken("");
+            setUser(null);
+            setPage("dashboard");
+            addToast("info", "Sesión cerrada");
+          }}
           records={records} mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
           onSettings={() => setShowSettings(true)} onChangePwd={() => setShowChangePwd(true)} notifCount={notifCount}/>
 
@@ -4078,61 +5449,166 @@ export default function App() {
             </div>
           </div>
 
-          <main className="flex-1 p-3 sm:p-5 lg:p-6 max-w-5xl mx-auto w-full">
-            {page==="dashboard" && (
-              <DashboardPage records={records} onNewForm={t => { setActiveForm(t); setPage("form"); }}
-                user={user} onViewRecord={setViewRecord} onAprobar={handleAprobar} onRechazar={handleRechazar} addToast={addToast} ips={ips}/>
-            )}
-            {page==="form" && !activeForm && <TipoSelectorPage onSelect={t => setActiveForm(t)}/>}
-            {page==="historial" && (
-              <HistorialPage records={records} onView={setViewRecord} onDelete={handleDelete}
-                onAprobar={handleAprobar} onRechazar={handleRechazar} addToast={addToast} user={user}/>
-            )}
-            {page==="admin" && user.rol === "ADMINISTRADOR" && (
-              <AdminStatsPage records={records} usuarios={usuarios}/>
-            )}
-            {page==="staff" && user.rol === "ADMINISTRADOR" && (
-              <StaffPage
-                usuarios={usuarios}
-                onAddUser={handleAddUser}
-                onToggleActivo={handleToggleActivo}
-                onEditUser={handleEditUser}
-                onChangePassword={handleChangeUserPassword}
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 max-w-5xl mx-auto w-full">
+          {page === "dashboard" && (
+            <DashboardPage
+              records={records}
+              onNewForm={t => { setActiveForm(t); setPage("form"); }}
+              user={user}
+              onViewRecord={setViewRecord}
+              onAprobar={handleAprobar}
+              onRechazar={handleRechazar}
+              addToast={addToast}
+              ips={ips}
+            />
+          )}
+          {page === "form" && !activeForm && <TipoSelectorPage onSelect={t => setActiveForm(t)} />}
+          {page === "historial" && (
+            <HistorialPage
+              records={records}
+              onView={setViewRecord}
+              onDelete={handleDelete}
+              onAprobar={handleAprobar}
+              onRechazar={handleRechazar}
+              addToast={addToast}
+              user={user}
+            />
+          )}
+          {page === "admin" && user.rol === "ADMINISTRADOR" && (
+            <AdminStatsPage records={records} usuarios={usuarios} />
+          )}
+          {page === "staff" && user.rol === "ADMINISTRADOR" && (
+            <StaffPage
+              usuarios={usuarios}
+              onAddUser={handleAddUser}
+              onToggleActivo={handleToggleActivo}
+              onEditUser={handleEditUser}
+              onChangePassword={handleChangeUserPassword}
+              addToast={addToast}
+            />
+          )}
+          {/* 👇 NUEVA PÁGINA: Administrar Usuarios (solo ADMINISTRADOR) */}
+                    {page === "usuarios" && user.rol === "ADMINISTRADOR" && <AdminUsuarios />}
+                    {page === "pacientes" && (
+                      <PacientesPage
+                        user={user}
+                        apiService={apiService}
+                        records={records}
+                        addToast={addToast}
+                        onOpenConsent={(id) => {
+                          const r = records.find((x) => x.id === id);
+                          if (r) setViewRecord(r);
+                        }}
+                      />
+                    )}
+                {page === "agenda" && (
+                  <AgendaPage user={user} apiService={apiService} addToast={addToast} />
+                )}
+
+                  </main>
+
+        {/* Formularios */}
+        {activeForm==="escleroterapia" && (
+          <FormEscleroterapia
+            onSave={handleSave}
+            onCancel={() => setActiveForm(null)}
+            addToast={addToast}
+            nextId={nextIdsRef.current.escleroterapia}
+            userName={user.nombre}
+            records={records}
+            apiService={apiService}
+          />
+        )}
+        {activeForm==="sueroterapia" && (
+          <FormSueroterapia
+            onSave={handleSave}
+            onCancel={() => setActiveForm(null)}
+            addToast={addToast}
+            nextId={nextIdsRef.current.sueroterapia}
+            userName={user.nombre}
+            records={records}
+            apiService={apiService}
+          />
+        )}
+        {activeForm==="laser" && (
+          <FormLaser
+            onSave={handleSave}
+            onCancel={() => setActiveForm(null)}
+            addToast={addToast}
+            nextId={nextIdsRef.current.laser}
+            userName={user.nombre}
+            records={records}
+            apiService={apiService}
+          />
+        )}
+        {activeForm==="paquete" && (
+          <FormPaquete
+            onSave={handleSave}
+            onCancel={() => setActiveForm(null)}
+            addToast={addToast}
+            nextId={nextIdsRef.current.paquete}
+            userName={user.nombre}
+            records={records}
+            apiService={apiService}
+          />
+        )}
+            {viewRecord && (
+              <PDFModal
+                record={viewRecord}
+                onClose={() => setViewRecord(null)}
                 addToast={addToast}
               />
             )}
-            {page==="licencias" && user.rol === "ADMINISTRADOR" && ADMIN_MASTER && (
-              <LicenseManagerPage addToast={addToast}/>
+
+            {showSettings && user.rol === "ADMINISTRADOR" && (
+              <IPSSettingsModal
+                ips={ips}
+                onSave={saveIPS}
+                onClose={() => setShowSettings(false)}
+              />
             )}
-          </main>
-        </div>
 
-        {/* Formularios */}
-        {activeForm==="escleroterapia" && <FormEscleroterapia onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdsRef.current.escleroterapia} userName={user.nombre} records={records}/>}
-        {activeForm==="sueroterapia"   && <FormSueroterapia   onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdsRef.current.sueroterapia}   userName={user.nombre} records={records}/>}
-        {activeForm==="laser"          && <FormLaser           onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdsRef.current.laser}          userName={user.nombre} records={records}/>}
-        {activeForm==="paquete"        && <FormPaquete         onSave={handleSave} onCancel={() => setActiveForm(null)} addToast={addToast} nextId={nextIdsRef.current.paquete}        userName={user.nombre} records={records}/>}
+            {showChangePwd && user.rol === "ADMINISTRADOR" && (
+              <AdminChangePwdModal
+                user={user}
+                onSave={(newPwd) => {
+                  handleChangeUserPassword(user.id, newPwd);
+                  setShowChangePwd(false);
+                }}
+                onClose={() => setShowChangePwd(false)}
+              />
+            )}
 
-        {viewRecord && <PDFModal record={viewRecord} onClose={() => setViewRecord(null)} addToast={addToast}/>}
-        {showSettings && user.rol === "ADMINISTRADOR" && <IPSSettingsModal ips={ips} onSave={saveIPS} onClose={() => setShowSettings(false)}/>}
-        {showChangePwd && user.rol === "ADMINISTRADOR" && (
-          <AdminChangePwdModal
-            user={user}
-            onSave={(newPwd) => { handleChangeUserPassword(user.id, newPwd); setShowChangePwd(false); }}
-            onClose={() => setShowChangePwd(false)}
-          />
-        )}
-        {showNotifs && (
-          <NotificationPanel
-            notifs={myNotifs}
-            onClose={() => setShowNotifs(false)}
-            onMarkRead={id => setNotificaciones(prev => prev.map(n => n.id === id ? {...n, leida: true} : n))}
-            onMarkAllRead={() => setNotificaciones(prev => prev.map(n => ({...n, leida: true})))}
-            onOpenConsent={id => { const r = records.find(x => x.id === id); if (r) { setViewRecord(r); setShowNotifs(false); } }}
-          />
-        )}
+            {showNotifs && (
+              <NotificationPanel
+                notifs={myNotifs}
+                onClose={() => setShowNotifs(false)}
+                onMarkRead={(id) =>
+                  setNotificaciones((prev) =>
+                    prev.map((n) => (n.id === id ? { ...n, leida: true } : n))
+                  )
+                }
+                onMarkAllRead={() =>
+                  setNotificaciones((prev) =>
+                    prev.map((n) => ({ ...n, leida: true }))
+                  )
+                }
+                onOpenConsent={(id) => {
+                  const r = records.find((x) => x.id === id);
+                  if (r) {
+                    setViewRecord(r);
+                    setShowNotifs(false);
+                  }
+                }}
+              />
+            )}
 
+            <Toast
+              toasts={toasts}
+              remove={(id) => setToasts((t) => t.filter((x) => x.id !== id))}
+            />
         <Toast toasts={toasts} remove={id => setToasts(t => t.filter(x => x.id !== id))}/>
+        </div>
       </div>
     </IPSContext.Provider>
     </LicenseGuard>
