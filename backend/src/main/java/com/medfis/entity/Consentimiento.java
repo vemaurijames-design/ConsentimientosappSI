@@ -40,6 +40,10 @@ public class Consentimiento {
     @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb", nullable = false) private Map<String, Object> datos;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
+    // Relación con la entidad Usuario (opcional)
+    @ManyToOne
+    @JoinColumn(name = "usuario_id", nullable = true)
+    private Usuario usuario;
     public enum TipoConsent { escleroterapia, sueroterapia, laser, paquete }
     public enum EstadoConsent { FIRMADO, PENDIENTE, APROBADO, RECHAZADO, ANULADO }
 }
