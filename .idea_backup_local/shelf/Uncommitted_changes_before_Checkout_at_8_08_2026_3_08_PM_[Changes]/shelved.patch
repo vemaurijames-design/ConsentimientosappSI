@@ -1,0 +1,788 @@
+Index: backend/src/main/java/com/medfis/service/EmailService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.medfis.service;\r\n\r\nimport com.medfis.entity.Consentimiento;\r\nimport jakarta.mail.MessagingException;\r\nimport jakarta.mail.internet.MimeMessage;\r\nimport lombok.RequiredArgsConstructor;\r\nimport lombok.extern.slf4j.Slf4j;\r\nimport org.springframework.beans.factory.annotation.Value;\r\nimport org.springframework.mail.javamail.JavaMailSender;\r\nimport org.springframework.mail.javamail.MimeMessageHelper;\r\nimport org.springframework.scheduling.annotation.Async;\r\nimport org.springframework.stereotype.Service;\r\n\r\nimport java.time.format.DateTimeFormatter;\r\nimport java.util.Base64;\r\n\r\n@Slf4j\r\n@Service\r\n@RequiredArgsConstructor\r\npublic class EmailService {\r\n\r\n    private final JavaMailSender mailSender;\r\n\r\n    @Value(\"${medfis.mail.from}\")               private String from;\r\n    @Value(\"${medfis.mail.from-name}\")           private String fromName;\r\n    @Value(\"${medfis.mail.copy-to}\")             private String copyTo;\r\n    @Value(\"${medfis.nombre-ips:Salud Intensa Med y Fis IPS}\") private String ipsNombre;\r\n    @Value(\"${medfis.wa.admin:573114048112}\")    private String waAdmin;\r\n\r\n    private static final DateTimeFormatter FMT     = DateTimeFormatter.ofPattern(\"dd/MM/yyyy\");\r\n    private static final DateTimeFormatter FMT_DIA = DateTimeFormatter.ofPattern(\"EEEE dd 'de' MMMM 'de' yyyy\",\r\n                                                          new java.util.Locale(\"es\", \"CO\"));\r\n\r\n    // ══════════════════════════════════════════════════════════════════════════\r\n    // MÉTODO PRINCIPAL — envía al paciente + copia a la clínica\r\n    // ══════════════════════════════════════════════════════════════════════════\r\n    @Async\r\n    public void enviarConsentimientoFirmado(Consentimiento c, String emailPaciente, String pdfBase64) {\r\n        try {\r\n            String tipoLabel = tipoLabel(c.getTipo().name());\r\n            String asunto    = \"\uD83D\uDCCB Consentimiento Informado — \" + tipoLabel + \" · \" + c.getRadicado();\r\n\r\n            String htmlPaciente = buildHtmlPaciente(c, tipoLabel);\r\n            String htmlClinica  = buildHtmlClinica(c, tipoLabel);\r\n\r\n            // ── Al paciente (con saludo personalizado) ────────────────────────\r\n            if (emailPaciente != null && !emailPaciente.isBlank()) {\r\n                send(emailPaciente, asunto, htmlPaciente, pdfBase64, c.getRadicado());\r\n                log.info(\"✅ Email enviado al paciente {} → {}\", c.getPacienteNombre(), emailPaciente);\r\n            }\r\n\r\n            // ── Copia interna a la clínica (con datos completos de gestión) ──\r\n            String asuntoClinica = \"[REGISTRO CLÍNICA] \" + asunto + \" · \" + c.getPacienteNombre();\r\n            send(copyTo, asuntoClinica, htmlClinica, pdfBase64, c.getRadicado());\r\n            log.info(\"✅ Copia clínica enviada → {}\", copyTo);\r\n\r\n        } catch (Exception ex) {\r\n            log.error(\"❌ Error enviando email consentimiento {}: {}\", c.getId(), ex.getMessage(), ex);\r\n        }\r\n    }\r\n\r\n    // ══════════════════════════════════════════════════════════════════════════\r\n    // EMAIL AL PACIENTE — diseño profesional y cálido\r\n    // ══════════════════════════════════════════════════════════════════════════\r\n    private String buildHtmlPaciente(Consentimiento c, String tipoLabel) {\r\n        String fecha   = c.getFecha() != null ? c.getFecha().format(FMT)     : \"—\";\r\n        String fechaLg = c.getFecha() != null ? c.getFecha().format(FMT_DIA) : \"—\";\r\n        String estadoHtml = estadoBadge(c);\r\n        int anio = java.time.LocalDate.now().getYear();\r\n\r\n        return \"\"\"\r\n<!DOCTYPE html>\r\n<html lang=\"es\">\r\n<head>\r\n  <meta charset=\"UTF-8\">\r\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\r\n  <title>Consentimiento Informado — %s</title>\r\n</head>\r\n<body style=\"margin:0;padding:0;background:#F0F4FF;font-family:'Segoe UI',Arial,sans-serif;\">\r\n\r\n<table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F0F4FF;padding:40px 16px;\">\r\n<tr><td align=\"center\">\r\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%%;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(3,28,166,0.12);\">\r\n\r\n  <!-- ══ CABECERA AZUL ══ -->\r\n  <tr><td style=\"background:linear-gradient(135deg,#031CA6 0%%,#0D51D9 100%%);padding:36px 40px 28px;\">\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\">\r\n      <tr>\r\n        <td>\r\n          <p style=\"margin:0 0 4px;font-size:11px;color:#C5D5F0;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;\">Sistema de Consentimientos Informados</p>\r\n          <p style=\"margin:0;font-size:26px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;line-height:1.2;\">%s</p>\r\n        </td>\r\n        <td align=\"right\" valign=\"top\">\r\n          <div style=\"background:rgba(255,255,255,0.15);border-radius:10px;padding:10px 16px;text-align:center;\">\r\n            <p style=\"margin:0;font-size:9px;color:#C5D5F0;text-transform:uppercase;letter-spacing:1px;\">Radicado</p>\r\n            <p style=\"margin:4px 0 0;font-size:17px;font-weight:900;color:#fff;font-family:monospace;\">%s</p>\r\n          </div>\r\n        </td>\r\n      </tr>\r\n    </table>\r\n    <div style=\"margin-top:20px;background:rgba(255,255,255,0.1);border-radius:8px;padding:10px 16px;\">\r\n      <p style=\"margin:0;font-size:12px;color:#E0E8FF;\">\r\n        \uD83D\uDCC5 <strong>%s</strong> &nbsp;·&nbsp; \uD83D\uDCCB %s\r\n      </p>\r\n    </div>\r\n  </td></tr>\r\n\r\n  <!-- ══ SALUDO ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:36px 40px 0;\">\r\n    <p style=\"margin:0 0 8px;font-size:22px;font-weight:800;color:#031CA6;\">Estimado/a %s,</p>\r\n    <p style=\"margin:0;font-size:14px;color:#4B5563;line-height:1.7;\">\r\n      Su consentimiento informado ha sido <strong style=\"color:#059669;\">registrado exitosamente</strong> en nuestro sistema.\r\n      Le enviamos este correo como constancia oficial del procedimiento, junto con el documento PDF adjunto\r\n      para su archivo personal.\r\n    </p>\r\n  </td></tr>\r\n\r\n  <!-- ══ TARJETA ESTADO ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:24px 40px 0;\">\r\n    <div style=\"background:#F0FDF4;border:2px solid #86EFAC;border-radius:12px;padding:20px 24px;\">\r\n      <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\">\r\n        <tr>\r\n          <td>\r\n            <p style=\"margin:0 0 4px;font-size:10px;color:#166534;text-transform:uppercase;letter-spacing:1px;font-weight:700;\">Estado actual</p>\r\n            <p style=\"margin:0;font-size:15px;font-weight:700;\">%s</p>\r\n          </td>\r\n          <td align=\"right\">\r\n            <p style=\"margin:0;font-size:10px;color:#6B7280;\">Registrado por</p>\r\n            <p style=\"margin:4px 0 0;font-size:13px;font-weight:600;color:#374151;\">%s</p>\r\n          </td>\r\n        </tr>\r\n      </table>\r\n    </div>\r\n  </td></tr>\r\n\r\n  <!-- ══ DATOS DEL PROCEDIMIENTO ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:24px 40px 0;\">\r\n    <p style=\"margin:0 0 14px;font-size:11px;font-weight:700;color:#031CA6;text-transform:uppercase;letter-spacing:1.2px;border-bottom:2px solid #E0E8FF;padding-bottom:8px;\">\r\n      \uD83D\uDCCB Datos del Procedimiento\r\n    </p>\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\">\r\n      %s\r\n    </table>\r\n  </td></tr>\r\n\r\n  <!-- ══ INFORMACIÓN IMPORTANTE ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:24px 40px 0;\">\r\n    <div style=\"background:#FFF7ED;border-left:4px solid #F97316;border-radius:0 10px 10px 0;padding:16px 20px;\">\r\n      <p style=\"margin:0 0 6px;font-size:12px;font-weight:700;color:#9A3412;\">⏳ Próximo paso</p>\r\n      <p style=\"margin:0;font-size:12px;color:#7C2D12;line-height:1.6;\">\r\n        El médico responsable revisará su consentimiento y otorgará el <strong>Visto Bueno</strong>\r\n        antes de proceder con su cita. Recibirá una notificación cuando sea aprobado.\r\n      </p>\r\n    </div>\r\n  </td></tr>\r\n\r\n  <!-- ══ PDF ADJUNTO ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:24px 40px 0;\">\r\n    <div style=\"background:#EFF3FB;border:2px dashed #93C5FD;border-radius:12px;padding:20px 24px;text-align:center;\">\r\n      <p style=\"margin:0 0 6px;font-size:28px;\">\uD83D\uDCC4</p>\r\n      <p style=\"margin:0 0 4px;font-size:13px;font-weight:700;color:#031CA6;\">Documento PDF adjunto</p>\r\n      <p style=\"margin:0;font-size:11px;color:#6B7280;\">\r\n        El consentimiento informado completo está adjunto a este correo.<br>\r\n        Consérvelo como registro oficial de su procedimiento médico.\r\n      </p>\r\n    </div>\r\n  </td></tr>\r\n\r\n  <!-- ══ NOTA LEGAL ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:24px 40px 0;\">\r\n    <div style=\"border-left:4px solid #6366F1;background:#F5F3FF;border-radius:0 10px 10px 0;padding:16px 20px;\">\r\n      <p style=\"margin:0 0 6px;font-size:11px;font-weight:700;color:#4338CA;\">⚖\uFE0F Nota Legal</p>\r\n      <p style=\"margin:0;font-size:11px;color:#4C1D95;line-height:1.7;\">\r\n        Este correo y el documento adjunto constituyen un <strong>registro digital oficial</strong>\r\n        de su consentimiento informado. <strong>%s</strong> almacena este registro de forma segura\r\n        y confidencial conforme a la normatividad colombiana de habeas data y registros clínicos.\r\n      </p>\r\n    </div>\r\n  </td></tr>\r\n\r\n  <!-- ══ CONTACTO ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:24px 40px 32px;\">\r\n    <p style=\"margin:0 0 14px;font-size:11px;font-weight:700;color:#031CA6;text-transform:uppercase;letter-spacing:1.2px;border-bottom:2px solid #E0E8FF;padding-bottom:8px;\">\r\n      \uD83D\uDCDE ¿Necesita ayuda?\r\n    </p>\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\">\r\n      <tr>\r\n        <td style=\"padding:6px 0;\">\r\n          <p style=\"margin:0;font-size:12px;color:#6B7280;\">WhatsApp clínica</p>\r\n          <p style=\"margin:2px 0 0;font-size:14px;font-weight:700;color:#031CA6;\">+%s</p>\r\n        </td>\r\n        <td align=\"right\" style=\"padding:6px 0;\">\r\n          <p style=\"margin:0;font-size:12px;color:#6B7280;\">Correo electrónico</p>\r\n          <p style=\"margin:2px 0 0;font-size:13px;font-weight:600;color:#0D51D9;\">%s</p>\r\n        </td>\r\n      </tr>\r\n    </table>\r\n  </td></tr>\r\n\r\n  <!-- ══ PIE ══ -->\r\n  <tr><td style=\"background:linear-gradient(135deg,#031CA6 0%%,#0D51D9 100%%);padding:24px 40px;border-radius:0 0 16px 16px;\">\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\">\r\n      <tr>\r\n        <td>\r\n          <p style=\"margin:0;font-size:13px;font-weight:800;color:#ffffff;\">%s</p>\r\n          <p style=\"margin:4px 0 0;font-size:10px;color:#93C5FD;\">Medellín, Colombia · NIT 901102930</p>\r\n          <p style=\"margin:8px 0 0;font-size:9px;color:#6B8FCA;\">© %d · Todos los derechos reservados · Desarrollado por JM Ingeniero</p>\r\n        </td>\r\n        <td align=\"right\">\r\n          <div style=\"background:rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;text-align:center;\">\r\n            <p style=\"margin:0;font-size:9px;color:#C5D5F0;text-transform:uppercase;letter-spacing:1px;\">Sistema</p>\r\n            <p style=\"margin:4px 0 0;font-size:11px;font-weight:700;color:#fff;\">CliniSign</p>\r\n          </div>\r\n        </td>\r\n      </tr>\r\n    </table>\r\n  </td></tr>\r\n\r\n</table>\r\n</td></tr>\r\n</table>\r\n</body>\r\n</html>\r\n            \"\"\".formatted(\r\n                ipsNombre,              // title\r\n                ipsNombre,              // cabecera nombre\r\n                c.getRadicado(),        // radicado badge\r\n                fechaLg,                // fecha larga\r\n                tipoLabel,              // tipo procedimiento\r\n                c.getPacienteNombre(),  // saludo\r\n                estadoHtml,             // estado badge\r\n                c.getCreadoPor() != null ? c.getCreadoPor() : \"Sistema\",\r\n                filasDetallePaciente(c, tipoLabel),\r\n                ipsNombre,              // nota legal IPS\r\n                waAdmin,                // WA número\r\n                from,                   // email contacto\r\n                ipsNombre,              // pie nombre IPS\r\n                anio\r\n        );\r\n    }\r\n\r\n    // ══════════════════════════════════════════════════════════════════════════\r\n    // EMAIL INTERNO A LA CLÍNICA — datos completos para gestión de calidad\r\n    // ══════════════════════════════════════════════════════════════════════════\r\n    private String buildHtmlClinica(Consentimiento c, String tipoLabel) {\r\n        String fecha   = c.getFecha() != null ? c.getFecha().format(FMT) : \"—\";\r\n        String estadoHtml = estadoBadge(c);\r\n        int anio = java.time.LocalDate.now().getYear();\r\n\r\n        return \"\"\"\r\n<!DOCTYPE html>\r\n<html lang=\"es\">\r\n<head>\r\n  <meta charset=\"UTF-8\">\r\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\r\n  <title>[REGISTRO CLÍNICA] %s — %s</title>\r\n</head>\r\n<body style=\"margin:0;padding:0;background:#F0F4FF;font-family:'Segoe UI',Arial,sans-serif;\">\r\n\r\n<table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F0F4FF;padding:40px 16px;\">\r\n<tr><td align=\"center\">\r\n<table width=\"640\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;width:100%%;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(3,28,166,0.12);\">\r\n\r\n  <!-- ══ CABECERA ══ -->\r\n  <tr><td style=\"background:linear-gradient(135deg,#031CA6 0%%,#1e40af 100%%);padding:28px 36px;\">\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\">\r\n      <tr>\r\n        <td>\r\n          <p style=\"margin:0 0 2px;font-size:10px;color:#93C5FD;text-transform:uppercase;letter-spacing:1.5px;\">REGISTRO INTERNO — CONTROL DE CALIDAD</p>\r\n          <p style=\"margin:0;font-size:22px;font-weight:900;color:#fff;\">%s</p>\r\n          <p style=\"margin:4px 0 0;font-size:11px;color:#C5D5F0;\">Consentimientos Informados · Gestión Clínica</p>\r\n        </td>\r\n        <td align=\"right\">\r\n          <div style=\"background:rgba(255,255,255,0.2);border-radius:10px;padding:12px 18px;text-align:center;\">\r\n            <p style=\"margin:0;font-size:9px;color:#C5D5F0;text-transform:uppercase;letter-spacing:1px;\">Radicado</p>\r\n            <p style=\"margin:4px 0 0;font-size:20px;font-weight:900;color:#fff;font-family:monospace;\">%s</p>\r\n            <p style=\"margin:4px 0 0;font-size:10px;color:#93C5FD;\">%s</p>\r\n          </div>\r\n        </td>\r\n      </tr>\r\n    </table>\r\n  </td></tr>\r\n\r\n  <!-- ══ ESTADO ══ -->\r\n  <tr><td style=\"background:#1e3a8a;padding:10px 36px;\">\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\r\n      <td><p style=\"margin:0;font-size:12px;color:#fff;\">Estado: %s</p></td>\r\n      <td align=\"right\"><p style=\"margin:0;font-size:11px;color:#93C5FD;\">Registrado: %s · Por: %s</p></td>\r\n    </tr></table>\r\n  </td></tr>\r\n\r\n  <!-- ══ DATOS DEL PACIENTE ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:28px 36px 0;\">\r\n    <p style=\"margin:0 0 16px;font-size:12px;font-weight:700;color:#031CA6;text-transform:uppercase;letter-spacing:1.2px;border-bottom:2px solid #E0E8FF;padding-bottom:10px;\">\r\n      \uD83D\uDC64 Datos del Paciente\r\n    </p>\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\">\r\n      %s\r\n    </table>\r\n  </td></tr>\r\n\r\n  <!-- ══ DATOS DEL PROCEDIMIENTO ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:24px 36px 0;\">\r\n    <p style=\"margin:0 0 16px;font-size:12px;font-weight:700;color:#031CA6;text-transform:uppercase;letter-spacing:1.2px;border-bottom:2px solid #E0E8FF;padding-bottom:10px;\">\r\n      \uD83C\uDFE5 Datos del Procedimiento\r\n    </p>\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\">\r\n      %s\r\n    </table>\r\n  </td></tr>\r\n\r\n  <!-- ══ AVISO PDF ══ -->\r\n  <tr><td style=\"background:#ffffff;padding:24px 36px 32px;\">\r\n    <div style=\"background:#F0FDF4;border:2px solid #86EFAC;border-radius:12px;padding:18px 24px;\">\r\n      <p style=\"margin:0 0 6px;font-size:12px;font-weight:700;color:#166534;\">\uD83D\uDCCE Documento adjunto</p>\r\n      <p style=\"margin:0;font-size:12px;color:#166534;line-height:1.6;\">\r\n        El PDF del consentimiento informado firmado está adjunto a este correo.\r\n        Consérvelo en el expediente del paciente como parte del registro clínico oficial.\r\n      </p>\r\n    </div>\r\n  </td></tr>\r\n\r\n  <!-- ══ PIE ══ -->\r\n  <tr><td style=\"background:linear-gradient(135deg,#031CA6 0%%,#0D51D9 100%%);padding:20px 36px;border-radius:0 0 16px 16px;\">\r\n    <table width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\r\n      <td>\r\n        <p style=\"margin:0;font-size:12px;font-weight:700;color:#fff;\">%s</p>\r\n        <p style=\"margin:4px 0 0;font-size:9px;color:#93C5FD;\">© %d · Registro Interno · CliniSign by JM Ingeniero</p>\r\n      </td>\r\n      <td align=\"right\">\r\n        <p style=\"margin:0;font-size:10px;color:#C5D5F0;\">NIT 901102930</p>\r\n        <p style=\"margin:2px 0 0;font-size:10px;color:#C5D5F0;\">Medellín, Colombia</p>\r\n      </td>\r\n    </tr></table>\r\n  </td></tr>\r\n\r\n</table>\r\n</td></tr>\r\n</table>\r\n</body>\r\n</html>\r\n            \"\"\".formatted(\r\n                c.getPacienteNombre(), c.getRadicado(),   // title\r\n                ipsNombre,                                 // cabecera nombre\r\n                c.getRadicado(),                          // radicado badge\r\n                fecha,                                    // fecha en badge\r\n                estadoHtml,                               // estado\r\n                fecha,                                    // registrado fecha\r\n                c.getCreadoPor() != null ? c.getCreadoPor() : \"Sistema\",\r\n                filasDetallePacienteClinica(c),           // sección paciente\r\n                filasDetalleProcedimiento(c, tipoLabel),  // sección procedimiento\r\n                ipsNombre,                                // pie\r\n                anio\r\n        );\r\n    }\r\n\r\n    // ══════════════════════════════════════════════════════════════════════════\r\n    // HELPERS\r\n    // ══════════════════════════════════════════════════════════════════════════\r\n\r\n    private String filasDetallePaciente(Consentimiento c, String tipoLabel) {\r\n        return fila(\"Procedimiento\", tipoLabel, \"#031CA6\", true) +\r\n               fila(\"Documento\",    c.getPacienteDoc(), null, false) +\r\n               fila(\"Teléfono\",     c.getPacienteTel() != null ? c.getPacienteTel() : \"—\", null, false) +\r\n               fila(\"Fecha\",        c.getFecha() != null ? c.getFecha().format(FMT) : \"—\", null, false);\r\n    }\r\n\r\n    private String filasDetallePacienteClinica(Consentimiento c) {\r\n        return fila(\"Nombre completo\", c.getPacienteNombre(), \"#031CA6\", true) +\r\n               fila(\"Documento\",      c.getPacienteDoc(), null, false) +\r\n               fila(\"Teléfono\",       c.getPacienteTel() != null ? c.getPacienteTel() : \"—\", null, false) +\r\n               fila(\"Email paciente\", c.getEmailPaciente() != null ? c.getEmailPaciente() : \"—\", null, false);\r\n    }\r\n\r\n    private String filasDetalleProcedimiento(Consentimiento c, String tipoLabel) {\r\n        return fila(\"Procedimiento\", tipoLabel, \"#0D51D9\", true) +\r\n               fila(\"Fecha\",        c.getFecha() != null ? c.getFecha().format(FMT) : \"—\", null, false) +\r\n               fila(\"Radicado\",     c.getRadicado(), null, false) +\r\n               fila(\"Registrado por\", c.getCreadoPor() != null ? c.getCreadoPor() : \"Sistema\", null, false) +\r\n               fila(\"Estado\",       c.getEstado().name(), null, false);\r\n    }\r\n\r\n    private String estadoBadge(Consentimiento c) {\r\n        return switch (c.getEstado()) {\r\n            case FIRMADO   -> \"<span style='background:#FEF3C7;color:#92400E;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;'>⏳ FIRMADO — Pendiente aprobación</span>\";\r\n            case APROBADO  -> \"<span style='background:#D1FAE5;color:#065F46;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;'>✅ APROBADO</span>\";\r\n            case RECHAZADO -> \"<span style='background:#FEE2E2;color:#991B1B;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;'>❌ RECHAZADO</span>\";\r\n            default        -> \"<span style='color:#6B7280;font-size:12px;'>\" + c.getEstado().name() + \"</span>\";\r\n        };\r\n    }\r\n\r\n    private String fila(String label, String valor, String colorValor, boolean bold) {\r\n        String valStyle = \"font-size:13px;\" +\r\n                (colorValor != null ? \"color:\" + colorValor + \";\" : \"color:#111827;\") +\r\n                (bold ? \"font-weight:700;\" : \"font-weight:500;\");\r\n        return \"\"\"\r\n            <tr>\r\n              <td style=\"padding:10px 0;border-bottom:1px solid #F3F4F6;font-size:11px;color:#9CA3AF;width:38%%;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;\">%s</td>\r\n              <td style=\"padding:10px 0;border-bottom:1px solid #F3F4F6;%s\">%s</td>\r\n            </tr>\r\n            \"\"\".formatted(label, valStyle, valor != null ? valor : \"—\");\r\n    }\r\n\r\n    private void send(String to, String subject, String html, String pdfBase64, String radicado)\r\n            throws MessagingException, java.io.UnsupportedEncodingException {\r\n        MimeMessage msg = mailSender.createMimeMessage();\r\n        MimeMessageHelper helper = new MimeMessageHelper(msg, true, \"UTF-8\");\r\n        helper.setFrom(new jakarta.mail.internet.InternetAddress(from, fromName, \"UTF-8\"));\r\n        helper.setTo(to);\r\n        helper.setSubject(subject);\r\n        helper.setText(html, true);\r\n\r\n        if (pdfBase64 != null && !pdfBase64.isBlank()) {\r\n            try {\r\n                String base64  = pdfBase64.contains(\",\") ? pdfBase64.split(\",\")[1] : pdfBase64;\r\n                byte[] pdfBytes = Base64.getDecoder().decode(base64);\r\n                helper.addAttachment(\"Consentimiento_\" + radicado + \".pdf\",\r\n                        new org.springframework.core.io.ByteArrayResource(pdfBytes),\r\n                        \"application/pdf\");\r\n            } catch (Exception e) {\r\n                log.warn(\"No se pudo adjuntar el PDF: {}\", e.getMessage());\r\n            }\r\n        }\r\n        mailSender.send(msg);\r\n    }\r\n\r\n    private String tipoLabel(String tipo) {\r\n        return switch (tipo.toLowerCase()) {\r\n            case \"escleroterapia\" -> \"Escleroterapia (Inyección de Várices)\";\r\n            case \"sueroterapia\"   -> \"Sueroterapia Vitamina C y/o Complejo B\";\r\n            case \"laser\"          -> \"Terapia Láser — Control de Venas Várices\";\r\n            case \"paquete\"        -> \"Paquete Integral Salud Intensa\";\r\n            default               -> tipo;\r\n        };\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/backend/src/main/java/com/medfis/service/EmailService.java b/backend/src/main/java/com/medfis/service/EmailService.java
+--- a/backend/src/main/java/com/medfis/service/EmailService.java	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/backend/src/main/java/com/medfis/service/EmailService.java	(date 1786214155385)
+@@ -400,6 +400,20 @@
+             </tr>
+             """.formatted(label, valStyle, valor != null ? valor : "—");
+     }
++    public void enviarConsentimientoFirmadoSync(Consentimiento c, String emailPaciente, String pdfBase64)
++            throws Exception {
++        String tipoLabel = tipoLabel(c.getTipo().name());
++        String asunto    = "Consentimiento Informado - " + tipoLabel + " · " + c.getRadicado();
++
++        if (emailPaciente != null && !emailPaciente.isBlank()) {
++            send(emailPaciente, asunto, buildHtmlPaciente(c, tipoLabel), pdfBase64, c.getRadicado());
++            log.info("Email enviado al paciente {} -> {}", c.getPacienteNombre(), emailPaciente);
++        }
++
++        send(copyTo, "[REGISTRO CLINICA] " + asunto + " · " + c.getPacienteNombre(),
++                buildHtmlClinica(c, tipoLabel), pdfBase64, c.getRadicado());
++        log.info("Copia clinica enviada -> {}", copyTo);
++    }
+ 
+     private void send(String to, String subject, String html, String pdfBase64, String radicado)
+             throws MessagingException, java.io.UnsupportedEncodingException {
+Index: backend/pom.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\r\n         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\r\n         xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd\">\r\n  <modelVersion>4.0.0</modelVersion>\r\n  <parent>\r\n    <groupId>org.springframework.boot</groupId>\r\n    <artifactId>spring-boot-starter-parent</artifactId>\r\n    <version>3.2.5</version>\r\n    <relativePath/>\r\n  </parent>\r\n  <groupId>com.medfis</groupId>\r\n  <artifactId>medfis-backend</artifactId>\r\n  <version>1.0.0</version>\r\n  <name>MedFis Backend</name>\r\n  <description>Sistema de Consentimientos Informados — Spring Boot + PostgreSQL</description>\r\n  <packaging>jar</packaging>\r\n  <properties>\r\n    <java.version>17</java.version>\r\n    <jjwt.version>0.11.5</jjwt.version>\r\n  </properties>\r\n  <dependencies>\r\n    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>\r\n    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>\r\n    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>\r\n    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-validation</artifactId></dependency>\r\n    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-websocket</artifactId></dependency>\r\n    <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>\r\n    <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-api</artifactId><version>${jjwt.version}</version></dependency>\r\n    <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-impl</artifactId><version>${jjwt.version}</version><scope>runtime</scope></dependency>\r\n    <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-jackson</artifactId><version>${jjwt.version}</version><scope>runtime</scope></dependency>\r\n    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-mail</artifactId></dependency>\r\n    <!-- Twilio SDK — WhatsApp automático -->\r\n    <dependency><groupId>com.twilio.sdk</groupId><artifactId>twilio</artifactId><version>10.1.1</version></dependency>\r\n    <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><optional>true</optional></dependency>\r\n    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>\r\n    <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>\r\n  </dependencies>\r\n  <build>\r\n    <plugins>\r\n      <plugin>\r\n        <groupId>org.springframework.boot</groupId>\r\n        <artifactId>spring-boot-maven-plugin</artifactId>\r\n        <configuration>\r\n          <excludes><exclude><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId></exclude></excludes>\r\n        </configuration>\r\n      </plugin>\r\n    </plugins>\r\n  </build>\r\n</project>\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/backend/pom.xml b/backend/pom.xml
+--- a/backend/pom.xml	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/backend/pom.xml	(date 1786214154645)
+@@ -18,6 +18,11 @@
+   <properties>
+     <java.version>17</java.version>
+     <jjwt.version>0.11.5</jjwt.version>
++      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
++      <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
++      <maven.compiler.source>17</maven.compiler.source>
++      <maven.compiler.target>17</maven.compiler.target>
++
+   </properties>
+   <dependencies>
+     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+Index: pnpm-workspace.yaml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>packages:\r\n  - '.'\r\nsupportedArchitectures:\r\n  os:\r\n    - linux\r\n  cpu:\r\n    - x64\r\n    - arm64\r\n  libc:\r\n    - glibc\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+--- a/pnpm-workspace.yaml	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/pnpm-workspace.yaml	(date 1786214155142)
+@@ -1,5 +1,9 @@
+ packages:
+   - '.'
++allowBuilds:
++  '@tailwindcss/oxide': set this to true or false
++  core-js: set this to true or false
++  esbuild: set this to true or false
+ supportedArchitectures:
+   os:
+     - linux
+Index: backend/src/main/java/com/medfis/config/DataInitializer.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.medfis.config;\r\n\r\nimport com.medfis.entity.Usuario;\r\nimport com.medfis.repository.UsuarioRepository;\r\nimport lombok.RequiredArgsConstructor;\r\nimport lombok.extern.slf4j.Slf4j;\r\nimport org.springframework.boot.ApplicationArguments;\r\nimport org.springframework.boot.ApplicationRunner;\r\nimport org.springframework.security.crypto.password.PasswordEncoder;\r\nimport org.springframework.stereotype.Component;\r\n\r\n/**\r\n * Crea el usuario administrador inicial si no existe.\r\n * Reemplaza data.sql — usa PasswordEncoder en runtime para BCrypt correcto.\r\n */\r\n@Component\r\n@RequiredArgsConstructor\r\n@Slf4j\r\npublic class DataInitializer implements ApplicationRunner {\r\n\r\n    private final UsuarioRepository usuarioRepo;\r\n    private final PasswordEncoder  passwordEncoder;\r\n\r\n    @Override\r\n    public void run(ApplicationArguments args) {\r\n        crearAdminSiNoExiste();\r\n    }\r\n\r\n    private void crearAdminSiNoExiste() {\r\n        final String adminEmail = \"saludintensaconsentimientos@hotmail.com\";\r\n\r\n        if (usuarioRepo.findByEmail(adminEmail).isPresent()) {\r\n            log.info(\"✅ Usuario administrador ya existe — omitiendo inicialización\");\r\n            return;\r\n        }\r\n\r\n        Usuario admin = new Usuario();\r\n        admin.setNombre(\"Administrador Salud Intensa\");\r\n        admin.setEmail(adminEmail);\r\n        admin.setPassword(passwordEncoder.encode(\"admin123456\"));\r\n        admin.setRol(Usuario.RolUsuario.ADMINISTRADOR);\r\n        admin.setActivo(true);\r\n\r\n        usuarioRepo.save(admin);\r\n        log.info(\"✅ Usuario administrador creado: {}\", adminEmail);\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/backend/src/main/java/com/medfis/config/DataInitializer.java b/backend/src/main/java/com/medfis/config/DataInitializer.java
+--- a/backend/src/main/java/com/medfis/config/DataInitializer.java	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/backend/src/main/java/com/medfis/config/DataInitializer.java	(date 1786214154732)
+@@ -4,14 +4,15 @@
+ import com.medfis.repository.UsuarioRepository;
+ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
++import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.boot.ApplicationArguments;
+ import org.springframework.boot.ApplicationRunner;
+ import org.springframework.security.crypto.password.PasswordEncoder;
+ import org.springframework.stereotype.Component;
+ 
+ /**
+- * Crea el usuario administrador inicial si no existe.
+- * Reemplaza data.sql — usa PasswordEncoder en runtime para BCrypt correcto.
++ * Garantiza que exista UN administrador con acceso total.
++ * El correo y la clave se leen de application.properties / variables de entorno.
+  */
+ @Component
+ @RequiredArgsConstructor
+@@ -21,27 +22,30 @@
+     private final UsuarioRepository usuarioRepo;
+     private final PasswordEncoder  passwordEncoder;
+ 
++    @Value("${medfis.admin.email}")                              private String adminEmail;
++    @Value("${medfis.admin.password}")                           private String adminPassword;
++    @Value("${medfis.admin.nombre:Administrador Salud Intensa}") private String adminNombre;
++    @Value("${medfis.admin.reset-password:true}")                private boolean resetPassword;
++
+     @Override
+     public void run(ApplicationArguments args) {
+-        crearAdminSiNoExiste();
+-    }
++        String email = adminEmail.trim().toLowerCase();
+ 
+-    private void crearAdminSiNoExiste() {
+-        final String adminEmail = "saludintensaconsentimientos@hotmail.com";
++        Usuario admin = usuarioRepo.findByEmail(email).orElseGet(Usuario::new);
++        boolean esNuevo = (admin.getId() == null);
+ 
+-        if (usuarioRepo.findByEmail(adminEmail).isPresent()) {
+-            log.info("✅ Usuario administrador ya existe — omitiendo inicialización");
+-            return;
+-        }
+-
+-        Usuario admin = new Usuario();
+-        admin.setNombre("Administrador Salud Intensa");
+-        admin.setEmail(adminEmail);
+-        admin.setPassword(passwordEncoder.encode("admin123456"));
++        admin.setNombre(adminNombre);
++        admin.setEmail(email);
+         admin.setRol(Usuario.RolUsuario.ADMINISTRADOR);
+         admin.setActivo(true);
+ 
++        if (esNuevo || resetPassword) {
++            admin.setPassword(passwordEncoder.encode(adminPassword));
++        }
++
+         usuarioRepo.save(admin);
+-        log.info("✅ Usuario administrador creado: {}", adminEmail);
++
++        if (esNuevo) log.info("Administrador CREADO: {}", email);
++        else         log.info("Administrador verificado y normalizado: {}", email);
+     }
+-}
++}
+\ No newline at end of file
+Index: backend/src/main/resources/application.properties
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>server.port=8081\r\nspring.datasource.url=jdbc:postgresql://localhost:5432/medfis_db\r\nspring.datasource.username=medfis_user\r\nspring.datasource.password=medfis_pass\r\nspring.datasource.driver-class-name=org.postgresql.Driver\r\nspring.jpa.hibernate.ddl-auto=update\r\nspring.jpa.show-sql=true\r\nspring.jpa.properties.hibernate.format_sql=true\r\nspring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect\r\nspring.sql.init.mode=never\r\nspring.jpa.defer-datasource-initialization=false\r\njwt.secret=MedFis2024SecretKeyParaJWTMustBe256BitsLongAtLeast32Chars!\r\njwt.expiration=86400000\r\ncors.allowed-origins=http://localhost:5173,http://localhost:3000\r\nlogging.level.com.medfis=DEBUG\r\n\r\n# â\u0094\u0080â\u0094\u0080 SerializaciÃ³n de fechas como ISO-8601 (no como array) â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080\r\nspring.jackson.serialization.write-dates-as-timestamps=false\r\nspring.jackson.serialization.write-date-timestamps-as-nanoseconds=false\r\nspring.jackson.time-zone=America/Bogota\r\n\r\n# â\u0094\u0080â\u0094\u0080 CORREO Hotmail/Outlook SMTP â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080â\u0094\u0080\r\n# Cuenta: saludintensaconsentimientos@hotmail.com\r\n# ContraseÃ±a: la contraseÃ±a normal de la cuenta Hotmail\r\n# Si tienes verificaciÃ³n en 2 pasos activada en Hotmail:\r\n#   account.live.com â\u0086\u0092 Seguridad â\u0086\u0092 ContraseÃ±as de aplicaciÃ³n â\u0086\u0092 Crear nueva\r\nspring.mail.host=smtp-mail.outlook.com\r\nspring.mail.port=587\r\nspring.mail.username=${MEDFIS_MAIL_USER:saludintensaconsentimientos@hotmail.com}\r\nspring.mail.password=${MEDFIS_MAIL_PASSWORD:TU_CLAVE_HOTMAIL_AQUI}\r\nspring.mail.properties.mail.smtp.auth=true\r\nspring.mail.properties.mail.smtp.starttls.enable=true\r\nspring.mail.properties.mail.smtp.starttls.required=true\r\nspring.mail.properties.mail.smtp.connectiontimeout=10000\r\nspring.mail.properties.mail.smtp.timeout=10000\r\nspring.mail.properties.mail.smtp.writetimeout=10000\r\n\r\n# Datos del remitente\r\nmedfis.mail.from=${MEDFIS_MAIL_USER:saludintensaconsentimientos@hotmail.com}\r\nmedfis.mail.from-name=Salud Intensa Med y Fis IPS - Consentimientos\r\nmedfis.mail.copy-to=${MEDFIS_MAIL_COPY:mantenimientojms@hotmail.com}\r\nmedfis.whatsapp.clinica=${MEDFIS_WA_CLINICA:573114048112}\r\n\r\n# NÃºmero WhatsApp del administrador (recibe solicitudes de acceso desde el login)\r\nmedfis.wa.admin=${MEDFIS_WA_ADMIN:573114048112}\r\n\r\n# Nombre de la IPS para los mensajes de WhatsApp\r\nmedfis.nombre-ips=${MEDFIS_NOMBRE_IPS:Salud Intensa Med y Fis IPS}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>ISO-8859-1
+===================================================================
+diff --git a/backend/src/main/resources/application.properties b/backend/src/main/resources/application.properties
+--- a/backend/src/main/resources/application.properties	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/backend/src/main/resources/application.properties	(date 1786214155550)
+@@ -1,7 +1,11 @@
+-server.port=8081
++# =========== SERVIDOR ===========
++# 8080: es el puerto que usan Postman y el frontend. NO lo cambies a 8081.
++server.port=8080
++
++# =========== BASE DE DATOS ===========
+ spring.datasource.url=jdbc:postgresql://localhost:5432/medfis_db
+-spring.datasource.username=medfis_user
+-spring.datasource.password=medfis_pass
++spring.datasource.username=${MEDFIS_DB_USER:medfis_user}
++spring.datasource.password=${MEDFIS_DB_PASSWORD:medfis_pass}
+ spring.datasource.driver-class-name=org.postgresql.Driver
+ spring.jpa.hibernate.ddl-auto=update
+ spring.jpa.show-sql=true
+@@ -9,40 +13,63 @@
+ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+ spring.sql.init.mode=never
+ spring.jpa.defer-datasource-initialization=false
+-jwt.secret=MedFis2024SecretKeyParaJWTMustBe256BitsLongAtLeast32Chars!
++
++# =========== SEGURIDAD ===========
++jwt.secret=${MEDFIS_JWT_SECRET:MedFis2024SecretKeyParaJWTMustBe256BitsLongAtLeast32Chars!}
+ jwt.expiration=86400000
+-cors.allowed-origins=http://localhost:5173,http://localhost:3000
++cors.allowed-origins=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:4200
++
++# =========== ADMINISTRADOR UNICO (acceso total) ===========
++medfis.admin.email=${MEDFIS_ADMIN_EMAIL:mantenimientojms@hotmail.com}
++medfis.admin.password=${MEDFIS_ADMIN_PASSWORD:admin123456}
++medfis.admin.nombre=Administrador Salud Intensa
++medfis.admin.reset-password=true
++
++# =========== LOGS ===========
+ logging.level.com.medfis=DEBUG
++logging.level.org.springframework.mail=DEBUG
+ 
+-# ââ SerializaciÃ³n de fechas como ISO-8601 (no como array) âââââââââââââââââââââ
++# =========== FECHAS ISO-8601 ===========
+ spring.jackson.serialization.write-dates-as-timestamps=false
+ spring.jackson.serialization.write-date-timestamps-as-nanoseconds=false
+ spring.jackson.time-zone=America/Bogota
+ 
+-# ââ CORREO Hotmail/Outlook SMTP âââââââââââââââââââââââââââââââââââââââââââââââ
+-# Cuenta: saludintensaconsentimientos@hotmail.com
+-# ContraseÃ±a: la contraseÃ±a normal de la cuenta Hotmail
+-# Si tienes verificaciÃ³n en 2 pasos activada en Hotmail:
+-#   account.live.com â Seguridad â ContraseÃ±as de aplicaciÃ³n â Crear nueva
+-spring.mail.host=smtp-mail.outlook.com
++# =========== SMTP Hotmail / Outlook ===========
++
++#spring.mail.host=smtp-mail.outlook.com
++#spring.mail.port=587
++#spring.mail.username=${MEDFIS_MAIL_USER:saludintensaconsentimientos@hotmail.com}
++#spring.mail.password=${MEDFIS_MAIL_PASSWORD:hofletrsajxkcshn}
++#spring.mail.properties.mail.smtp.auth=true
++#spring.mail.properties.mail.smtp.ssl.enable=true
++#spring.mail.properties.mail.smtp.ssl.trust=smtp-mail.outlook.com
++#spring.mail.properties.mail.smtp.connectiontimeout=15000
++#spring.mail.properties.mail.smtp.timeout=15000
++#spring.mail.properties.mail.smtp.writetimeout=15000
++#spring.mail.properties.mail.debug=false
++
++# =========== SMTP Gmail ===========
++spring.mail.host=smtp.gmail.com
+ spring.mail.port=587
+-spring.mail.username=${MEDFIS_MAIL_USER:saludintensaconsentimientos@hotmail.com}
+-spring.mail.password=${MEDFIS_MAIL_PASSWORD:TU_CLAVE_HOTMAIL_AQUI}
++spring.mail.username=${MEDFIS_MAIL_USER:vemaurijames@gmail.com}
++spring.mail.password=${MEDFIS_MAIL_PASSWORD:ihxl cadw tznh tlvl}
+ spring.mail.properties.mail.smtp.auth=true
+ spring.mail.properties.mail.smtp.starttls.enable=true
+ spring.mail.properties.mail.smtp.starttls.required=true
+-spring.mail.properties.mail.smtp.connectiontimeout=10000
+-spring.mail.properties.mail.smtp.timeout=10000
+-spring.mail.properties.mail.smtp.writetimeout=10000
++spring.mail.properties.mail.smtp.ssl.trust=smtp.gmail.com
++spring.mail.properties.mail.smtp.ssl.protocols=TLSv1.2
++spring.mail.properties.mail.smtp.connectiontimeout=15000
++spring.mail.properties.mail.smtp.timeout=15000
++spring.mail.properties.mail.smtp.writetimeout=15000
++spring.mail.properties.mail.debug=false
+ 
+-# Datos del remitente
+-medfis.mail.from=${MEDFIS_MAIL_USER:saludintensaconsentimientos@hotmail.com}
++# =========== REMITENTE Y COPIAS ===========
++# El "from" DEBE ser la misma cuenta autenticada o Outlook rechaza el envio.
++medfis.mail.from=${MEDFIS_MAIL_USER:vemaurijames@gmail.com}
+ medfis.mail.from-name=Salud Intensa Med y Fis IPS - Consentimientos
+ medfis.mail.copy-to=${MEDFIS_MAIL_COPY:mantenimientojms@hotmail.com}
++
++# =========== WHATSAPP ===========
+ medfis.whatsapp.clinica=${MEDFIS_WA_CLINICA:573114048112}
+-
+-# NÃºmero WhatsApp del administrador (recibe solicitudes de acceso desde el login)
+ medfis.wa.admin=${MEDFIS_WA_ADMIN:573114048112}
+-
+-# Nombre de la IPS para los mensajes de WhatsApp
+-medfis.nombre-ips=${MEDFIS_NOMBRE_IPS:Salud Intensa Med y Fis IPS}
++medfis.nombre-ips=${MEDFIS_NOMBRE_IPS:Salud Intensa Med y Fis IPS}
+\ No newline at end of file
+Index: backend/src/main/java/com/medfis/controller/ConsentimientoController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.medfis.controller;\r\nimport com.medfis.dto.ConsentimientoRequest;\r\nimport com.medfis.dto.EnviarNotificacionRequest;\r\nimport com.medfis.entity.Consentimiento;\r\nimport com.medfis.service.ConsentimientoService;\r\nimport com.medfis.service.EmailService;\r\nimport jakarta.validation.Valid;\r\nimport lombok.RequiredArgsConstructor;\r\nimport org.springframework.http.HttpStatus;\r\nimport org.springframework.http.ResponseEntity;\r\nimport org.springframework.security.access.prepost.PreAuthorize;\r\nimport org.springframework.security.core.Authentication;\r\nimport org.springframework.web.bind.annotation.*;\r\nimport java.util.List;\r\nimport java.util.Map;\r\nimport java.util.UUID;\r\n\r\n@RestController @RequestMapping(\"/api/consentimientos\") @RequiredArgsConstructor\r\npublic class ConsentimientoController {\r\n    private final ConsentimientoService svc;\r\n    private final EmailService emailService;\r\n\r\n    @GetMapping public ResponseEntity<List<Consentimiento>> listar(@RequestParam(required=false) String q) { return ResponseEntity.ok(svc.buscar(q)); }\r\n    @GetMapping(\"/pendientes\") @PreAuthorize(\"hasAnyRole('MEDICO','ADMINISTRADOR')\") public ResponseEntity<List<Consentimiento>> pendientes() { return ResponseEntity.ok(svc.pendientesMedico()); }\r\n    @GetMapping(\"/{id}\") public ResponseEntity<Consentimiento> buscar(@PathVariable UUID id) { return ResponseEntity.ok(svc.buscar(id)); }\r\n    @PostMapping public ResponseEntity<Consentimiento> crear(@Valid @RequestBody ConsentimientoRequest req, Authentication auth) { return ResponseEntity.status(HttpStatus.CREATED).body(svc.crear(req, auth.getName())); }\r\n    @PostMapping(\"/{id}/aprobar\") @PreAuthorize(\"hasAnyRole('MEDICO','ADMINISTRADOR')\") public ResponseEntity<Consentimiento> aprobar(@PathVariable UUID id, Authentication auth) { return ResponseEntity.ok(svc.aprobar(id, auth.getName())); }\r\n    @PostMapping(\"/{id}/rechazar\") @PreAuthorize(\"hasAnyRole('MEDICO','ADMINISTRADOR')\") public ResponseEntity<Consentimiento> rechazar(@PathVariable UUID id, @RequestBody Map<String,String> b, Authentication auth) { return ResponseEntity.ok(svc.rechazar(id, b.getOrDefault(\"motivo\",\"Sin motivo\"), auth.getName())); }\r\n    @PatchMapping(\"/{id}/anular\") @PreAuthorize(\"hasAnyRole('MEDICO','ADMINISTRADOR')\") public ResponseEntity<Consentimiento> anular(@PathVariable UUID id) { return ResponseEntity.ok(svc.anular(id)); }\r\n    @PatchMapping(\"/{id}/pdfurl\") public ResponseEntity<Void> pdfUrl(@PathVariable UUID id, @RequestBody Map<String,String> body) { svc.actualizarPdfUrl(id, body.get(\"pdfUrl\")); return ResponseEntity.ok().build(); }\r\n    @GetMapping(\"/estadisticas\") public ResponseEntity<Map<String,Long>> stats() { return ResponseEntity.ok(Map.of(\"total\",svc.countTotal(),\"firmados\",svc.countFirmados(),\"aprobados\",svc.countAprobados(),\"hoy\",svc.countHoy())); }\r\n\r\n    /** Envía email con PDF adjunto al paciente y copia a la clínica. */\r\n    @PostMapping(\"/{id}/enviar-notificacion\")\r\n    public ResponseEntity<Map<String,String>> enviarNotificacion(\r\n            @PathVariable UUID id,\r\n            @RequestBody EnviarNotificacionRequest req) {\r\n        Consentimiento c = svc.buscar(id);\r\n        svc.marcarEmailEnviado(id, req.getEmailPaciente());\r\n        emailService.enviarConsentimientoFirmado(c, req.getEmailPaciente(), req.getPdfBase64());\r\n        return ResponseEntity.ok(Map.of(\r\n            \"status\", \"ok\",\r\n            \"mensaje\", \"Notificación enviada a \" + (req.getEmailPaciente() != null ? req.getEmailPaciente() : \"clínica\")\r\n        ));\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/backend/src/main/java/com/medfis/controller/ConsentimientoController.java b/backend/src/main/java/com/medfis/controller/ConsentimientoController.java
+--- a/backend/src/main/java/com/medfis/controller/ConsentimientoController.java	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/backend/src/main/java/com/medfis/controller/ConsentimientoController.java	(date 1786214155099)
+@@ -30,17 +30,49 @@
+     @PatchMapping("/{id}/pdfurl") public ResponseEntity<Void> pdfUrl(@PathVariable UUID id, @RequestBody Map<String,String> body) { svc.actualizarPdfUrl(id, body.get("pdfUrl")); return ResponseEntity.ok().build(); }
+     @GetMapping("/estadisticas") public ResponseEntity<Map<String,Long>> stats() { return ResponseEntity.ok(Map.of("total",svc.countTotal(),"firmados",svc.countFirmados(),"aprobados",svc.countAprobados(),"hoy",svc.countHoy())); }
+ 
+-    /** Envía email con PDF adjunto al paciente y copia a la clínica. */
++    /** Guarda el PDF, envía el correo y solo marca enviado si el SMTP respondió OK. */
+     @PostMapping("/{id}/enviar-notificacion")
+-    public ResponseEntity<Map<String,String>> enviarNotificacion(
++    public ResponseEntity<Map<String, String>> enviarNotificacion(
+             @PathVariable UUID id,
+             @RequestBody EnviarNotificacionRequest req) {
+-        Consentimiento c = svc.buscar(id);
+-        svc.marcarEmailEnviado(id, req.getEmailPaciente());
+-        emailService.enviarConsentimientoFirmado(c, req.getEmailPaciente(), req.getPdfBase64());
+-        return ResponseEntity.ok(Map.of(
+-            "status", "ok",
+-            "mensaje", "Notificación enviada a " + (req.getEmailPaciente() != null ? req.getEmailPaciente() : "clínica")
+-        ));
++
++        // 1) El PDF queda almacenado pase lo que pase con el correo
++        Consentimiento c = svc.guardarPdf(id, req.getPdfBase64());
++
++        try {
++            // 2) Envío sincrónico: si falla, lanza excepción
++            emailService.enviarConsentimientoFirmadoSync(c, req.getEmailPaciente(), req.getPdfBase64());
++
++            // 3) Recién ahora se marca como enviado
++            svc.marcarEmailEnviado(id, req.getEmailPaciente());
++
++            return ResponseEntity.ok(Map.of(
++                    "status",      "ok",
++                    "mensaje",     "Notificacion enviada a " +
++                            (req.getEmailPaciente() != null ? req.getEmailPaciente() : "clinica"),
++                    "pdfGuardado", "true"
++            ));
++        } catch (Exception e) {
++            svc.marcarEmailError(id, e.getMessage());
++            return ResponseEntity.status(502).body(Map.of(
++                    "status",      "error",
++                    "mensaje",     "El consentimiento y su PDF quedaron guardados, pero el correo no salio",
++                    "pdfGuardado", "true",
++                    "detalle",     String.valueOf(e.getMessage())
++            ));
++        }
++    }
++    @GetMapping("/{id}/pdf")
++    public ResponseEntity<byte[]> descargarPdf(@PathVariable UUID id) {
++        Consentimiento c = svc.buscar(id);
++        if (c.getPdfBase64() == null || c.getPdfBase64().isBlank()) {
++            return ResponseEntity.notFound().build();
++        }
++        byte[] pdf = java.util.Base64.getDecoder().decode(c.getPdfBase64());
++        return ResponseEntity.ok()
++                .header("Content-Type", "application/pdf")
++                .header("Content-Disposition",
++                        "inline; filename=\"Consentimiento_" + c.getRadicado() + ".pdf\"")
++                .body(pdf);
+     }
+ }
+Index: backend/src/main/java/com/medfis/config/SecurityConfig.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.medfis.config;\r\nimport com.medfis.security.JwtFilter;\r\nimport lombok.RequiredArgsConstructor;\r\nimport org.springframework.beans.factory.annotation.Value;\r\nimport org.springframework.context.annotation.Bean;\r\nimport org.springframework.context.annotation.Configuration;\r\nimport org.springframework.http.HttpMethod;\r\nimport org.springframework.security.authentication.AuthenticationManager;\r\nimport org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;\r\nimport org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;\r\nimport org.springframework.security.config.annotation.web.builders.HttpSecurity;\r\nimport org.springframework.security.config.http.SessionCreationPolicy;\r\nimport org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;\r\nimport org.springframework.security.crypto.password.PasswordEncoder;\r\nimport org.springframework.security.web.SecurityFilterChain;\r\nimport org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;\r\nimport org.springframework.web.cors.CorsConfiguration;\r\nimport org.springframework.web.cors.CorsConfigurationSource;\r\nimport org.springframework.web.cors.UrlBasedCorsConfigurationSource;\r\nimport java.util.Arrays;\r\nimport java.util.List;\r\n\r\n@Configuration\r\n@EnableMethodSecurity\r\n@RequiredArgsConstructor\r\npublic class SecurityConfig {\r\n    private final JwtFilter jwtFilter;\r\n    @Value(\"${cors.allowed-origins}\") private String origins;\r\n\r\n    @Bean\r\n    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {\r\n        return http\r\n            .csrf(c -> c.disable())\r\n            .cors(c -> c.configurationSource(corsSource()))\r\n            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))\r\n            .authorizeHttpRequests(a -> a\r\n                .requestMatchers(\"/api/auth/**\", \"/ws/**\").permitAll()\r\n                .requestMatchers(HttpMethod.POST, \"/api/whatsapp/solicitud-acceso\").permitAll()\r\n                .requestMatchers(HttpMethod.POST, \"/api/usuarios\").hasRole(\"ADMINISTRADOR\")\r\n                .requestMatchers(HttpMethod.PUT, \"/api/usuarios/**\").hasRole(\"ADMINISTRADOR\")\r\n                .requestMatchers(HttpMethod.PATCH, \"/api/usuarios/**\").hasRole(\"ADMINISTRADOR\")\r\n                .requestMatchers(HttpMethod.POST, \"/api/consentimientos/*/aprobar\").hasAnyRole(\"MEDICO\",\"ADMINISTRADOR\")\r\n                .requestMatchers(HttpMethod.POST, \"/api/consentimientos/*/rechazar\").hasAnyRole(\"MEDICO\",\"ADMINISTRADOR\")\r\n                .anyRequest().authenticated())\r\n            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)\r\n            .build();\r\n    }\r\n\r\n    @Bean\r\n    public CorsConfigurationSource corsSource() {\r\n        CorsConfiguration c = new CorsConfiguration();\r\n        c.setAllowedOrigins(Arrays.asList(origins.split(\",\")));\r\n        c.setAllowedMethods(Arrays.asList(\"GET\",\"POST\",\"PUT\",\"PATCH\",\"DELETE\",\"OPTIONS\"));\r\n        c.setAllowedHeaders(List.of(\"*\")); c.setAllowCredentials(true);\r\n        UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();\r\n        s.registerCorsConfiguration(\"/**\", c); return s;\r\n    }\r\n\r\n    @Bean public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }\r\n\r\n    @Bean\r\n    public AuthenticationManager authenticationManager(AuthenticationConfiguration c) throws Exception {\r\n        return c.getAuthenticationManager();\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/backend/src/main/java/com/medfis/config/SecurityConfig.java b/backend/src/main/java/com/medfis/config/SecurityConfig.java
+--- a/backend/src/main/java/com/medfis/config/SecurityConfig.java	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/backend/src/main/java/com/medfis/config/SecurityConfig.java	(date 1786214155011)
+@@ -1,4 +1,5 @@
+ package com.medfis.config;
++
+ import com.medfis.security.JwtFilter;
+ import lombok.RequiredArgsConstructor;
+ import org.springframework.beans.factory.annotation.Value;
+@@ -9,6 +10,7 @@
+ import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+ import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
++import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+ import org.springframework.security.config.http.SessionCreationPolicy;
+ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+ import org.springframework.security.crypto.password.PasswordEncoder;
+@@ -17,6 +19,7 @@
+ import org.springframework.web.cors.CorsConfiguration;
+ import org.springframework.web.cors.CorsConfigurationSource;
+ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
++
+ import java.util.Arrays;
+ import java.util.List;
+ 
+@@ -25,41 +28,63 @@
+ @RequiredArgsConstructor
+ public class SecurityConfig {
+     private final JwtFilter jwtFilter;
+-    @Value("${cors.allowed-origins}") private String origins;
++
++    // Recuerda definir esto en tu application.properties o application.yml
++    @Value("${cors.allowed-origins}")
++    private String origins;
+ 
+     @Bean
+     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+         return http
+-            .csrf(c -> c.disable())
+-            .cors(c -> c.configurationSource(corsSource()))
+-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+-            .authorizeHttpRequests(a -> a
+-                .requestMatchers("/api/auth/**", "/ws/**").permitAll()
+-                .requestMatchers(HttpMethod.POST, "/api/whatsapp/solicitud-acceso").permitAll()
+-                .requestMatchers(HttpMethod.POST, "/api/usuarios").hasRole("ADMINISTRADOR")
+-                .requestMatchers(HttpMethod.PUT, "/api/usuarios/**").hasRole("ADMINISTRADOR")
+-                .requestMatchers(HttpMethod.PATCH, "/api/usuarios/**").hasRole("ADMINISTRADOR")
+-                .requestMatchers(HttpMethod.POST, "/api/consentimientos/*/aprobar").hasAnyRole("MEDICO","ADMINISTRADOR")
+-                .requestMatchers(HttpMethod.POST, "/api/consentimientos/*/rechazar").hasAnyRole("MEDICO","ADMINISTRADOR")
+-                .anyRequest().authenticated())
+-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+-            .build();
++                .csrf(AbstractHttpConfigurer::disable)
++                .cors(c -> c.configurationSource(corsSource()))
++                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
++                .authorizeHttpRequests(a -> a
++                        // Rutas públicas sin token
++                        .requestMatchers("/api/auth/**", "/ws/**").permitAll()
++                        .requestMatchers(HttpMethod.POST, "/api/whatsapp/solicitud-acceso").permitAll()
++
++                        // ✅ ¡AQUÍ ESTÁ LA CORRECCIÓN QUE ELIMINA TU ERROR 403!
++                        // Opción A (Recomendada para prueba): Permitir el envío de mails SIN autenticación
++                        .requestMatchers(HttpMethod.POST, "/api/emails/enviar-consentimiento").permitAll()
++
++                        // Opción B (Seguridad real): Si quieres que solo médicos o administradores envíen correos:
++                        // .requestMatchers(HttpMethod.POST, "/api/emails/enviar-consentimiento").hasAnyRole("MEDICO", "ADMINISTRADOR")
++
++                        // Rutas exclusivas para Roles
++                        .requestMatchers(HttpMethod.POST, "/api/usuarios").hasRole("ADMINISTRADOR")
++                        .requestMatchers(HttpMethod.PUT, "/api/usuarios/**").hasRole("ADMINISTRADOR")
++                        .requestMatchers(HttpMethod.PATCH, "/api/usuarios/**").hasRole("ADMINISTRADOR")
++                        .requestMatchers(HttpMethod.POST, "/api/consentimientos/*/aprobar").hasAnyRole("MEDICO", "ADMINISTRADOR")
++                        .requestMatchers(HttpMethod.POST, "/api/consentimientos/*/rechazar").hasAnyRole("MEDICO", "ADMINISTRADOR")
++
++                        // El resto de peticiones SÍ necesitan token
++                        .anyRequest().authenticated()
++                )
++                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
++                .build();
+     }
+ 
+     @Bean
+     public CorsConfigurationSource corsSource() {
+         CorsConfiguration c = new CorsConfiguration();
++        // Usamos la variable de entorno (ej: http://localhost:4200)
+         c.setAllowedOrigins(Arrays.asList(origins.split(",")));
+-        c.setAllowedMethods(Arrays.asList("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+-        c.setAllowedHeaders(List.of("*")); c.setAllowCredentials(true);
++        c.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
++        c.setAllowedHeaders(List.of("*"));
++        c.setAllowCredentials(true);
+         UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
+-        s.registerCorsConfiguration("/**", c); return s;
++        s.registerCorsConfiguration("/**", c);
++        return s;
+     }
+ 
+-    @Bean public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
++    @Bean
++    public PasswordEncoder passwordEncoder() {
++        return new BCryptPasswordEncoder();
++    }
+ 
+     @Bean
+     public AuthenticationManager authenticationManager(AuthenticationConfiguration c) throws Exception {
+         return c.getAuthenticationManager();
+     }
+-}
++}
+\ No newline at end of file
+Index: backend/src/main/java/com/medfis/entity/Consentimiento.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.medfis.entity;\r\nimport jakarta.persistence.*;\r\nimport lombok.Data;\r\nimport lombok.NoArgsConstructor;\r\nimport org.hibernate.annotations.CreationTimestamp;\r\nimport org.hibernate.annotations.JdbcTypeCode;\r\nimport org.hibernate.annotations.UpdateTimestamp;\r\nimport org.hibernate.type.SqlTypes;\r\nimport java.time.LocalDate;\r\nimport java.time.LocalDateTime;\r\nimport java.util.Map;\r\nimport java.util.UUID;\r\n\r\n@Entity\r\n@Table(name = \"consentimientos\")\r\n@Data\r\n@NoArgsConstructor\r\npublic class Consentimiento {\r\n    @Id @GeneratedValue(strategy = GenerationType.UUID) private UUID id;\r\n    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 50) private TipoConsent tipo;\r\n    @Column(nullable = false, unique = true, length = 30) private String radicado;\r\n    @Column(nullable = false) private LocalDate fecha;\r\n    @Column(name = \"paciente_nombre\", nullable = false, length = 200) private String pacienteNombre;\r\n    @Column(name = \"paciente_doc\", nullable = false, length = 50) private String pacienteDoc;\r\n    @Column(name = \"paciente_tel\", length = 30) private String pacienteTel;\r\n    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 30) private EstadoConsent estado = EstadoConsent.FIRMADO;\r\n    @Column(name = \"pendiente_medico\", nullable = false) private boolean pendienteMedico = true;\r\n    @Column(name = \"motivo_rechazo\") private String motivoRechazo;\r\n    @Column(name = \"aprobado_por\", length = 200) private String aprobadoPor;\r\n    @Column(name = \"fecha_aprobacion\") private LocalDate fechaAprobacion;\r\n    @Column(name = \"creado_por\", length = 200) private String creadoPor;\r\n    @Column(name = \"email_paciente\", length = 200) private String emailPaciente;\r\n    @Column(name = \"pdf_url\", length = 1000) private String pdfUrl;\r\n    @Column(name = \"email_enviado\", nullable = false) private boolean emailEnviado = false;\r\n    @Column(name = \"whatsapp_enviado\", nullable = false) private boolean whatsappEnviado = false;\r\n    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = \"jsonb\", nullable = false) private Map<String, Object> datos;\r\n    @CreationTimestamp @Column(name = \"created_at\", nullable = false, updatable = false) private LocalDateTime createdAt;\r\n    @UpdateTimestamp @Column(name = \"updated_at\", nullable = false) private LocalDateTime updatedAt;\r\n    public enum TipoConsent { escleroterapia, sueroterapia, laser, paquete }\r\n    public enum EstadoConsent { FIRMADO, PENDIENTE, APROBADO, RECHAZADO, ANULADO }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/backend/src/main/java/com/medfis/entity/Consentimiento.java b/backend/src/main/java/com/medfis/entity/Consentimiento.java
+--- a/backend/src/main/java/com/medfis/entity/Consentimiento.java	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/backend/src/main/java/com/medfis/entity/Consentimiento.java	(date 1786214155239)
+@@ -33,6 +33,10 @@
+     @Column(name = "pdf_url", length = 1000) private String pdfUrl;
+     @Column(name = "email_enviado", nullable = false) private boolean emailEnviado = false;
+     @Column(name = "whatsapp_enviado", nullable = false) private boolean whatsappEnviado = false;
++    @Column(name = "pdf_nombre", length = 200)              private String pdfNombre;
++    @Column(name = "pdf_base64", columnDefinition = "text") private String pdfBase64;
++    @Column(name = "fecha_email")                           private LocalDateTime fechaEmail;
++    @Column(name = "email_error", length = 1000)            private String emailError;
+     @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb", nullable = false) private Map<String, Object> datos;
+     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
+     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
+Index: backend/src/main/java/com/medfis/service/ConsentimientoService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.medfis.service;\r\n\r\nimport com.medfis.dto.ConsentimientoRequest;\r\nimport com.medfis.entity.Consentimiento;\r\nimport com.medfis.entity.Consentimiento.EstadoConsent;\r\nimport com.medfis.entity.Consentimiento.TipoConsent;\r\nimport com.medfis.entity.Notificacion;\r\nimport com.medfis.repository.ConsentimientoRepository;\r\nimport lombok.RequiredArgsConstructor;\r\nimport org.springframework.stereotype.Service;\r\nimport org.springframework.transaction.annotation.Transactional;\r\n\r\nimport java.time.LocalDate;\r\nimport java.util.List;\r\nimport java.util.UUID;\r\n\r\n@Service\r\n@RequiredArgsConstructor\r\npublic class ConsentimientoService {\r\n\r\n    private final ConsentimientoRepository repo;\r\n    private final NotificacionService notif;\r\n    private final WhatsAppService whatsApp;\r\n\r\n    public List<Consentimiento> listarTodos()     { return repo.findAllByOrderByCreatedAtDesc(); }\r\n    public List<Consentimiento> pendientesMedico(){ return repo.findByPendienteMedicoTrueAndEstadoOrderByCreatedAtDesc(EstadoConsent.FIRMADO); }\r\n    public Consentimiento buscar(UUID id)          { return repo.findById(id).orElseThrow(() -> new RuntimeException(\"No encontrado: \" + id)); }\r\n    public List<Consentimiento> buscar(String q)   { return q == null || q.isBlank() ? repo.findAllByOrderByCreatedAtDesc() : repo.search(q); }\r\n\r\n    @Transactional\r\n    public Consentimiento crear(ConsentimientoRequest req, String creadoPor) {\r\n        Consentimiento c = new Consentimiento();\r\n        TipoConsent tipo = TipoConsent.valueOf(req.getTipo().toLowerCase());\r\n        c.setTipo(tipo);\r\n        c.setRadicado(genRadicado(tipo));\r\n        c.setFecha(LocalDate.now());\r\n        c.setPacienteNombre(req.getPacienteNombre());\r\n        c.setPacienteDoc(req.getPacienteDoc());\r\n        c.setPacienteTel(req.getPacienteTel());\r\n        c.setEstado(EstadoConsent.FIRMADO);\r\n        c.setPendienteMedico(true);\r\n        c.setCreadoPor(creadoPor);\r\n        if (req.getEmailPaciente() != null && !req.getEmailPaciente().isBlank())\r\n            c.setEmailPaciente(req.getEmailPaciente());\r\n        if (req.getPdfUrl() != null && !req.getPdfUrl().isBlank())\r\n            c.setPdfUrl(req.getPdfUrl());\r\n        c.setDatos(req.getDatos());\r\n\r\n        Consentimiento saved = repo.save(c);\r\n\r\n        // ── Notificaciones internas ──────────────────────────────────────────\r\n        String base = req.getPacienteNombre() + \" · \" + req.getTipo() + \" · \" + saved.getRadicado();\r\n        notif.crearYEmitir(Notificacion.TipoNotif.NUEVO_CONSENTIMIENTO,\r\n                \"Consentimiento pendiente de Visto Bueno\",\r\n                base + \". Revise y apruebe.\", saved.getId(), \"MEDICO\");\r\n        notif.crearYEmitir(Notificacion.TipoNotif.NUEVO_CONSENTIMIENTO,\r\n                \"Nuevo consentimiento — \" + req.getPacienteNombre(),\r\n                \"Por: \" + creadoPor + \" · \" + saved.getRadicado() + \" · Pendiente aprobación médica.\",\r\n                saved.getId(), \"ADMINISTRADOR\");\r\n\r\n        // ── WhatsApp automático al paciente ──────────────────────────────────\r\n        whatsApp.notificarConsentimientoCreado(saved);\r\n\r\n        return saved;\r\n    }\r\n\r\n    @Transactional\r\n    public void actualizarPdfUrl(UUID id, String pdfUrl) {\r\n        Consentimiento c = buscar(id);\r\n        if (pdfUrl != null && !pdfUrl.isBlank()) c.setPdfUrl(pdfUrl);\r\n        repo.save(c);\r\n    }\r\n\r\n    @Transactional\r\n    public Consentimiento aprobar(UUID id, String medico) {\r\n        Consentimiento c = buscar(id);\r\n        if (c.getEstado() != EstadoConsent.FIRMADO)\r\n            throw new RuntimeException(\"No está en estado FIRMADO\");\r\n        c.setEstado(EstadoConsent.APROBADO);\r\n        c.setPendienteMedico(false);\r\n        c.setAprobadoPor(medico);\r\n        c.setFechaAprobacion(LocalDate.now());\r\n        Consentimiento saved = repo.save(c);\r\n\r\n        notif.crearYEmitir(Notificacion.TipoNotif.APROBADO,\r\n                \"Visto Bueno — Cita habilitada\",\r\n                c.getPacienteNombre() + \" — \" + c.getRadicado() + \" aprobado por \" + medico,\r\n                saved.getId(), \"TODOS\");\r\n\r\n        // ── WhatsApp automático al paciente ──────────────────────────────────\r\n        whatsApp.notificarAprobado(saved);\r\n\r\n        return saved;\r\n    }\r\n\r\n    @Transactional\r\n    public Consentimiento rechazar(UUID id, String motivo, String medico) {\r\n        Consentimiento c = buscar(id);\r\n        c.setEstado(EstadoConsent.RECHAZADO);\r\n        c.setPendienteMedico(false);\r\n        c.setMotivoRechazo(motivo);\r\n        c.setAprobadoPor(medico);\r\n        Consentimiento saved = repo.save(c);\r\n\r\n        notif.crearYEmitir(Notificacion.TipoNotif.RECHAZADO,\r\n                \"Consentimiento rechazado\",\r\n                c.getPacienteNombre() + \" — \" + c.getRadicado() + \". Motivo: \" + motivo,\r\n                saved.getId(), \"TODOS\");\r\n\r\n        // ── WhatsApp automático al paciente ──────────────────────────────────\r\n        whatsApp.notificarRechazado(saved);\r\n\r\n        return saved;\r\n    }\r\n\r\n    @Transactional\r\n    public Consentimiento anular(UUID id) {\r\n        Consentimiento c = buscar(id);\r\n        c.setEstado(EstadoConsent.ANULADO);\r\n        c.setPendienteMedico(false);\r\n        return repo.save(c);\r\n    }\r\n\r\n    @Transactional\r\n    public void marcarEmailEnviado(UUID id, String emailPaciente) {\r\n        Consentimiento c = buscar(id);\r\n        c.setEmailEnviado(true);\r\n        if (emailPaciente != null && !emailPaciente.isBlank())\r\n            c.setEmailPaciente(emailPaciente);\r\n        repo.save(c);\r\n    }\r\n\r\n    public long countHoy()       { return repo.countByFecha(LocalDate.now()); }\r\n    public long countAprobados() { return repo.countByEstado(EstadoConsent.APROBADO); }\r\n    public long countFirmados()  { return repo.countByEstado(EstadoConsent.FIRMADO); }\r\n    public long countTotal()     { return repo.count(); }\r\n\r\n    private String genRadicado(TipoConsent tipo) {\r\n        String p = switch (tipo) {\r\n            case escleroterapia -> \"ESC\";\r\n            case sueroterapia   -> \"SUE\";\r\n            case laser          -> \"LAS\";\r\n            default             -> \"PAQ\";\r\n        };\r\n        int year  = LocalDate.now().getYear();\r\n        long count = repo.countByTipoAndYear(tipo, year) + 1;\r\n        return p + \"-\" + year + \"-\" + String.format(\"%04d\", count);\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/backend/src/main/java/com/medfis/service/ConsentimientoService.java b/backend/src/main/java/com/medfis/service/ConsentimientoService.java
+--- a/backend/src/main/java/com/medfis/service/ConsentimientoService.java	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/backend/src/main/java/com/medfis/service/ConsentimientoService.java	(date 1786214155298)
+@@ -125,11 +125,31 @@
+     public void marcarEmailEnviado(UUID id, String emailPaciente) {
+         Consentimiento c = buscar(id);
+         c.setEmailEnviado(true);
++        c.setFechaEmail(java.time.LocalDateTime.now());   // ← NUEVA
++        c.setEmailError(null);                            // ← NUEVA
+         if (emailPaciente != null && !emailPaciente.isBlank())
+             c.setEmailPaciente(emailPaciente);
+         repo.save(c);
+     }
+-
++    @Transactional
++    public Consentimiento guardarPdf(UUID id, String pdfBase64) {
++        Consentimiento c = buscar(id);
++        if (pdfBase64 != null && !pdfBase64.isBlank()) {
++            String limpio = pdfBase64.contains(",") ? pdfBase64.split(",")[1] : pdfBase64;
++            c.setPdfBase64(limpio);
++            c.setPdfNombre("Consentimiento_" + c.getRadicado() + ".pdf");
++        }
++        return repo.save(c);
++    }
++
++    /** Registra un fallo de envío sin perder el consentimiento. */
++    @Transactional
++    public void marcarEmailError(UUID id, String detalle) {
++        Consentimiento c = buscar(id);
++        c.setEmailEnviado(false);
++        c.setEmailError(detalle != null && detalle.length() > 990 ? detalle.substring(0, 990) : detalle);
++        repo.save(c);
++    }
+     public long countHoy()       { return repo.countByFecha(LocalDate.now()); }
+     public long countAprobados() { return repo.countByEstado(EstadoConsent.APROBADO); }
+     public long countFirmados()  { return repo.countByEstado(EstadoConsent.FIRMADO); }
+Index: MedFis_API.postman_collection.json
+===================================================================
+diff --git a/MedFis_API.postman_collection.json b/MedFis_API.postman_collection.json
+deleted file mode 100644
+--- a/MedFis_API.postman_collection.json	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ /dev/null	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
+@@ -1,272 +0,0 @@
+-{
+-  "info": {
+-    "name": "Med&Fis API - Consentimientos",
+-    "description": "Colección completa para pruebas del backend Med&Fis\nDesarrollado por JM Ingeniero",
+-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+-  },
+-  "variable": [
+-    { "key": "base_url", "value": "http://localhost:8080/api", "type": "string" },
+-    { "key": "token",    "value": "", "type": "string" },
+-    { "key": "token_medico", "value": "", "type": "string" },
+-    { "key": "consent_id",  "value": "", "type": "string" },
+-    { "key": "usuario_id",  "value": "", "type": "string" }
+-  ],
+-  "item": [
+-    {
+-      "name": "🔐 AUTH",
+-      "item": [
+-        {
+-          "name": "1. Login Admin",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "if (pm.response.code === 200) {",
+-            "  var r = pm.response.json();",
+-            "  pm.collectionVariables.set('token', r.token);",
+-            "  pm.test('Login exitoso', () => pm.expect(r.token).to.not.be.empty);",
+-            "  console.log('✅ Token guardado para:', r.nombre, '|', r.rol);",
+-            "} else {",
+-            "  pm.test('Login fallido - revisar credenciales', () => pm.expect(pm.response.code).to.equal(200));",
+-            "}"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "POST",
+-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"medfissaludintensa@gmail.com\",\n  \"password\": \"admin123456\"\n}" },
+-            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth","login"] }
+-          }
+-        },
+-        {
+-          "name": "2. Login Médico",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "if (pm.response.code === 200) {",
+-            "  var r = pm.response.json();",
+-            "  pm.collectionVariables.set('token_medico', r.token);",
+-            "  pm.test('Login médico exitoso', () => pm.expect(r.token).to.not.be.empty);",
+-            "  console.log('✅ Token médico guardado para:', r.nombre);",
+-            "} else {",
+-            "  pm.test('Primero crea el médico en el paso 4', () => pm.expect(pm.response.code).to.equal(200));",
+-            "}"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "POST",
+-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"rafael.marrero@medfis.com\",\n  \"password\": \"medico2024\"\n}" },
+-            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth","login"] }
+-          }
+-        }
+-      ]
+-    },
+-    {
+-      "name": "👥 USUARIOS / STAFF",
+-      "item": [
+-        {
+-          "name": "3. Listar todos los usuarios",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "pm.test('Status 200', () => pm.expect(pm.response.code).to.equal(200));",
+-            "var r = pm.response.json();",
+-            "if (Array.isArray(r) && r.length > 0) {",
+-            "  pm.collectionVariables.set('usuario_id', r[0].id);",
+-            "  console.log('Usuarios encontrados:', r.length);",
+-            "}"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "GET",
+-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+-            "url": { "raw": "{{base_url}}/usuarios", "host": ["{{base_url}}"], "path": ["usuarios"] }
+-          }
+-        },
+-        {
+-          "name": "4. Crear médico",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "if (pm.response.code === 200 || pm.response.code === 201) {",
+-            "  var r = pm.response.json();",
+-            "  pm.collectionVariables.set('usuario_id', r.id);",
+-            "  pm.test('Médico creado', () => pm.expect(r.email).to.equal('rafael.marrero@medfis.com'));",
+-            "  console.log('✅ Médico creado con ID:', r.id);",
+-            "} else {",
+-            "  console.log('Respuesta:', pm.response.text());",
+-            "}"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "POST",
+-            "header": [
+-              { "key": "Content-Type", "value": "application/json" },
+-              { "key": "Authorization", "value": "Bearer {{token}}" }
+-            ],
+-            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Dr. Rafael Eduardo Marrero Padilla\",\n  \"email\": \"rafael.marrero@medfis.com\",\n  \"password\": \"medico2024\",\n  \"rol\": \"MEDICO\"\n}" },
+-            "url": { "raw": "{{base_url}}/usuarios", "host": ["{{base_url}}"], "path": ["usuarios"] }
+-          }
+-        },
+-        {
+-          "name": "5. Crear auxiliar",
+-          "request": {
+-            "method": "POST",
+-            "header": [
+-              { "key": "Content-Type", "value": "application/json" },
+-              { "key": "Authorization", "value": "Bearer {{token}}" }
+-            ],
+-            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Auxiliar Recepción\",\n  \"email\": \"auxiliar@medfis.com\",\n  \"password\": \"auxiliar2024\",\n  \"rol\": \"AUXILIAR\"\n}" },
+-            "url": { "raw": "{{base_url}}/usuarios", "host": ["{{base_url}}"], "path": ["usuarios"] }
+-          }
+-        },
+-        {
+-          "name": "6. Activar o desactivar usuario",
+-          "request": {
+-            "method": "PATCH",
+-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+-            "url": { "raw": "{{base_url}}/usuarios/{{usuario_id}}/toggle", "host": ["{{base_url}}"], "path": ["usuarios","{{usuario_id}}","toggle"] }
+-          }
+-        }
+-      ]
+-    },
+-    {
+-      "name": "📋 CONSENTIMIENTOS",
+-      "item": [
+-        {
+-          "name": "7. Crear consentimiento - Escleroterapia",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "if (pm.response.code === 200 || pm.response.code === 201) {",
+-            "  var r = pm.response.json();",
+-            "  pm.collectionVariables.set('consent_id', r.id);",
+-            "  pm.test('Consentimiento creado', () => pm.expect(r.radicado).to.include('ESC'));",
+-            "  console.log('✅ Radicado:', r.radicado, '| ID:', r.id);",
+-            "} else {",
+-            "  console.log('Error:', pm.response.text());",
+-            "}"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "POST",
+-            "header": [
+-              { "key": "Content-Type", "value": "application/json" },
+-              { "key": "Authorization", "value": "Bearer {{token}}" }
+-            ],
+-            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"escleroterapia\",\n  \"pacienteNombre\": \"María Pérez López\",\n  \"pacienteDoc\": \"1098765432\",\n  \"pacienteTel\": \"3201234567\",\n  \"datos\": {\n    \"paciente\": {\n      \"nombre\": \"María Pérez López\",\n      \"documento\": \"1098765432\",\n      \"telefono\": \"3201234567\",\n      \"email\": \"maria@gmail.com\"\n    }\n  }\n}" },
+-            "url": { "raw": "{{base_url}}/consentimientos", "host": ["{{base_url}}"], "path": ["consentimientos"] }
+-          }
+-        },
+-        {
+-          "name": "8. Crear consentimiento - Sueroterapia",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "if (pm.response.code === 200 || pm.response.code === 201) {",
+-            "  var r = pm.response.json();",
+-            "  console.log('✅ Radicado:', r.radicado);",
+-            "}"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "POST",
+-            "header": [
+-              { "key": "Content-Type", "value": "application/json" },
+-              { "key": "Authorization", "value": "Bearer {{token}}" }
+-            ],
+-            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"sueroterapia\",\n  \"pacienteNombre\": \"Carlos Rodríguez Gómez\",\n  \"pacienteDoc\": \"1020304050\",\n  \"pacienteTel\": \"3109876543\",\n  \"datos\": {}\n}" },
+-            "url": { "raw": "{{base_url}}/consentimientos", "host": ["{{base_url}}"], "path": ["consentimientos"] }
+-          }
+-        },
+-        {
+-          "name": "9. Listar todos los consentimientos",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "pm.test('Status 200', () => pm.expect(pm.response.code).to.equal(200));",
+-            "var r = pm.response.json();",
+-            "console.log('Total consentimientos:', Array.isArray(r) ? r.length : 'N/A');"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "GET",
+-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+-            "url": { "raw": "{{base_url}}/consentimientos", "host": ["{{base_url}}"], "path": ["consentimientos"] }
+-          }
+-        },
+-        {
+-          "name": "10. Ver consentimiento por ID",
+-          "request": {
+-            "method": "GET",
+-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+-            "url": { "raw": "{{base_url}}/consentimientos/{{consent_id}}", "host": ["{{base_url}}"], "path": ["consentimientos","{{consent_id}}"] }
+-          }
+-        },
+-        {
+-          "name": "11. Aprobar consentimiento (token médico)",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "if (pm.response.code === 200) {",
+-            "  var r = pm.response.json();",
+-            "  pm.test('Estado APROBADO', () => pm.expect(r.estado).to.equal('APROBADO'));",
+-            "  console.log('✅ Aprobado por:', r.aprobadoPor);",
+-            "} else {",
+-            "  console.log('Error:', pm.response.status, pm.response.text());",
+-            "}"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "PUT",
+-            "header": [
+-              { "key": "Content-Type", "value": "application/json" },
+-              { "key": "Authorization", "value": "Bearer {{token_medico}}" }
+-            ],
+-            "body": { "mode": "raw", "raw": "{\n  \"medico\": \"Dr. Rafael Eduardo Marrero Padilla\"\n}" },
+-            "url": { "raw": "{{base_url}}/consentimientos/{{consent_id}}/aprobar", "host": ["{{base_url}}"], "path": ["consentimientos","{{consent_id}}","aprobar"] }
+-          }
+-        },
+-        {
+-          "name": "12. Rechazar consentimiento (token médico)",
+-          "request": {
+-            "method": "PUT",
+-            "header": [
+-              { "key": "Content-Type", "value": "application/json" },
+-              { "key": "Authorization", "value": "Bearer {{token_medico}}" }
+-            ],
+-            "body": { "mode": "raw", "raw": "{\n  \"motivo\": \"Paciente presenta contraindicación por embarazo\",\n  \"medico\": \"Dr. Rafael Eduardo Marrero Padilla\"\n}" },
+-            "url": { "raw": "{{base_url}}/consentimientos/{{consent_id}}/rechazar", "host": ["{{base_url}}"], "path": ["consentimientos","{{consent_id}}","rechazar"] }
+-          }
+-        },
+-        {
+-          "name": "13. Anular consentimiento (solo ADMIN)",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "if (pm.response.code === 200) {",
+-            "  pm.test('Consentimiento anulado', () => pm.expect(pm.response.json().estado).to.equal('ANULADO'));",
+-            "}"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "PUT",
+-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+-            "url": { "raw": "{{base_url}}/consentimientos/{{consent_id}}/anular", "host": ["{{base_url}}"], "path": ["consentimientos","{{consent_id}}","anular"] }
+-          }
+-        },
+-        {
+-          "name": "14. Buscar consentimiento por nombre o doc",
+-          "request": {
+-            "method": "GET",
+-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+-            "url": { "raw": "{{base_url}}/consentimientos?q=María", "host": ["{{base_url}}"], "path": ["consentimientos"], "query": [{ "key": "q", "value": "María" }] }
+-          }
+-        },
+-        {
+-          "name": "15. Enviar notificación email",
+-          "request": {
+-            "method": "POST",
+-            "header": [
+-              { "key": "Content-Type", "value": "application/json" },
+-              { "key": "Authorization", "value": "Bearer {{token}}" }
+-            ],
+-            "body": { "mode": "raw", "raw": "{\n  \"emailPaciente\": \"maria@gmail.com\"\n}" },
+-            "url": { "raw": "{{base_url}}/consentimientos/{{consent_id}}/enviar-notificacion", "host": ["{{base_url}}"], "path": ["consentimientos","{{consent_id}}","enviar-notificacion"] }
+-          }
+-        }
+-      ]
+-    },
+-    {
+-      "name": "🔔 NOTIFICACIONES",
+-      "item": [
+-        {
+-          "name": "16. Listar notificaciones",
+-          "event": [{ "listen": "test", "script": { "exec": [
+-            "pm.test('Status 200', () => pm.expect(pm.response.code).to.equal(200));",
+-            "var r = pm.response.json();",
+-            "console.log('Notificaciones:', Array.isArray(r) ? r.length : r);"
+-          ], "type": "text/javascript" }}],
+-          "request": {
+-            "method": "GET",
+-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+-            "url": { "raw": "{{base_url}}/notificaciones", "host": ["{{base_url}}"], "path": ["notificaciones"] }
+-          }
+-        }
+-      ]
+-    }
+-  ]
+-}

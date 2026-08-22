@@ -1,0 +1,20 @@
+Index: pnpm-workspace.yaml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>packages:\r\n  - '.'\r\nsupportedArchitectures:\r\n  os:\r\n    - linux\r\n  cpu:\r\n    - x64\r\n    - arm64\r\n  libc:\r\n    - glibc\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+--- a/pnpm-workspace.yaml	(revision 310a53668130ef1fb3964c17088ec041c6f56042)
++++ b/pnpm-workspace.yaml	(date 1786211585488)
+@@ -1,5 +1,9 @@
+ packages:
+   - '.'
++allowBuilds:
++  '@tailwindcss/oxide': set this to true or false
++  core-js: set this to true or false
++  esbuild: set this to true or false
+ supportedArchitectures:
+   os:
+     - linux

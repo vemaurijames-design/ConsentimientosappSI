@@ -5420,6 +5420,7 @@ export default function App() {
         <Sidebar page={page} onPage={setPage} user={user}
           onLogout={() => {
             apiService.setToken("");
+            localStorage.removeItem("medfis_token");
             setUser(null);
             setPage("dashboard");
             addToast("info", "Sesión cerrada");

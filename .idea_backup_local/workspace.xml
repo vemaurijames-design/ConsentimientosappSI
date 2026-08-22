@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="97180d7b-10dc-4eee-aa47-08f518bdad1f" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/config/CorsConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/controller/CitaController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/controller/EmailController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/controller/HistoriaClinicaController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/controller/PacienteController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/dto/CitaResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/dto/PacienteBasicoDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/entity/Cita.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/entity/HistoriaClinica.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/entity/Paciente.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/repository/CitaRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/repository/HistoriaClinicaRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/repository/PacienteRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/CitaService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/HistoriaClinicaService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/PacienteService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/ServiciosPrueba.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/UsuarioDetailsService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/app/components/AgendaPage.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/app/components/PacientesPage.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/app/components/ui/AdminUsuarios.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/app/lib/AuthContext.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/app/lib/BuscarPacienteBar.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/app/lib/pacienteLookup.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/app/lib/whatsapp.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/app/lib/whatsappService.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/config/SecurityConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/controller/UsuarioController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/controller/UsuarioController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/dto/UsuarioRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/dto/UsuarioRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/dto/UsuarioResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/dto/UsuarioResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/entity/Consentimiento.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/entity/Consentimiento.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/entity/Usuario.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/entity/Usuario.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/repository/ConsentimientoRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/repository/ConsentimientoRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/security/JwtFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/security/JwtFilter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/security/JwtUtil.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/security/JwtUtil.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/AuthService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/AuthService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/UsuarioService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/medfis/service/UsuarioService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/resources/application.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/browserslist" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/browserslist" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/browserslist.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/browserslist.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/conc" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/conc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/conc.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/conc.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/conc.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/conc.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/concurrently" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/concurrently" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/concurrently.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/concurrently.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/concurrently.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/concurrently.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/jiti" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/jiti" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/jiti.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/jiti.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/vite" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/vite" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/vite.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/vite.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.bin/vite.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.bin/vite.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.modules.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.modules.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.package-map.json" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.package-map.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm-workspace-state-v1.json" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm-workspace-state-v1.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-imports@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-imports@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-imports@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-imports@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-imports@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-imports@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/json5.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/core/node_modules/.bin/semver.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+helper-module-transforms@7.29.7_@babel+core@7.29.7/node_modules/@babel/traverse/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/json5" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/json5" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/json5.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/json5.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/json5.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/json5.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/semver" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/semver" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/semver.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/semver.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/semver.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_309667e54d104a0a669c92d155cb27e1/node_modules/@babel/core/node_modules/.bin/semver.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/json5" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/json5" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/json5.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/json5.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/json5.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/json5.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/semver" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/semver" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/semver.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/semver.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/semver.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+plugin-transform-rea_ed9648de23b924cb1b0b4bfc07929da0/node_modules/@babel/core/node_modules/.bin/semver.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+traverse@7.29.8/node_modules/@babel/traverse/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+traverse@7.29.8/node_modules/@babel/traverse/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+traverse@7.29.8/node_modules/@babel/traverse/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+traverse@7.29.8/node_modules/@babel/traverse/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@babel+traverse@7.29.8/node_modules/@babel/traverse/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@babel+traverse@7.29.8/node_modules/@babel/traverse/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/declarations/src/index.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.browser.cjs.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.browser.cjs.mjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.browser.esm.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.cjs.d.mts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.cjs.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.cjs.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.cjs.mjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.edge-light.cjs.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.edge-light.cjs.mjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.edge-light.esm.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/dist/emotion-use-insertion-effect-with-fallbacks.esm.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/src/conditions/false.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/src/conditions/is-browser.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/src/conditions/true.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/use-insertion-effect-with-fallbacks/src/index.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/LICENSE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/declarations/src/index.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.d.mts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.d.mts.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.d.ts.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.default.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.default.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.dev.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.mjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.cjs.prod.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/dist/emotion-weak-memoize.esm.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/@emotion/weak-memoize/src/index.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/hoist-non-react-statics/CHANGELOG.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/hoist-non-react-statics/LICENSE.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/hoist-non-react-statics/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/hoist-non-react-statics/dist/hoist-non-react-statics.cjs.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/hoist-non-react-statics/dist/hoist-non-react-statics.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/hoist-non-react-statics/dist/hoist-non-react-statics.min.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/hoist-non-react-statics/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@emotion+react@11.14.0_@types+react@19.2.18_react@18.3.1/node_modules/hoist-non-react-statics/src/index.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/json5" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/json5" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/json5.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/json5.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/json5.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/json5.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/parser.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/parser.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/semver" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/semver" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/semver.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/semver.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/semver.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@babel/core/node_modules/.bin/semver.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@vitejs/plugin-react/node_modules/.bin/vite" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@vitejs/plugin-react/node_modules/.bin/vite" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@vitejs/plugin-react/node_modules/.bin/vite.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@vitejs/plugin-react/node_modules/.bin/vite.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@vitejs/plugin-react/node_modules/.bin/vite.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/@vitejs+plugin-react@4.7.0__91a4615328155af3af14f85328e7c436/node_modules/@vitejs/plugin-react/node_modules/.bin/vite.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/cjs/components/useEmblaCarousel.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/cjs/embla-carousel-react.cjs.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/cjs/embla-carousel-react.cjs.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/cjs/index.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/cjs/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/components/useEmblaCarousel.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/esm/components/useEmblaCarousel.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/esm/embla-carousel-react.esm.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/esm/embla-carousel-react.esm.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/esm/index.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/embla-carousel-react@8.6.0_react@18.3.1/node_modules/embla-carousel-react/esm/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/lock.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/baseline-browser-mapping" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/baseline-browser-mapping" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/baseline-browser-mapping.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/baseline-browser-mapping.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/browserslist" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/browserslist" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/browserslist.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/browserslist.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/esbuild" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/esbuild" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/esbuild.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/esbuild.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/jiti" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/jiti" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/jiti.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/jiti.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/jsesc" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/jsesc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/jsesc.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/jsesc.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/json5" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/json5" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/json5.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/json5.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/loose-envify" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/loose-envify" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/loose-envify.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/loose-envify.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/nanoid" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/nanoid" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/nanoid.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/nanoid.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/parser" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/parser" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/parser.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/parser.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/resolve" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/resolve" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/resolve.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/resolve.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/rollup" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/rollup" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/rollup.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/rollup.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/semver" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/semver" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/semver.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/semver.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/tree-kill" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/tree-kill" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/tree-kill.CMD" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/tree-kill.CMD" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/tree-kill.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/tree-kill.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/update-browserslist-db" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/update-browserslist-db" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/update-browserslist-db.ps1" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.pnpm/node_modules/.bin/update-browserslist-db.ps1" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/@supabase_supabase-js.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/@supabase_supabase-js.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/@supabase_supabase-js.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/@supabase_supabase-js.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/_metadata.json" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/_metadata.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-BMEPZ7US.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-BMEPZ7US.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-DC5AMYBS.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-DC5AMYBS.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-DC5AMYBS.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-DC5AMYBS.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-HBJ3AJOL.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-HBJ3AJOL.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-HDWYUXML.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/chunk-HDWYUXML.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/html2canvas.esm-7YJP37YQ.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/html2canvas.esm-7YJP37YQ.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/html2canvas.esm-7YJP37YQ.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/html2canvas.esm-7YJP37YQ.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/index.es-NOFTWCI3.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/index.es-NOFTWCI3.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/jspdf.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/jspdf.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/jspdf.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/jspdf.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/lucide-react.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/lucide-react.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/lucide-react.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/lucide-react.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/purify.es-FTDMSLK5.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/purify.es-FTDMSLK5.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react-dom.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react-dom.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react-dom.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react-dom.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react-dom_client.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react-dom_client.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react-dom_client.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react-dom_client.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react_jsx-dev-runtime.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react_jsx-dev-runtime.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react_jsx-dev-runtime.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react_jsx-dev-runtime.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react_jsx-runtime.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react_jsx-runtime.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/react_jsx-runtime.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/react_jsx-runtime.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/recharts.js" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/recharts.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps/recharts.js.map" beforeDir="false" afterPath="$PROJECT_DIR$/node_modules/.vite/deps/recharts.js.map" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/@supabase_supabase-js.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/@supabase_supabase-js.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/chunk-BMEPZ7US.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/chunk-BMEPZ7US.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/chunk-DC5AMYBS.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/chunk-DC5AMYBS.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/chunk-HBJ3AJOL.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/chunk-HBJ3AJOL.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/chunk-HDWYUXML.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/chunk-HDWYUXML.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/html2canvas.esm-7YJP37YQ.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/html2canvas.esm-7YJP37YQ.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/index.es-NOFTWCI3.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/index.es-NOFTWCI3.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/jspdf.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/jspdf.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/lucide-react.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/lucide-react.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/purify.es-FTDMSLK5.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/purify.es-FTDMSLK5.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react-dom.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react-dom.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react-dom_client.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react-dom_client.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react_jsx-dev-runtime.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react_jsx-dev-runtime.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react_jsx-runtime.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/react_jsx-runtime.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/recharts.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_5120ef18/recharts.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/cjs/components/useEmblaCarousel.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/cjs/embla-carousel-react.cjs.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/cjs/embla-carousel-react.cjs.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/cjs/index.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/cjs/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/components/useEmblaCarousel.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/esm/components/useEmblaCarousel.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/esm/embla-carousel-react.esm.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/esm/embla-carousel-react.esm.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/esm/index.d.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/node_modules/embla-carousel-react/esm/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/App.tsx" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_D:/CliniSign Consentimiento INF" value="3HbHW0aUYTTM7uWglNUUcZ76p9n" />
+    </persistenceIdMap>
+  </component>
+  <component name="CopilotUserSelectedChatMode">
+    <option name="chatModeId" value="Edit" />
+  </component>
+  <component name="DBNavigator.Project.Workspace.Settings">
+    <assistant-settings>
+      <credential-settings>
+        <credentials />
+      </credential-settings>
+      <profile-settings>
+        <profiles />
+      </profile-settings>
+      <mcp-server-settings>
+        <workspace-integration value="false" />
+        <mcp-servers />
+        <mcp-tool-approvals />
+      </mcp-server-settings>
+    </assistant-settings>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Interface" />
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;vemaurijames-design&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://vemaurijames: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@github.com/vemaurijames-design/ConsentimientosappSI.git&quot;,
+    &quot;accountId&quot;: &quot;220388e7-5b37-4224-8713-e8c10fb7efeb&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="3HbHW0aUYTTM7uWglNUUcZ76p9n" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "Application.MedfisApplication.executor": "Run",
+    "Maven.medfis-backend [clean].executor": "Run",
+    "Maven.medfis-backend [install].executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "ignore.virus.scanning.warn.message": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/CliniSign Consentimiento INF",
+    "settings.editor.selected.configurable": "vcs.Git"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\CliniSign Consentimiento INF\src\app\components" />
+      <recent name="D:\CliniSign Consentimiento INF\src\app\components\ui" />
+    </key>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="97180d7b-10dc-4eee-aa47-08f518bdad1f" name="Changes" comment="" />
+      <created>1786129875868</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1786129875868</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="OPEN_GENERIC_TABS">
+      <map>
+        <entry key="965a8cb4-135a-456b-84f9-3e47c9c2178f" value="TOOL_WINDOW" />
+      </map>
+    </option>
+    <option name="TAB_STATES">
+      <map>
+        <entry key="965a8cb4-135a-456b-84f9-3e47c9c2178f">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="range">
+                    <value>
+                      <list>
+                        <option value="origin/main..origin/fix/admin-smtp-persistencia" />
+                      </list>
+                    </value>
+                  </entry>
+                  <entry key="roots">
+                    <value>
+                      <list>
+                        <option value="$PROJECT_DIR$" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="fix/admin-smtp-persistencia" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="MARK_IGNORED_AS_EXCLUDED" value="true" />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
+  </component>
+</project>
